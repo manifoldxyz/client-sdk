@@ -4,7 +4,7 @@ import {
   validateInstanceId,
   parseManifoldUrl,
   formatMoney,
-} from '../utils/validation';
+} from '../src/utils/validation';
 
 describe('Validation Utils', () => {
   describe('validateAddress', () => {

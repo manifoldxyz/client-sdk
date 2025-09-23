@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { createMockProduct } from '../products/mock';
-import { AppType } from '../types/common';
-import type { EditionProduct, BurnRedeemProduct, BlindMintProduct } from '../types/product';
+import { createMockProduct } from '../src/products/mock';
+import { AppType } from '../src/types/common';
+import type { EditionProduct, BurnRedeemProduct, BlindMintProduct } from '../src/types/product';
 
 describe('Mock Products', () => {
   describe('Edition Product', () => {

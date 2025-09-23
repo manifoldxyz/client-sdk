@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { createClient } from '../client';
-import { AppType } from '../types/common';
-import { ClientSDKError, ErrorCode } from '../types/errors';
+import { createClient } from '../src/client';
+import { AppType } from '../src/types/common';
+import { ClientSDKError, ErrorCode } from '../src/types/errors';
 
 describe('createClient', () => {
   it('should create a client with default config', () => {
