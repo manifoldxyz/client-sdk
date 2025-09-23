@@ -1,0 +1,13 @@
+{
+  "name": "@manifoldxyz/client-sdk-playground",
+  "version": "1.0.0",
+  "description": "Playground for testing the Manifold Client SDK",
+  "main": "index.ts",
+  "scripts": {
+    "dev": "tsx index.ts",
+    "start": "tsx index.ts"
+  },
+  "dependencies": {
+    "tsx": "^4.7.1"
+  }
+}

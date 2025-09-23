@@ -1,0 +1,71 @@
+{
+  "name": "@manifoldxyz/client-sdk",
+  "version": "0.1.0",
+  "description": "Manifold Client SDK for headless purchasing and display of Manifold products",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w",
+    "test": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "playground": "cd playground && npm install && npm run dev"
+  },
+  "keywords": [
+    "manifold",
+    "web3",
+    "nft",
+    "ethereum",
+    "sdk",
+    "typescript"
+  ],
+  "author": "Manifold",
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-typescript": "^11.1.6",
+    "@types/node": "^20.11.30",
+    "@typescript-eslint/eslint-plugin": "^7.3.1",
+    "@typescript-eslint/parser": "^7.3.1",
+    "@vitest/coverage-v8": "^1.4.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "prettier": "^3.2.5",
+    "rimraf": "^5.0.5",
+    "rollup": "^4.13.2",
+    "rollup-plugin-dts": "^6.1.0",
+    "tslib": "^2.6.2",
+    "typescript": "^5.4.3",
+    "vite": "^5.2.6",
+    "vitest": "^1.4.0"
+  },
+  "dependencies": {},
+  "peerDependencies": {},
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  }
+}
