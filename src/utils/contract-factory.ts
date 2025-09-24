@@ -1,4 +1,4 @@
-import { ethers } from 'ethers';
+import * as ethers from 'ethers';
 import type { DualProvider } from './provider-factory';
 import type { NetworkId, Address } from '../types/common';
 import { getNetworkConfig } from '../config/networks';

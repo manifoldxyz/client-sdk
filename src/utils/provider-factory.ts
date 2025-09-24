@@ -1,4 +1,4 @@
-import { ethers } from 'ethers';
+import * as ethers from 'ethers';
 import type { ProviderConfig, BridgeProviderConfig, PrimaryProviderConfig } from '../types/config';
 import type { NetworkId } from '../types/common';
 import { getNetworkConfig } from '../config/networks';

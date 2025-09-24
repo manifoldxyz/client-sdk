@@ -3,6 +3,17 @@
  * Centralized configuration management for the Manifold Client SDK
  */
 
+// Import required types
+import type { NetworkId } from '../types/common';
+import type { ProviderConfig } from '../types/contracts';
+import type { CacheConfig } from '../types/config';
+import type { APIConfig as ApiConfig } from '../types/config';
+
+// Import factory functions
+import { createProviderConfig } from './providers';
+import { createCacheConfig } from './cache';
+import { createApiConfig } from './api';
+
 // Network configurations
 export {
   NETWORK_CONFIGS,

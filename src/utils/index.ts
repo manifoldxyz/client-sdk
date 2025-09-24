@@ -60,7 +60,7 @@ export type {
 /**
  * Format BigNumber to human-readable string
  */
-import { ethers } from 'ethers';
+import * as ethers from 'ethers';
 
 export function formatBigNumber(
   value: ethers.BigNumber,

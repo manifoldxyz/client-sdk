@@ -223,54 +223,79 @@ export const NETWORK_CACHE_CONFIG: Record<NetworkId, Partial<CacheConfig>> = {
   // Ethereum - slower blocks, can cache longer
   1: {
     memory: {
+      maxSizeMB: 50,
+      defaultTTL: 300,
       ttlByType: {
         'onchain-data': 90,   // Longer for Ethereum due to slower blocks
+        'metadata': 600,
         'pricing': 45,        // More stable pricing
+        'allocation': 300,
         'gas-estimates': 90
-      }
-    } as Partial<MemoryCacheConfig>
+      },
+      useLRU: true
+    }
   },
 
   // Polygon - faster blocks, shorter cache
   137: {
     memory: {
+      maxSizeMB: 50,
+      defaultTTL: 180,
       ttlByType: {
         'onchain-data': 30,   // Shorter due to faster blocks
+        'metadata': 600,
         'pricing': 15,        // More volatile pricing
+        'allocation': 180,
         'gas-estimates': 30
-      }
-    } as Partial<MemoryCacheConfig>
+      },
+      useLRU: true
+    }
   },
 
   // L2s - very fast, shortest cache
   8453: { // Base
     memory: {
+      maxSizeMB: 50,
+      defaultTTL: 120,
       ttlByType: {
         'onchain-data': 15,
+        'metadata': 600,
         'pricing': 10,
+        'allocation': 120,
         'gas-estimates': 15
-      }
-    } as Partial<MemoryCacheConfig>
+      },
+      useLRU: true
+    }
   },
 
   42161: { // Arbitrum
     memory: {
+      maxSizeMB: 50,
+      defaultTTL: 120,
       ttlByType: {
         'onchain-data': 15,
+        'metadata': 600,
         'pricing': 10,
+        'allocation': 120,
         'gas-estimates': 15
-      }
-    } as Partial<MemoryCacheConfig>
+      },
+      useLRU: true
+    }
   },
 
   10: { // Optimism
     memory: {
+      maxSizeMB: 50,
+      defaultTTL: 120,
       ttlByType: {
         'onchain-data': 15,
+        'metadata': 600,
         'pricing': 10,
+        'allocation': 120,
         'gas-estimates': 15
-      }
-    } as Partial<MemoryCacheConfig>
+      },
+      useLRU: true
+    }
   }
 };
 

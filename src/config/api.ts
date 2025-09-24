@@ -386,32 +386,42 @@ export const NETWORK_API_CONFIG: Record<NetworkId, Partial<ApiConfig>> = {
   1: { // Ethereum
     requests: {
       timeout: 15000, // Longer timeout for mainnet
-      maxRetries: 5
-    } as Partial<ApiRequestConfig>
+      maxRetries: 5,
+      retryDelay: { type: 'exponential', baseDelay: 1000, maxDelay: 8000 },
+      interceptors: []
+    }
   },
   137: { // Polygon
     requests: {
       timeout: 8000,
-      maxRetries: 3
-    } as Partial<ApiRequestConfig>
+      maxRetries: 3,
+      retryDelay: { type: 'exponential', baseDelay: 500, maxDelay: 4000 },
+      interceptors: []
+    }
   },
   8453: { // Base
     requests: {
       timeout: 5000,
-      maxRetries: 2
-    } as Partial<ApiRequestConfig>
+      maxRetries: 2,
+      retryDelay: { type: 'exponential', baseDelay: 500, maxDelay: 2000 },
+      interceptors: []
+    }
   },
   42161: { // Arbitrum
     requests: {
       timeout: 5000,
-      maxRetries: 2
-    } as Partial<ApiRequestConfig>
+      maxRetries: 2,
+      retryDelay: { type: 'exponential', baseDelay: 500, maxDelay: 2000 },
+      interceptors: []
+    }
   },
   10: { // Optimism
     requests: {
       timeout: 5000,
-      maxRetries: 2
-    } as Partial<ApiRequestConfig>
+      maxRetries: 2,
+      retryDelay: { type: 'exponential', baseDelay: 500, maxDelay: 2000 },
+      interceptors: []
+    }
   }
 };
 
