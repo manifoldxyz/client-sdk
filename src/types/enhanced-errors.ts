@@ -1,4 +1,4 @@
-import type { ErrorCode, ClientSDKError } from './errors';
+import { ErrorCode, ClientSDKError } from './errors';
 
 // =============================================================================
 // BLINDMINT-SPECIFIC ERROR TYPES
@@ -16,6 +16,9 @@ export enum BlindMintErrorCode {
   EXCEEDS_WALLET_LIMIT = 'EXCEEDS_WALLET_LIMIT',
   EXCEEDS_TOTAL_SUPPLY = 'EXCEEDS_TOTAL_SUPPLY',
   INVALID_QUANTITY = 'INVALID_QUANTITY',
+  NOT_ELIGIBLE = 'NOT_ELIGIBLE',
+  INVALID_WALLET_ADDRESS = 'INVALID_WALLET_ADDRESS',
+  TRANSACTION_FAILED = 'TRANSACTION_FAILED',
   
   // Allowlist errors
   INVALID_MERKLE_PROOF = 'INVALID_MERKLE_PROOF',
@@ -307,6 +310,27 @@ export const BLINDMINT_ERROR_CLASSIFICATIONS: Record<BlindMintErrorCode, ErrorMe
     recoverable: true,
     userActions: ['Enter valid quantity (positive number)'],
     reportable: false,
+  },
+  [BlindMintErrorCode.NOT_ELIGIBLE]: {
+    severity: ErrorSeverity.MEDIUM,
+    category: ErrorCategory.USER_ERROR,
+    recoverable: false,
+    userActions: ['Check eligibility requirements'],
+    reportable: false,
+  },
+  [BlindMintErrorCode.INVALID_WALLET_ADDRESS]: {
+    severity: ErrorSeverity.LOW,
+    category: ErrorCategory.VALIDATION_ERROR,
+    recoverable: true,
+    userActions: ['Enter valid wallet address'],
+    reportable: false,
+  },
+  [BlindMintErrorCode.TRANSACTION_FAILED]: {
+    severity: ErrorSeverity.HIGH,
+    category: ErrorCategory.CONTRACT_ERROR,
+    recoverable: true,
+    userActions: ['Try again', 'Check wallet connection'],
+    reportable: true,
   },
   
   // Allowlist errors
