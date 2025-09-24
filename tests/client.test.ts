@@ -29,8 +29,10 @@ describe('createClient', () => {
       expect(product).toBeDefined();
       expect(product.id).toBe('4150231280');
       expect(Object.values(AppType)).toContain(product.type);
-      expect(typeof product.name).toBe('string');
-      expect(typeof product.contractAddress).toBe('string');
+      expect(product.data).toBeDefined();
+      expect(product.data.id).toBe('4150231280');
+      expect(product.data.creator).toBeDefined();
+      expect(product.data.publicData).toBeDefined();
     });
 
     it('should parse Manifold URL and return product', async () => {

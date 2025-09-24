@@ -14,15 +14,14 @@ export enum AppType {
 
 export type ProductStatus = 'active' | 'paused' | 'completed' | 'upcoming';
 
-export interface Money {
-  value: bigint;
-  formatted: string;
-  currency: string;
-}
+import type { Money } from './product';
 
+// Cost type as per documentation (lines 1409-1416)
 export interface Cost {
   total: Money;
-  fee: Money;
-  price: Money;
-  gas: Money;
+  subtotal: Money;
+  fees: Money;
 }
+
+// Note: Money is now defined in product.ts with full specification
+export type { Money } from './product';

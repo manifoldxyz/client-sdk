@@ -10,10 +10,11 @@ describe('Mock Products', () => {
 
       expect(product.type).toBe(AppType.Edition);
       expect(product.id).toBe('1000');
-      expect(product.name).toContain('Mock Edition');
-      expect(typeof product.price).toBe('bigint');
-      expect(product.totalSupply).toBeDefined();
-      expect(product.maxPerWallet).toBeDefined();
+      expect(product.data).toBeDefined();
+      expect(product.data.id).toBe('1000');
+      expect(product.data.publicData.title).toContain('Mock Edition');
+      expect(product.data.creator).toBeDefined();
+      expect(product.data.appName).toBe('Edition');
     });
 
     it('should check allocation correctly', async () => {
@@ -66,9 +67,11 @@ describe('Mock Products', () => {
 
       expect(product.type).toBe(AppType.BurnRedeem);
       expect(product.id).toBe('1001');
-      expect(product.name).toContain('Mock Burn/Redeem');
-      expect(product.burnTokens).toBeDefined();
-      expect(product.redeemTokens).toBeDefined();
+      expect(product.data).toBeDefined();
+      expect(product.data.id).toBe('1001');
+      expect(product.data.publicData.redeemAsset).toBeDefined();
+      expect(product.data.creator).toBeDefined();
+      expect(product.data.appName).toBe('Burn-Redeem');
     });
 
     it('should have multiple transaction steps for burn/redeem', async () => {
@@ -89,9 +92,12 @@ describe('Mock Products', () => {
 
       expect(product.type).toBe(AppType.BlindMint);
       expect(product.id).toBe('1002');
-      expect(product.name).toContain('Mock Blind Mint');
-      expect(product.revealTime).toBeDefined();
-      expect(product.maxSupply).toBeDefined();
+      expect(product.data).toBeDefined();
+      expect(product.data.id).toBe('1002');
+      expect(product.data.publicData.title).toContain('Mock Blind Mint');
+      expect(product.data.publicData.tierProbabilities).toBeDefined();
+      expect(product.data.creator).toBeDefined();
+      expect(product.data.appName).toBe('Blind-Mint');
     });
 
     it('should return active status', async () => {
