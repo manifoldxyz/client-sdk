@@ -40,7 +40,7 @@
   "type": "module",
   "dependencies": {
     "@manifoldxyz/manifold-provider-client": "^0.2.0",
-    "@manifoldxyz/studio-app-sdk": "^10.2.4",
+    "@manifoldxyz/studio-apps-client": "^3.4.1",
     "ethers": "5.7.0"
   },
   "devDependencies": {

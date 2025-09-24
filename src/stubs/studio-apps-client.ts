@@ -1,9 +1,9 @@
 /**
- * Studio Apps Client integration for @manifoldxyz/studio-app-sdk
+ * Studio Apps Client integration for @manifoldxyz/studio-apps-client
  * Provides access to preview data and other studio functionality
  */
 
-import { getAllPreviews } from '@manifoldxyz/studio-app-sdk';
+import { getAllPreviews } from '@manifoldxyz/studio-apps-client';
 import type { PreviewData } from '../types/product';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import { logger } from '../utils/logger';
@@ -18,7 +18,7 @@ export interface StudioAppsConfig {
 
 /**
  * Studio Apps Client for fetching preview data and other studio functionality
- * Following patterns from gachapon-widgets and @manifoldxyz/studio-app-sdk
+ * Following patterns from gachapon-widgets and @manifoldxyz/studio-apps-client
  */
 export class StudioAppsClient {
   private config: StudioAppsConfig;
@@ -37,7 +37,7 @@ export class StudioAppsClient {
 
   /**
    * Get all preview data and filter by instanceId
-   * Based on CON-2729 spec: "To get the previewData, we will use @manifoldxyz/studio-app-sdk 
+   * Based on CON-2729 spec: "To get the previewData, we will use @manifoldxyz/studio-apps-client 
    * package with method getAllPreviews, filter for the specific instanceId"
    */
   async getPreviewData(instanceId: string): Promise<PreviewData | null> {
