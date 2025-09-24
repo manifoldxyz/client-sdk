@@ -41,6 +41,8 @@ import { getCacheConfig } from '../config/cache';
 import { validateAddress } from '../utils/validation';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import { BlindMintError, BlindMintErrorCode } from '../types/enhanced-errors';
+import { StudioAppsClient } from '../stubs/studio-apps-client';
+import { logger } from '../utils/logger';
 import * as ethers from 'ethers';
 
 // =============================================================================
@@ -69,9 +71,23 @@ export class BlindMintProductImpl implements BlindMintProduct {
   private _contractFactory?: ContractFactory;
   private _claimContract?: BlindMintClaimContract;
   private _cacheConfig = getCacheConfig();
+  private _studioAppsClient?: StudioAppsClient;
+  private _log: ReturnType<typeof logger>;
 
-  constructor(instanceData: InstanceData, includeOnchainData = false) {
+  constructor(
+    instanceData: InstanceData, 
+    includeOnchainData = false, 
+    options: { debug?: boolean; fetchPreviewData?: boolean } = {}
+  ) {
+    const { debug = false, fetchPreviewData = false } = options;
+    this._log = logger(debug);
     this.id = instanceData.id;
+    
+    this._log('Initializing BlindMintProduct:', { 
+      instanceId: this.id, 
+      includeOnchainData, 
+      fetchPreviewData 
+    });
     
     // Validate and transform instance data
     if (!instanceData.publicData || typeof instanceData.publicData !== 'object') {
@@ -91,21 +107,82 @@ export class BlindMintProductImpl implements BlindMintProduct {
       appName: instanceData.appName || 'BlindMint',
     };
 
-    // Initialize preview data with safe defaults
+    // Initialize preview data with safe defaults from publicData
     this.previewData = {
-      title: this.data.publicData.title,
-      description: this.data.publicData.description,
-      contract: this.data.publicData.contract,
-      thumbnail: this.data.publicData.thumbnail,
-      network: this.data.publicData.network,
+      title: this.data.publicData.title || '',
+      description: this.data.publicData.description || '',
+      contract: this.data.publicData.contract || '',
+      thumbnail: this.data.publicData.thumbnail || '',
+      network: this.data.publicData.network || 1,
       startDate: undefined, // Will be populated from onchain data
       endDate: undefined,
       price: undefined,
     };
 
+    // Initialize Studio Apps client if we need to fetch preview data
+    if (fetchPreviewData) {
+      this._studioAppsClient = new StudioAppsClient({
+        debug,
+        timeout: 10000,
+      });
+      
+      // Fetch preview data asynchronously and enhance the preview data
+      this._fetchAndEnhancePreviewData().catch((error) => {
+        this._log('Warning: Failed to fetch preview data:', error.message);
+      });
+    }
+
     // Initialize blockchain infrastructure if needed
     if (includeOnchainData) {
       this._initializeProviderAndContracts();
+    }
+  }
+
+  // =============================================================================
+  // PREVIEW DATA INTEGRATION
+  // =============================================================================
+
+  /**
+   * Fetch preview data from Studio Apps SDK and enhance the preview data
+   * Based on CON-2729 spec: use @manifoldxyz/studio-app-sdk with getAllPreviews
+   */
+  private async _fetchAndEnhancePreviewData(): Promise<void> {
+    if (!this._studioAppsClient) {
+      this._log('Studio Apps client not initialized, skipping preview data fetch');
+      return;
+    }
+
+    try {
+      this._log('Fetching preview data from Studio Apps SDK');
+      const studioPreviewData = await this._studioAppsClient.getPreviewData(this.id);
+      
+      if (studioPreviewData) {
+        this._log('Successfully fetched preview data, enhancing preview:', {
+          title: studioPreviewData.title,
+          hasImages: studioPreviewData.images?.length > 0,
+          hasAnimations: studioPreviewData.animations?.length > 0,
+        });
+
+        // Enhance preview data with Studio Apps data (mutating the object)
+        // This is safe because the constructor has already initialized previewData
+        Object.assign(this.previewData, {
+          title: studioPreviewData.title || this.previewData.title,
+          description: studioPreviewData.description || this.previewData.description,
+          thumbnail: studioPreviewData.thumbnail || this.previewData.thumbnail,
+          // Add additional fields from Studio Apps
+          images: studioPreviewData.images || [],
+          animations: studioPreviewData.animations || [],
+          metadata: {
+            ...this.previewData.metadata,
+            ...studioPreviewData.metadata,
+          },
+        });
+      } else {
+        this._log('No preview data found in Studio Apps SDK for instanceId:', this.id);
+      }
+    } catch (error) {
+      this._log('Error fetching preview data from Studio Apps SDK:', error);
+      // Don't throw - preview data is optional enhancement
     }
   }
 

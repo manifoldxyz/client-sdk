@@ -1,16 +1,29 @@
 import type { ClientConfig, ManifoldClient, WorkspaceProductsOptions } from '../types/client';
 import type { Product } from '../types/product';
 import { ClientSDKError, ErrorCode } from '../types/errors';
+import { BlindMintProductImpl } from '../products/blindmint';
 import { createMockProduct } from '../products/mock';
 import { validateInstanceId, parseManifoldUrl } from '../utils/validation';
 import { logger } from '../utils/logger';
+import { getManifoldApiClient } from '../api/manifold-api';
+import { createApiConfig } from '../config/api';
 
 export function createClient(config?: ClientConfig): ManifoldClient {
   const debug = config?.debug ?? false;
-  // TODO: Use httpRPCs for actual network calls
-  // const httpRPCs = config?.httpRPCs ?? {};
+  const httpRPCs = config?.httpRPCs ?? {};
 
   const log = logger(debug);
+
+  // Initialize API configuration
+  const apiConfig = createApiConfig({
+    environment: config?.environment || 'production',
+    apiKey: config?.apiKey,
+    enableAuth: !!config?.apiKey,
+    strictValidation: debug,
+  });
+
+  // Initialize Manifold API client
+  const manifoldApi = getManifoldApiClient(apiConfig, debug);
 
   return {
     async getProduct(instanceIdOrUrl: string): Promise<Product> {
@@ -34,10 +47,53 @@ export function createClient(config?: ClientConfig): ManifoldClient {
         throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Invalid instance ID format');
       }
 
-      // TODO: Replace with actual API call
-      // For now, return mock product
-      log('Returning mock product for:', instanceId);
-      return createMockProduct(instanceId);
+      try {
+        // Fetch instance data from Manifold API
+        log('Fetching instance data from API:', instanceId);
+        const instanceData = await manifoldApi.getInstanceData(instanceId);
+        
+        // Determine product type from instance data
+        const appId = instanceData.appId || 3; // Default to BlindMint app ID
+        
+        log('Creating product based on instance data:', { 
+          instanceId, 
+          appId, 
+          appName: instanceData.appName 
+        });
+
+        // Create BlindMint product with real instance data
+        // Following CON-2729 spec pattern
+        if (appId === 3 || instanceData.appName === 'BlindMint') {
+          const includeOnchainData = config?.includeOnchainData ?? false;
+          return new BlindMintProductImpl(instanceData, includeOnchainData, {
+            debug,
+            fetchPreviewData: true, // Enable preview data fetching from Studio Apps SDK
+          });
+        }
+
+        // For now, fallback to mock for other product types
+        log('Unknown product type, falling back to mock:', { appId, appName: instanceData.appName });
+        return createMockProduct(instanceId);
+
+      } catch (error) {
+        if (error instanceof ClientSDKError) {
+          throw error;
+        }
+
+        log('Error fetching product, falling back to mock:', error);
+        
+        // Fallback to mock product if API fails (for development/testing)
+        if (debug) {
+          log('Debug mode: returning mock product after API failure');
+          return createMockProduct(instanceId);
+        }
+
+        throw new ClientSDKError(
+          ErrorCode.API_ERROR,
+          `Failed to fetch product data for ${instanceId}: ${error.message}`,
+          { instanceId, originalError: error.message }
+        );
+      }
     },
 
     async getProductsByWorkspace(
