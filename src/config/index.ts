@@ -40,6 +40,7 @@ export {
 // Cache configurations
 export {
   createCacheConfig,
+  getCacheConfig,
   generateCacheKey,
   getNetworkCacheConfig,
   shouldCacheData,

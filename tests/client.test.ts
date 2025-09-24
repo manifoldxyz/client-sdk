@@ -1,9 +1,53 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createClient } from '../src/client';
 import { AppType } from '../src/types/common';
 import { ClientSDKError, ErrorCode } from '../src/types/errors';
+import { resetManifoldApiClient } from '../src/api/manifold-api';
+import type { InstanceData } from '../src/types/product';
+
+// Mock fetch globally
+global.fetch = vi.fn();
 
 describe('createClient', () => {
+  const mockInstanceData: InstanceData = {
+    id: '4150231280',
+    appId: 3,
+    appName: 'BlindMint',
+    creator: {
+      name: 'Test Creator',
+      address: '0x1234567890123456789012345678901234567890'
+    },
+    publicData: {
+      title: 'Test BlindMint',
+      description: 'A test blind mint collection',
+      contract: '0x1234567890123456789012345678901234567890',
+      network: 1,
+      thumbnail: 'https://example.com/thumbnail.jpg',
+      mintPrice: {
+        currency: 'ETH',
+        value: BigInt('100000000000000000'), // 0.1 ETH in wei
+        erc20: '0x0000000000000000000000000000000000000000'
+      },
+      pool: []
+    }
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetManifoldApiClient();
+    
+    // Set up default successful API mock
+    const mockFetch = vi.mocked(fetch);
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(mockInstanceData),
+    } as Response);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
   it('should create a client with default config', () => {
     const client = createClient();
     expect(client).toBeDefined();

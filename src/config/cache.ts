@@ -484,3 +484,39 @@ export const TEST_CACHE_CONFIG: CacheConfig = {
     customComponents: ['test-run']
   }
 };
+
+// =============================================================================
+// DEFAULT CACHE CONFIGURATION GETTER
+// =============================================================================
+
+/**
+ * Get default cache configuration based on current environment
+ * This function auto-detects the environment and returns appropriate config
+ */
+export function getCacheConfig(): CacheConfig {
+  // Environment detection
+  const isTest = 
+    (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') ||
+    (typeof global !== 'undefined' && (global as any).jest) ||
+    (typeof window !== 'undefined' && (window as any).jest);
+  
+  const isDevelopment = 
+    (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') ||
+    (typeof window !== 'undefined' && window.location?.hostname === 'localhost');
+
+  // Return appropriate configuration
+  if (isTest) {
+    return TEST_CACHE_CONFIG;
+  } else if (isDevelopment) {
+    return DEVELOPMENT_CACHE_CONFIG;
+  } else {
+    // Production configuration
+    return createCacheConfig({
+      environment: 'production',
+      maxMemoryMB: 50,
+      maxPersistentMB: 100,
+      enablePersistent: true,
+      aggressiveCaching: true
+    });
+  }
+}

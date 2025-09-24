@@ -76,8 +76,13 @@ export function createClient(config?: ClientConfig): ManifoldClient {
         return createMockProduct(instanceId);
 
       } catch (error) {
+        // Re-throw non-recoverable client errors immediately
         if (error instanceof ClientSDKError) {
-          throw error;
+          const sdkError = error as ClientSDKError;
+          // Allow network errors and API errors to be handled by fallback logic
+          if (sdkError.code !== ErrorCode.NETWORK_ERROR && sdkError.code !== ErrorCode.API_ERROR) {
+            throw error;
+          }
         }
 
         log('Error fetching product, falling back to mock:', error);
