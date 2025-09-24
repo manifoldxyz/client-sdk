@@ -38,6 +38,9 @@
   "author": "Manifold",
   "license": "MIT",
   "type": "module",
+  "dependencies": {
+    "ethers": "5.7.0"
+  },
   "devDependencies": {
     "@types/node": "^20.11.30",
     "@typescript-eslint/eslint-plugin": "^7.3.1",
