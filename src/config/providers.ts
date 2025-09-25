@@ -257,14 +257,8 @@ export function getNetworkProviderConfig(
       timeout,
       retries
     },
-    networks: {
-      ...baseConfig.networks,
-      [networkId]: {
-        timeout,
-        retries,
-        preferBridge: networkId === 1 // Prefer bridge for Ethereum due to higher load
-      }
-    }
+    // TODO: Network-specific provider configs need proper NetworkConfig structure
+    networks: baseConfig.networks
   };
 }
 
@@ -276,8 +270,6 @@ export function selectProvider(
   networkId: NetworkId,
   primaryProviderAvailable: boolean
 ): 'primary' | 'bridge' {
-  const strategy = PROVIDER_FALLBACK_STRATEGIES[operationType];
-  
   // Always prefer primary for write operations if available
   if (operationType === 'write' && primaryProviderAvailable) {
     return 'primary';

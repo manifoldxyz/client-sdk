@@ -5,14 +5,15 @@
 
 // Import required types
 import type { NetworkId } from '../types/common';
-import type { ProviderConfig } from '../types/contracts';
+import type { ProviderConfig } from '../types/config';
 import type { CacheConfig } from '../types/config';
-import type { APIConfig as ApiConfig } from '../types/config';
+import type { ApiConfig } from '../types/config';
 
 // Import factory functions
 import { createProviderConfig } from './providers';
 import { createCacheConfig } from './cache';
 import { createApiConfig } from './api';
+import { isNetworkSupported } from './networks';
 
 // Network configurations
 export {
@@ -252,9 +253,9 @@ export function mergeConfigs<T extends Record<string, any>>(
   for (const [key, value] of Object.entries(override)) {
     if (value !== undefined) {
       if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        result[key] = mergeConfigs(result[key] || {}, value);
+        (result as any)[key] = mergeConfigs((result as any)[key] || {}, value);
       } else {
-        result[key] = value;
+        (result as any)[key] = value;
       }
     }
   }

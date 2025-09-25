@@ -12,7 +12,7 @@ export enum AppType {
   BlindMint = 'blind-mint',
 }
 
-export type ProductStatus = 'active' | 'paused' | 'completed' | 'upcoming';
+export type ProductStatus = 'active' | 'paused' | 'completed' | 'upcoming' | 'sold-out' | 'ended';
 
 import type { Money } from './product';
 

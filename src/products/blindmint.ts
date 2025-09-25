@@ -23,7 +23,6 @@ import type {
   ProductMetadata,
   ProductRule,
   ProductProvenance,
-  ProductInventory,
   Media,
   InstanceData,
   PreviewData,
@@ -31,19 +30,18 @@ import type {
   TransactionReceipt,
 } from '../types/product';
 import type { Address, NetworkId, Cost, Money } from '../types/common';
+import { AppType } from '../types/common';
 import type { DualProvider } from '../utils/provider-factory';
 import type { ContractFactory, BlindMintClaimContract } from '../utils/contract-factory';
 
 import { createDualProvider } from '../utils/provider-factory';
 import { ContractFactory as ContractFactoryClass } from '../utils/contract-factory';
-import { getNetworkConfig } from '../config/networks';
-import { getCacheConfig } from '../config/cache';
+// import { getCacheConfig } from '../config/cache'; // TODO: Implement caching
 import { validateAddress } from '../utils/validation';
-import { ClientSDKError, ErrorCode } from '../types/errors';
+// import { ClientSDKError, ErrorCode } from '../types/errors'; // TODO: Fix error handling
 import { BlindMintError, BlindMintErrorCode } from '../types/enhanced-errors';
 import { StudioAppsClient } from '../stubs/studio-apps-client';
 import { logger } from '../utils/logger';
-import * as ethers from 'ethers';
 
 // =============================================================================
 // BLINDMINT PRODUCT IMPLEMENTATION
@@ -54,7 +52,7 @@ import * as ethers from 'ethers';
  * and dual-provider architecture from CONTRACT_PATTERNS.md
  */
 export class BlindMintProductImpl implements BlindMintProduct {
-  readonly type = 'blind-mint' as const;
+  readonly type = AppType.BlindMint;
   readonly id: string;
   readonly data: {
     id: string;
@@ -70,7 +68,7 @@ export class BlindMintProductImpl implements BlindMintProduct {
   private _provider?: DualProvider;
   private _contractFactory?: ContractFactory;
   private _claimContract?: BlindMintClaimContract;
-  private _cacheConfig = getCacheConfig();
+  // private _cacheConfig = getCacheConfig(); // TODO: Implement caching
   private _studioAppsClient?: StudioAppsClient;
   private _log: ReturnType<typeof logger>;
 

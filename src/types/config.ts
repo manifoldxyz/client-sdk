@@ -234,6 +234,10 @@ export interface CacheConfig {
   invalidation: CacheInvalidationConfig;
   /** Cache key generation */
   keyGeneration: CacheKeyConfig;
+  /** Instance data specific cache settings */
+  instanceData?: {
+    ttl: number;
+  };
 }
 
 export interface MemoryCacheConfig {

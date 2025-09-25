@@ -10,7 +10,8 @@ import { createApiConfig } from '../config/api';
 
 export function createClient(config?: ClientConfig): ManifoldClient {
   const debug = config?.debug ?? false;
-  const httpRPCs = config?.httpRPCs ?? {};
+  // Note: httpRPCs configuration is reserved for future network provider configuration
+  // const httpRPCs = config?.httpRPCs ?? {};
 
   const log = logger(debug);
 
@@ -95,8 +96,8 @@ export function createClient(config?: ClientConfig): ManifoldClient {
 
         throw new ClientSDKError(
           ErrorCode.API_ERROR,
-          `Failed to fetch product data for ${instanceId}: ${error.message}`,
-          { instanceId, originalError: error.message }
+          `Failed to fetch product data for ${instanceId}: ${(error as Error).message}`,
+          { instanceId, originalError: (error as Error).message }
         );
       }
     },

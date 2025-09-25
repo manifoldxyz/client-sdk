@@ -5,11 +5,10 @@ import type {
   CacheInvalidationConfig,
   CacheKeyConfig,
   CacheDataType,
-  AutoInvalidationRule,
-  InvalidationTrigger
+  AutoInvalidationRule
 } from '../types/config';
 import type { NetworkId } from '../types/common';
-import { DEFAULT_CACHE_CONFIG } from '../types/config';
+// import { DEFAULT_CACHE_CONFIG } from '../types/config'; // TODO: Use if needed
 
 /**
  * Cache configuration for BlindMint on-chain data

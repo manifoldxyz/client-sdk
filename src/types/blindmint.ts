@@ -1,4 +1,4 @@
-import type { Address, NetworkId, Cost, Money } from './common';
+import type { Address, NetworkId, Cost, Money, ProductStatus } from './common';
 import type { Asset, Media, Contract, Workspace } from './product';
 
 // =============================================================================
@@ -177,7 +177,7 @@ export interface BlindMintProduct {
   getAllocations(params: AllocationParams): Promise<AllocationResponse>;
   preparePurchase(params: PreparePurchaseParams): Promise<PreparedPurchase>;
   purchase(params: PurchaseParams): Promise<Order>;
-  getStatus(): Promise<BlindMintStatus>;
+  getStatus(): Promise<ProductStatus>;
   getPreviewMedia(): Promise<Media | undefined>;
   getMetadata(): Promise<ProductMetadata>;
   getInventory(): Promise<BlindMintInventory>;
@@ -218,6 +218,7 @@ export interface ClaimableToken {
 
 export interface BlindMintInventory {
   totalSupply: number;
+  totalPurchased: number; // Required by ProductInventory
   totalMinted: number;
   remainingSupply: number;
   tierBreakdown: TierInventory[];
@@ -263,12 +264,7 @@ export type {
   ProductProvenance
 } from './product';
 
-export type BlindMintStatus = 
-  | 'upcoming'    // Before start date
-  | 'active'      // Currently mintable
-  | 'paused'      // Temporarily disabled
-  | 'sold-out'    // All tokens minted
-  | 'ended';      // Past end date
+export type BlindMintStatus = ProductStatus;
 
 // =============================================================================
 // VALIDATION TYPES
