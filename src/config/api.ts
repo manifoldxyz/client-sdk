@@ -387,7 +387,7 @@ export const NETWORK_API_CONFIG: Record<NetworkId, Partial<ApiConfig>> = {
     requests: {
       timeout: 15000, // Longer timeout for mainnet
       maxRetries: 5,
-      retryDelay: { type: 'exponential', baseDelay: 1000, maxDelay: 8000 },
+      retryDelay: { strategy: 'exponential', baseDelay: 1000, maxDelay: 8000, jitter: 0.1 },
       interceptors: []
     }
   },
@@ -395,7 +395,7 @@ export const NETWORK_API_CONFIG: Record<NetworkId, Partial<ApiConfig>> = {
     requests: {
       timeout: 8000,
       maxRetries: 3,
-      retryDelay: { type: 'exponential', baseDelay: 500, maxDelay: 4000 },
+      retryDelay: { strategy: 'exponential', baseDelay: 500, maxDelay: 4000, jitter: 0.1 },
       interceptors: []
     }
   },
@@ -403,7 +403,7 @@ export const NETWORK_API_CONFIG: Record<NetworkId, Partial<ApiConfig>> = {
     requests: {
       timeout: 5000,
       maxRetries: 2,
-      retryDelay: { type: 'exponential', baseDelay: 500, maxDelay: 2000 },
+      retryDelay: { strategy: 'exponential', baseDelay: 500, maxDelay: 2000, jitter: 0.1 },
       interceptors: []
     }
   },
@@ -411,7 +411,7 @@ export const NETWORK_API_CONFIG: Record<NetworkId, Partial<ApiConfig>> = {
     requests: {
       timeout: 5000,
       maxRetries: 2,
-      retryDelay: { type: 'exponential', baseDelay: 500, maxDelay: 2000 },
+      retryDelay: { strategy: 'exponential', baseDelay: 500, maxDelay: 2000, jitter: 0.1 },
       interceptors: []
     }
   },
@@ -419,7 +419,7 @@ export const NETWORK_API_CONFIG: Record<NetworkId, Partial<ApiConfig>> = {
     requests: {
       timeout: 5000,
       maxRetries: 2,
-      retryDelay: { type: 'exponential', baseDelay: 500, maxDelay: 2000 },
+      retryDelay: { strategy: 'exponential', baseDelay: 500, maxDelay: 2000, jitter: 0.1 },
       interceptors: []
     }
   }

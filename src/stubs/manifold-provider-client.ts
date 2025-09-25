@@ -41,9 +41,9 @@ export class ManifoldProvider {
     } catch (error) {
       this.log('Error initializing ManifoldBridgeProvider:', error);
       throw new ClientSDKError(
-        ErrorCode.CONFIGURATION_ERROR,
-        `Failed to initialize ManifoldBridgeProvider for network ${networkId}: ${error.message}`,
-        { networkId, originalError: error.message }
+        ErrorCode.NETWORK_ERROR,
+        `Failed to initialize ManifoldBridgeProvider for network ${networkId}: ${(error as Error).message}`,
+        { networkId, originalError: (error as Error).message }
       );
     }
   }

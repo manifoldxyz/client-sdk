@@ -1,5 +1,12 @@
 import type { Address, AppType, ProductStatus } from './common';
-import type { PreparedPurchase, PurchaseParams, PreparePurchaseParams, Order } from './purchase';
+import type { 
+  PreparedPurchase, 
+  PurchaseParams, 
+  PreparePurchaseParams, 
+  Order,
+  TransactionStep,
+  TransactionReceipt
+} from './purchase';
 
 // Base Product type as per documentation (lines 1231-1238)
 export interface BaseProduct {
@@ -283,3 +290,13 @@ export interface BlindMintPool {
 
 // Union type for Product
 export type Product = EditionProduct | BurnRedeemProduct | BlindMintProduct;
+
+// Re-export purchase-related types
+export type {
+  PreparePurchaseParams,
+  PreparedPurchase,
+  PurchaseParams,
+  Order,
+  TransactionStep,
+  TransactionReceipt
+} from './purchase';

@@ -130,7 +130,7 @@ export function createManifoldApiClient(config: ApiConfig, debug = false): Manif
 
         // Exponential backoff with jitter
         const delay = Math.min(1000 * Math.pow(2, attempt) + Math.random() * 1000, 10000);
-        log(`Request failed, retrying in ${delay}ms:`, error.message);
+        log(`Request failed, retrying in ${delay}ms:`, (error as Error).message);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -263,8 +263,8 @@ export function createManifoldApiClient(config: ApiConfig, debug = false): Manif
         log('Error fetching instance data:', error);
         throw new ClientSDKError(
           ErrorCode.API_ERROR,
-          `Failed to fetch instance data for ${instanceId}: ${error.message}`,
-          { instanceId, originalError: error.message }
+          `Failed to fetch instance data for ${instanceId}: ${(error as Error).message}`,
+          { instanceId, originalError: (error as Error).message }
         );
       }
     },
