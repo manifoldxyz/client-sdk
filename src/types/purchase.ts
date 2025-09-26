@@ -1,10 +1,10 @@
 import type { Address, Cost, NetworkId } from './common';
 
-export interface PreparePurchaseParams {
+export interface PreparePurchaseParams<T = any> {
   address: Address;
   recipientAddress?: Address;
   networkId?: NetworkId;
-  payload?: EditionPayload | BurnRedeemPayload | BlindMintPayload;
+  payload?: T;
   gasBuffer?: GasBuffer;
 }
 
@@ -34,10 +34,11 @@ export interface PreparedPurchase {
 }
 
 export interface TransactionStep {
-  type: 'approve' | 'mint' | 'burn' | 'bridge';
-  description: string;
-  estimatedGas: bigint;
-  execute(): Promise<TransactionReceipt>;
+  id: string;
+  name: string;
+  type: 'mint' | 'approve';
+  execute?: () => Promise<TransactionReceipt>;
+  description?: string;
 }
 
 export interface PurchaseParams {
@@ -51,14 +52,17 @@ export interface WalletAccount {
 }
 
 export interface Order {
-  id: string;
+  id?: string;
   status: OrderStatus;
   receipts: TransactionReceipt[];
-  createdAt: Date;
+  createdAt?: Date;
   completedAt?: Date;
+  buyer?: { walletAddress: string };
+  total?: any;
+  items?: any[];
 }
 
-export type OrderStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type OrderStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'confirmed';
 
 export interface TransactionReceipt {
   txHash: string;

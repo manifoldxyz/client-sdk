@@ -7,12 +7,19 @@ export interface HttpRPCs {
 }
 
 export enum AppType {
-  Edition = 'edition',
-  BurnRedeem = 'burn-redeem',
-  BlindMint = 'blind-mint',
+  EDITION = 'edition',
+  BURN_REDEEM = 'burn-redeem',
+  BLIND_MINT = 'blind-mint',
 }
 
-export type ProductStatus = 'active' | 'paused' | 'completed' | 'upcoming';
+// App IDs for different Manifold products
+export enum AppId {
+  BLIND_MINT_1155 = 2526777015,
+  EDITION = 2522713783,
+  BURN_REDEEM = 2520944311,
+}
+
+export type ProductStatus = 'active' | 'paused' | 'completed' | 'upcoming' | 'sold-out' | 'ended';
 
 import type { Money } from './product';
 

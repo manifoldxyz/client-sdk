@@ -1,7 +1,13 @@
-import type { Address } from '../types/common';
+import type { Address, NetworkId } from '../types/common';
 
 export function validateAddress(address: string): address is Address {
   return /^0x[a-fA-F0-9]{40}$/.test(address);
+}
+
+export function validateNetworkId(networkId: number): networkId is NetworkId {
+  // Validate common Ethereum network IDs
+  const validNetworks = [1, 5, 10, 56, 137, 8453, 42161, 11155111];
+  return validNetworks.includes(networkId);
 }
 
 export function validateInstanceId(instanceId: string): boolean {
