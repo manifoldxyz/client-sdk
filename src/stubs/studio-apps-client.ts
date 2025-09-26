@@ -3,17 +3,15 @@
  * Provides access to preview data and other studio functionality
  */
 
-import { getAllPreviews } from '@manifoldxyz/studio-apps-client';
+import { StudioAppsClientForPublic } from '@manifoldxyz/studio-apps-client';
 import type { PreviewData } from '../types/product';
 import { ClientSDKError, ErrorCode } from '../types/errors';
-import { logger } from '../utils/logger';
 import { getCacheConfig } from '../config/cache';
 
 export interface StudioAppsConfig {
   apiKey?: string;
   baseUrl?: string;
   timeout?: number;
-  debug?: boolean;
 }
 
 /**
@@ -22,17 +20,14 @@ export interface StudioAppsConfig {
  */
 export class StudioAppsClient {
   private config: StudioAppsConfig;
-  private log: ReturnType<typeof logger>;
   private previewCache = new Map<string, { data: PreviewData | null; expiresAt: number }>();
   private cacheConfig = getCacheConfig();
 
   constructor(config: StudioAppsConfig) {
     this.config = {
       timeout: 10000,
-      debug: false,
       ...config,
     };
-    this.log = logger(this.config.debug || false);
   }
 
   /**
@@ -51,15 +46,16 @@ export class StudioAppsClient {
     // Check cache first
     const cached = this.previewCache.get(instanceId);
     if (cached && Date.now() < cached.expiresAt) {
-      this.log('Cache hit for preview data:', instanceId);
       return cached.data;
     }
 
     try {
-      this.log('Fetching preview data for instanceId:', instanceId);
       
-      // Get all previews using the studio app SDK
-      const allPreviews = await getAllPreviews();
+      // Create client and get preview using the studio app SDK public client
+      const client = new StudioAppsClientForPublic({ baseUrl: this.config.baseUrl || 'https://api.manifold.xyz' });
+      const { instancePreviews: allPreviews } = await client.public.getPreviews({ 
+        instanceIds: [instanceId] 
+      });
       
       if (!Array.isArray(allPreviews)) {
         throw new ClientSDKError(
@@ -78,31 +74,34 @@ export class StudioAppsClient {
       let previewData: PreviewData | null = null;
 
       if (matchedPreview) {
-        this.log('Found preview data:', { instanceId, previewId: matchedPreview.id });
 
         // Transform to match PreviewData format
         previewData = {
           title: matchedPreview.title || '',
           description: matchedPreview.description || '',
-          contract: matchedPreview.contract || '',
-          thumbnail: matchedPreview.thumbnail || matchedPreview.image || '',
+          contract: matchedPreview.contract ? {
+            address: matchedPreview.contract.contractAddress,
+            name: matchedPreview.contract.name,
+            symbol: matchedPreview.contract.symbol,
+            networkId: matchedPreview.contract.network,
+            explorer: {
+              etherscanUrl: `https://etherscan.io/address/${matchedPreview.contract.contractAddress}`,
+            },
+            spec: 'erc1155' as const,
+          } : undefined,
+          thumbnail: matchedPreview.thumbnail || '',
           network: matchedPreview.network || 1,
-          // Additional fields that might be available
-          images: matchedPreview.images || [],
-          animations: matchedPreview.animations || [],
-          metadata: matchedPreview.metadata || {},
+          // Additional fields mapped to standard fields
         };
       } else {
-        this.log('No preview data found for instanceId:', instanceId);
       }
 
       // Cache the result (even if null)
-      const ttl = this.cacheConfig.previewData?.ttl || 600000; // 10 minutes default
+      const ttl = this.cacheConfig.memory?.defaultTTL || 600; // 10 minutes default in seconds
       this.previewCache.set(instanceId, {
         data: previewData,
-        expiresAt: Date.now() + ttl,
+        expiresAt: Date.now() + (ttl * 1000), // Convert seconds to milliseconds
       });
-      this.log('Cached preview data:', { instanceId, found: !!previewData, expiresIn: ttl / 1000 + 's' });
 
       return previewData;
 
@@ -111,11 +110,10 @@ export class StudioAppsClient {
         throw error;
       }
 
-      this.log('Error fetching preview data:', error);
       throw new ClientSDKError(
         ErrorCode.API_ERROR,
-        `Failed to fetch preview data for ${instanceId}: ${error.message}`,
-        { instanceId, originalError: error.message }
+        `Failed to fetch preview data for ${instanceId}: ${(error as any).message}`,
+        { instanceId, originalError: (error as any).message }
       );
     }
   }
@@ -126,10 +124,8 @@ export class StudioAppsClient {
   clearCache(instanceId?: string): void {
     if (instanceId) {
       this.previewCache.delete(instanceId);
-      this.log('Cleared preview cache for:', instanceId);
     } else {
       this.previewCache.clear();
-      this.log('Cleared all preview cache');
     }
   }
 
@@ -138,7 +134,6 @@ export class StudioAppsClient {
    * @deprecated Use getPreviewData instead
    */
   async getBlindMintData(instanceId: string): Promise<any> {
-    this.log('getBlindMintData called - redirecting to getPreviewData');
     return this.getPreviewData(instanceId);
   }
 }

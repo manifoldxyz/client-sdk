@@ -6,14 +6,12 @@
 import { ManifoldBridgeProvider } from '@manifoldxyz/manifold-provider-client';
 import type { NetworkId } from '../types/common';
 import { ClientSDKError, ErrorCode } from '../types/errors';
-import { logger } from '../utils/logger';
 
 export interface ManifoldProviderConfig {
   apiKey?: string;
   baseUrl?: string;
   timeout?: number;
   retries?: number;
-  debug?: boolean;
 }
 
 /**
@@ -23,23 +21,18 @@ export interface ManifoldProviderConfig {
 export class ManifoldProvider {
   private bridgeProvider: ManifoldBridgeProvider;
   private config: ManifoldProviderConfig;
-  private log: ReturnType<typeof logger>;
 
   constructor(networkId: NetworkId, config: ManifoldProviderConfig = {}) {
     this.config = {
       timeout: 10000,
       retries: 3,
-      debug: false,
       ...config,
     };
-    this.log = logger(this.config.debug || false);
 
     try {
       // Initialize the ManifoldBridgeProvider with the network ID
       this.bridgeProvider = new ManifoldBridgeProvider(networkId);
-      this.log('ManifoldProvider initialized for network:', networkId);
     } catch (error) {
-      this.log('Error initializing ManifoldBridgeProvider:', error);
       throw new ClientSDKError(
         ErrorCode.NETWORK_ERROR,
         `Failed to initialize ManifoldBridgeProvider for network ${networkId}: ${(error as Error).message}`,
@@ -76,26 +69,28 @@ export class ManifoldProvider {
     }
 
     try {
-      this.log('Making RPC request:', { method, params });
 
       // The ManifoldBridgeProvider should handle RPC calls
       // This follows the pattern from gachapon-widgets where the bridge provider
       // is used as a fallback when the user's provider is not available
-      const result = await this.bridgeProvider.request({
+      // Cast to any since ManifoldBridgeProvider may have request method
+      const provider = this.bridgeProvider as any;
+      if (!provider.request) {
+        throw new Error('Bridge provider does not support request method');
+      }
+      const result = await provider.request({
         method,
         params,
       });
 
-      this.log('RPC request successful:', { method, result });
       return result;
 
     } catch (error) {
-      this.log('RPC request failed:', { method, params, error });
       
       throw new ClientSDKError(
-        ErrorCode.RPC_ERROR,
-        `RPC request failed for method ${method}: ${error.message}`,
-        { method, params, originalError: error.message }
+        ErrorCode.NETWORK_ERROR,
+        `RPC request failed for method ${method}: ${(error as any).message}`,
+        { method, params, originalError: (error as any).message }
       );
     }
   }
@@ -116,7 +111,6 @@ export class ManifoldProvider {
       // This may vary based on the actual API of the package
       return (this.bridgeProvider as any).networkId || null;
     } catch (error) {
-      this.log('Error getting network ID:', error);
       return null;
     }
   }

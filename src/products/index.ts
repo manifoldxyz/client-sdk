@@ -2,8 +2,7 @@
 
 // BlindMint product implementation
 export {
-  BlindMintProductImpl,
-  createBlindMintProduct,
+  BlindMintProduct,
   isBlindMintProduct
 } from './blindmint';
 
@@ -12,7 +11,7 @@ export { createMockProduct } from './mock';
 
 // Re-export product types
 export type {
-  BlindMintProduct,
+  BlindMintProduct as BlindMintProductType,
   BlindMintPublicData,
   BlindMintOnchainData,
   BlindMintStatus,

@@ -2,11 +2,7 @@ import type { HttpRPCs } from './common';
 import type { Product } from './product';
 
 export interface ClientConfig {
-  debug?: boolean;
   httpRPCs?: HttpRPCs;
-  apiKey?: string;
-  environment?: 'development' | 'production' | 'test';
-  includeOnchainData?: boolean;
 }
 
 export interface ManifoldClient {

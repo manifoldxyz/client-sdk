@@ -17,7 +17,13 @@ import { getNetworkConfig } from '../config/networks';
  * Based on gachapon-widgets contract analysis
  */
 export const BLINDMINT_CLAIM_ABI = [
-  // Read functions
+  // Read functions from spec
+  'function MINT_FEE() external view returns (uint256)',
+  'function getClaim(address creatorContract, uint256 claimIndex) external view returns (tuple(uint256 total, uint256 totalMax, uint256 walletMax, uint256 startDate, uint256 endDate, uint8 storageProtocol, bytes32 merkleRoot, uint256 tokenVariations, uint256 startingTokenId, string location, uint256 cost, address paymentReceiver, address erc20))',
+  'function getTotalMints(address wallet, address creatorContract, uint256 claimIndex) external view returns (uint256)',
+  'function checkMintIndices(address creatorContract, uint256 claimIndex, uint256[] calldata indices) external view returns (bool[] memory)',
+
+  // Legacy read functions (for fallback)
   'function totalSupply() external view returns (uint256)',
   'function totalMinted() external view returns (uint256)',
   'function walletMax() external view returns (uint256)',
@@ -29,15 +35,16 @@ export const BLINDMINT_CLAIM_ABI = [
   'function startingTokenId() external view returns (uint256)',
   'function metadataLocation() external view returns (string)',
   'function storageProtocol() external view returns (uint8)',
-  
-  // Claim functions
+
+  // Mint functions from spec
+  'function mintReserve(address creatorContract, uint256 claimIndex, uint256 mintCount, uint256[] calldata mintIndices, bytes32[][] calldata merkleProofs, address mintForAddress) external payable',
   'function mint(address to, uint256 count) external payable',
   'function mintBatch(address to, uint256[] calldata tokenIds) external payable',
   'function claim(bytes32[] calldata proof, address to, uint256 count) external payable',
-  
+
   // Events
   'event Mint(address indexed to, uint256[] tokenIds)',
-  'event Claim(address indexed to, uint256[] tokenIds, bytes32[] proof)'
+  'event Claim(address indexed to, uint256[] tokenIds, bytes32[] proof)',
 ] as const;
 
 /**
@@ -53,15 +60,15 @@ export const CREATOR_CONTRACT_ABI = [
   'function setApprovalForAll(address operator, bool approved) external',
   'function isApprovedForAll(address owner, address operator) external view returns (bool)',
   'function transferFrom(address from, address to, uint256 tokenId) external',
-  
+
   // Creator-specific functions
   'function totalSupply() external view returns (uint256)',
   'function contractURI() external view returns (string)',
-  
+
   // Events
   'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
   'event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId)',
-  'event ApprovalForAll(address indexed owner, address indexed operator, bool approved)'
+  'event ApprovalForAll(address indexed owner, address indexed operator, bool approved)',
 ] as const;
 
 /**
@@ -75,7 +82,7 @@ export const ERC20_ABI = [
   'function transferFrom(address from, address to, uint256 amount) external returns (bool)',
   'function decimals() external view returns (uint8)',
   'function symbol() external view returns (string)',
-  'function name() external view returns (string)'
+  'function name() external view returns (string)',
 ] as const;
 
 // =============================================================================
@@ -83,6 +90,49 @@ export const ERC20_ABI = [
 // =============================================================================
 
 export type BlindMintClaimContract = ethers.Contract & {
+  // Main contract methods from spec
+  MINT_FEE(): Promise<ethers.BigNumber>;
+  getClaim(
+    creatorContract: string,
+    claimIndex: number,
+  ): Promise<{
+    total: ethers.BigNumber;
+    totalMax: ethers.BigNumber;
+    walletMax: ethers.BigNumber;
+    startDate: ethers.BigNumber;
+    endDate: ethers.BigNumber;
+    storageProtocol: number;
+    merkleRoot: string;
+    tokenVariations: ethers.BigNumber;
+    startingTokenId: ethers.BigNumber;
+    location: string;
+    cost: ethers.BigNumber;
+    paymentReceiver: string;
+    erc20: string;
+  }>;
+  getTotalMints(
+    wallet: string,
+    creatorContract: string,
+    claimIndex: number,
+  ): Promise<ethers.BigNumber>;
+  checkMintIndices(
+    creatorContract: string,
+    claimIndex: number,
+    indices: ethers.BigNumberish[],
+  ): Promise<boolean[]>;
+
+  // MintReserve - the main minting method
+  mintReserve(
+    creatorContract: string,
+    claimIndex: number,
+    mintCount: ethers.BigNumberish,
+    mintIndices: ethers.BigNumberish[],
+    merkleProofs: string[][],
+    mintForAddress: string,
+    options?: ethers.Overrides,
+  ): Promise<ethers.ContractTransaction>;
+
+  // Legacy methods (for fallback)
   totalSupply(): Promise<ethers.BigNumber>;
   totalMinted(): Promise<ethers.BigNumber>;
   walletMax(): Promise<ethers.BigNumber>;
@@ -94,10 +144,23 @@ export type BlindMintClaimContract = ethers.Contract & {
   startingTokenId(): Promise<ethers.BigNumber>;
   metadataLocation(): Promise<string>;
   storageProtocol(): Promise<number>;
-  
-  mint(to: string, count: ethers.BigNumberish, options?: ethers.Overrides): Promise<ethers.ContractTransaction>;
-  mintBatch(to: string, tokenIds: ethers.BigNumberish[], options?: ethers.Overrides): Promise<ethers.ContractTransaction>;
-  claim(proof: string[], to: string, count: ethers.BigNumberish, options?: ethers.Overrides): Promise<ethers.ContractTransaction>;
+
+  mint(
+    to: string,
+    count: ethers.BigNumberish,
+    options?: ethers.Overrides,
+  ): Promise<ethers.ContractTransaction>;
+  mintBatch(
+    to: string,
+    tokenIds: ethers.BigNumberish[],
+    options?: ethers.Overrides,
+  ): Promise<ethers.ContractTransaction>;
+  claim(
+    proof: string[],
+    to: string,
+    count: ethers.BigNumberish,
+    options?: ethers.Overrides,
+  ): Promise<ethers.ContractTransaction>;
 };
 
 export type CreatorContract = ethers.Contract & {
@@ -106,10 +169,23 @@ export type CreatorContract = ethers.Contract & {
   tokenURI(tokenId: ethers.BigNumberish): Promise<string>;
   totalSupply(): Promise<ethers.BigNumber>;
   contractURI(): Promise<string>;
-  
-  approve(to: string, tokenId: ethers.BigNumberish, options?: ethers.Overrides): Promise<ethers.ContractTransaction>;
-  setApprovalForAll(operator: string, approved: boolean, options?: ethers.Overrides): Promise<ethers.ContractTransaction>;
-  transferFrom(from: string, to: string, tokenId: ethers.BigNumberish, options?: ethers.Overrides): Promise<ethers.ContractTransaction>;
+
+  approve(
+    to: string,
+    tokenId: ethers.BigNumberish,
+    options?: ethers.Overrides,
+  ): Promise<ethers.ContractTransaction>;
+  setApprovalForAll(
+    operator: string,
+    approved: boolean,
+    options?: ethers.Overrides,
+  ): Promise<ethers.ContractTransaction>;
+  transferFrom(
+    from: string,
+    to: string,
+    tokenId: ethers.BigNumberish,
+    options?: ethers.Overrides,
+  ): Promise<ethers.ContractTransaction>;
 };
 
 export type ERC20Contract = ethers.Contract & {
@@ -118,10 +194,23 @@ export type ERC20Contract = ethers.Contract & {
   decimals(): Promise<number>;
   symbol(): Promise<string>;
   name(): Promise<string>;
-  
-  approve(spender: string, amount: ethers.BigNumberish, options?: ethers.Overrides): Promise<ethers.ContractTransaction>;
-  transfer(to: string, amount: ethers.BigNumberish, options?: ethers.Overrides): Promise<ethers.ContractTransaction>;
-  transferFrom(from: string, to: string, amount: ethers.BigNumberish, options?: ethers.Overrides): Promise<ethers.ContractTransaction>;
+
+  approve(
+    spender: string,
+    amount: ethers.BigNumberish,
+    options?: ethers.Overrides,
+  ): Promise<ethers.ContractTransaction>;
+  transfer(
+    to: string,
+    amount: ethers.BigNumberish,
+    options?: ethers.Overrides,
+  ): Promise<ethers.ContractTransaction>;
+  transferFrom(
+    from: string,
+    to: string,
+    amount: ethers.BigNumberish,
+    options?: ethers.Overrides,
+  ): Promise<ethers.ContractTransaction>;
 };
 
 // =============================================================================
@@ -132,7 +221,6 @@ export interface ContractFactoryOptions {
   provider: DualProvider;
   networkId: NetworkId;
   signer?: ethers.Signer;
-  enableDebug?: boolean;
 }
 
 /**
@@ -142,30 +230,25 @@ export class ContractFactory {
   private provider: DualProvider;
   private networkId: NetworkId;
   private signer?: ethers.Signer;
-  private enableDebug: boolean;
-  
+
   constructor(options: ContractFactoryOptions) {
     this.provider = options.provider;
     this.networkId = options.networkId;
     this.signer = options.signer;
-    this.enableDebug = options.enableDebug ?? false;
   }
 
   /**
    * Create BlindMint claim extension contract instance
    */
   createBlindMintContract(address: Address): BlindMintClaimContract {
-    if (this.enableDebug) {
-      console.log(`Creating BlindMint contract at ${address} on network ${this.networkId}`);
-    }
 
     // Use primary provider for write operations if signer is available
     const providerOrSigner = this.signer || this.provider.current;
-    
+
     return new ethers.Contract(
       address,
       BLINDMINT_CLAIM_ABI,
-      providerOrSigner
+      providerOrSigner,
     ) as BlindMintClaimContract;
   }
 
@@ -173,34 +256,20 @@ export class ContractFactory {
    * Create Creator (ERC721) contract instance
    */
   createCreatorContract(address: Address): CreatorContract {
-    if (this.enableDebug) {
-      console.log(`Creating Creator contract at ${address} on network ${this.networkId}`);
-    }
 
     const providerOrSigner = this.signer || this.provider.current;
-    
-    return new ethers.Contract(
-      address,
-      CREATOR_CONTRACT_ABI,
-      providerOrSigner
-    ) as CreatorContract;
+
+    return new ethers.Contract(address, CREATOR_CONTRACT_ABI, providerOrSigner) as CreatorContract;
   }
 
   /**
    * Create ERC20 token contract instance
    */
   createERC20Contract(address: Address): ERC20Contract {
-    if (this.enableDebug) {
-      console.log(`Creating ERC20 contract at ${address} on network ${this.networkId}`);
-    }
 
     const providerOrSigner = this.signer || this.provider.current;
-    
-    return new ethers.Contract(
-      address,
-      ERC20_ABI,
-      providerOrSigner
-    ) as ERC20Contract;
+
+    return new ethers.Contract(address, ERC20_ABI, providerOrSigner) as ERC20Contract;
   }
 
   /**
@@ -212,13 +281,23 @@ export class ContractFactory {
 
     return {
       // ERC20 tokens
-      usdc: contracts.erc20Tokens.usdc ? this.createERC20Contract(contracts.erc20Tokens.usdc) : null,
-      usdt: contracts.erc20Tokens.usdt ? this.createERC20Contract(contracts.erc20Tokens.usdt) : null,
-      weth: contracts.erc20Tokens.weth ? this.createERC20Contract(contracts.erc20Tokens.weth) : null,
+      usdc: contracts.erc20Tokens.usdc
+        ? this.createERC20Contract(contracts.erc20Tokens.usdc)
+        : null,
+      usdt: contracts.erc20Tokens.usdt
+        ? this.createERC20Contract(contracts.erc20Tokens.usdt)
+        : null,
+      weth: contracts.erc20Tokens.weth
+        ? this.createERC20Contract(contracts.erc20Tokens.weth)
+        : null,
 
       // Claim extensions
-      blindMint: contracts.claimExtensions.blindMint ? this.createBlindMintContract(contracts.claimExtensions.blindMint) : null,
-      gacha: contracts.claimExtensions.gacha ? this.createBlindMintContract(contracts.claimExtensions.gacha) : null
+      blindMint: contracts.claimExtensions.blindMint
+        ? this.createBlindMintContract(contracts.claimExtensions.blindMint)
+        : null,
+      gacha: contracts.claimExtensions.gacha
+        ? this.createBlindMintContract(contracts.claimExtensions.gacha)
+        : null,
     };
   }
 
@@ -227,9 +306,6 @@ export class ContractFactory {
    */
   setSigner(signer: ethers.Signer) {
     this.signer = signer;
-    if (this.enableDebug) {
-      console.log('Updated contract factory signer');
-    }
   }
 
   /**
@@ -237,9 +313,6 @@ export class ContractFactory {
    */
   removeSigner() {
     this.signer = undefined;
-    if (this.enableDebug) {
-      console.log('Removed contract factory signer');
-    }
   }
 }
 
@@ -254,12 +327,11 @@ export async function estimateGasWithFallback(
   contract: ethers.Contract,
   methodName: string,
   args: any[],
-  fallbackGas: ethers.BigNumberish = 200000
+  fallbackGas: ethers.BigNumberish = 200000,
 ): Promise<ethers.BigNumber> {
   try {
     return await contract.estimateGas[methodName](...args);
   } catch (error) {
-    console.warn(`Gas estimation failed for ${methodName}, using fallback:`, error);
     return ethers.BigNumber.from(fallbackGas);
   }
 }
@@ -270,7 +342,7 @@ export async function estimateGasWithFallback(
 export async function callWithRetry<T>(
   contractCall: () => Promise<T>,
   maxRetries: number = 3,
-  delay: number = 1000
+  delay: number = 1000,
 ): Promise<T> {
   let lastError: Error;
 
@@ -279,9 +351,9 @@ export async function callWithRetry<T>(
       return await contractCall();
     } catch (error) {
       lastError = error as Error;
-      
+
       if (i < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+        await new Promise((resolve) => setTimeout(resolve, delay * (i + 1)));
       }
     }
   }
@@ -294,10 +366,10 @@ export async function callWithRetry<T>(
  */
 export async function batchContractCalls<T>(
   calls: Array<() => Promise<T>>,
-  maxConcurrent: number = 5
+  maxConcurrent: number = 5,
 ): Promise<T[]> {
   const results: T[] = [];
-  
+
   for (let i = 0; i < calls.length; i += maxConcurrent) {
     const batch = calls.slice(i, i + maxConcurrent);
     const batchResults = await Promise.all(
@@ -305,15 +377,14 @@ export async function batchContractCalls<T>(
         try {
           return await call();
         } catch (error) {
-          console.warn(`Batch call ${i + index} failed:`, error);
           throw error;
         }
-      })
+      }),
     );
-    
+
     results.push(...batchResults);
   }
-  
+
   return results;
 }
 
@@ -323,7 +394,7 @@ export async function batchContractCalls<T>(
 export async function validateContract(
   provider: ethers.providers.Provider,
   address: Address,
-  expectedMethods: string[]
+  expectedMethods: string[],
 ): Promise<{
   isValid: boolean;
   hasCode: boolean;
@@ -334,20 +405,22 @@ export async function validateContract(
     // Check if contract has code
     const code = await provider.getCode(address);
     const hasCode = code !== '0x';
-    
+
     if (!hasCode) {
       return {
         isValid: false,
         hasCode: false,
         supportedMethods: [],
-        missingMethods: expectedMethods
+        missingMethods: expectedMethods,
       };
     }
 
     // Create temporary contract to test method calls
-    const tempContract = new ethers.Contract(address, [
-      'function supportsInterface(bytes4 interfaceId) external view returns (bool)'
-    ], provider);
+    const tempContract = new ethers.Contract(
+      address,
+      ['function supportsInterface(bytes4 interfaceId) external view returns (bool)'],
+      provider,
+    );
 
     const supportedMethods: string[] = [];
     const missingMethods: string[] = [];
@@ -368,15 +441,14 @@ export async function validateContract(
       isValid: missingMethods.length === 0,
       hasCode: true,
       supportedMethods,
-      missingMethods
+      missingMethods,
     };
-
   } catch (error) {
     return {
       isValid: false,
       hasCode: false,
       supportedMethods: [],
-      missingMethods: expectedMethods
+      missingMethods: expectedMethods,
     };
   }
 }
@@ -386,11 +458,11 @@ export async function validateContract(
  */
 export function parseContractEvents(
   contract: ethers.Contract,
-  receipt: ethers.providers.TransactionReceipt
+  receipt: ethers.providers.TransactionReceipt,
 ): ethers.utils.LogDescription[] {
   const events: ethers.utils.LogDescription[] = [];
-  
-  receipt.logs.forEach(log => {
+
+  receipt.logs.forEach((log) => {
     try {
       const parsedLog = contract.interface.parseLog(log);
       events.push(parsedLog);
@@ -398,7 +470,7 @@ export function parseContractEvents(
       // Log doesn't match this contract's interface
     }
   });
-  
+
   return events;
 }
 
@@ -412,7 +484,7 @@ export function parseContractEvents(
 export function createMockContract(
   address: Address,
   abi: readonly string[],
-  mockImplementation: Record<string, any> = {}
+  mockImplementation: Record<string, any> = {},
 ): ethers.Contract {
   // Create a mock provider that returns predefined values
   const mockProvider = {
@@ -420,10 +492,10 @@ export function createMockContract(
       const method = transaction.data?.slice(0, 10); // Function selector
       return mockImplementation[method] || '0x';
     },
-    
+
     estimateGas: async () => ethers.BigNumber.from('21000'),
-    
-    getNetwork: async () => ({ chainId: 1, name: 'homestead' })
+
+    getNetwork: async () => ({ chainId: 1, name: 'homestead' }),
   } as any;
 
   return new ethers.Contract(address, abi, mockProvider);
@@ -434,29 +506,29 @@ export function createMockContract(
  */
 export function createTestContractFactory(
   networkId: NetworkId,
-  mockContracts: Record<Address, any> = {}
+  mockContracts: Record<Address, any> = {},
 ): ContractFactory {
   const mockProvider = {
     current: {
       call: async (transaction: any) => {
         const address = transaction.to;
         const mockContract = mockContracts[address];
-        
+
         if (mockContract) {
           const method = transaction.data?.slice(0, 10);
           return mockContract[method] || '0x';
         }
-        
+
         return '0x';
       },
-      
-      estimateGas: async () => ethers.BigNumber.from('21000')
-    }
+
+      estimateGas: async () => ethers.BigNumber.from('21000'),
+    },
   } as any;
 
   return new ContractFactory({
     provider: mockProvider,
     networkId,
-    enableDebug: false
+    enableDebug: false,
   });
 }

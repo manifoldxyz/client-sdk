@@ -1,5 +1,21 @@
-import type { Address, NetworkId, Cost, Money, ProductStatus } from './common';
-import type { Asset, Media, Contract, Workspace } from './product';
+import type { Address, Cost, ProductStatus } from './common';
+import type { Money } from './product';
+import type {
+  Asset,
+  Media,
+  Contract,
+  Workspace,
+  AllocationParams,
+  AllocationResponse,
+  PreparePurchaseParams,
+  PreparedPurchase,
+  PurchaseParams,
+  Order,
+  ProductMetadata,
+  ProductRule,
+  ProductProvenance,
+} from './product';
+import type { ethers } from 'ethers';
 
 // =============================================================================
 // CORE BLINDMINT INTERFACES
@@ -29,13 +45,7 @@ export interface BlindMintOnchainData {
   /** Number of unique token variations available */
   tokenVariations: number;
   /** Starting token ID for the collection */
-  startingTokenId: number;
-  /** Gacha configuration for tier probabilities */
-  gachaConfig?: GachaConfig;
-  /** Storage protocol for metadata (IPFS, Arweave, etc.) */
-  storageProtocol: StorageProtocol;
-  /** Base location for metadata */
-  metadataLocation: string;
+  startingTokenId: string;
 }
 
 /**
@@ -110,10 +120,6 @@ export interface TokenVariation {
   tier: string;
   /** Rarity score (0-100) */
   rarityScore?: number;
-  /** Current supply of this specific token */
-  currentSupply?: number;
-  /** Maximum supply of this specific token */
-  maxSupply?: number;
 }
 
 /**
@@ -202,6 +208,26 @@ export interface BlindMintProduct {
 
 export type StorageProtocol = 'ipfs' | 'arweave' | 'http' | 'data';
 
+/**
+ * Internal claim data structure - not exposed in public API
+ * Used internally to handle storage-specific fields
+ */
+export interface InternalClaimData {
+  total: ethers.BigNumber;
+  totalMax: ethers.BigNumber;
+  walletMax: ethers.BigNumber;
+  startDate: ethers.BigNumber;
+  endDate: ethers.BigNumber;
+  storageProtocol: number;
+  merkleRoot: string;
+  tokenVariations: ethers.BigNumber;
+  startingTokenId: ethers.BigNumber;
+  location: string;
+  cost: ethers.BigNumber;
+  paymentReceiver: string;
+  erc20: string;
+}
+
 export interface FloorPriceConfig {
   enabled: boolean;
   source: 'opensea' | 'manifold' | 'custom';
@@ -261,7 +287,7 @@ export type {
   Order,
   ProductMetadata,
   ProductRule,
-  ProductProvenance
+  ProductProvenance,
 } from './product';
 
 export type BlindMintStatus = ProductStatus;

@@ -98,8 +98,6 @@ export interface ContractCallOptions {
   timeout?: number;
   /** Number of retry attempts on failure */
   retries?: number;
-  /** Enable debug logging */
-  debug?: boolean;
 }
 
 /**

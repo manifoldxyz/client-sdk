@@ -1,5 +1,5 @@
 import type { Address, NetworkId, Money } from './common';
-import type { Asset, Media, Contract, Workspace } from './product';
+import type { Media, Contract, Workspace } from './product';
 import type { BlindMintPublicData, TokenVariation, GachaTier } from './blindmint';
 
 // =============================================================================

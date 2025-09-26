@@ -17,13 +17,7 @@ export {
 
 // Provider utilities
 export {
-  createDualProvider,
-  testProviderPerformance,
-  getProviderNetwork,
-  waitForProviderReady,
-  checkProviderFeatures,
-  createMockProvider,
-  createTestProviderFactory
+  createDualProvider
 } from './provider-factory';
 
 export type {

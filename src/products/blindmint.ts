@@ -1,19 +1,24 @@
 import type {
-  BlindMintProduct,
   BlindMintPublicData,
   BlindMintOnchainData,
   BlindMintStatus,
   BlindMintInventory,
+  InternalClaimData,
   TokenVariation,
   GachaConfig,
   GachaTier,
   ClaimableToken,
   MintValidationParams,
   MintValidation,
+  ValidationError,
+  ValidationWarning,
   FloorPriceData,
   MintHistoryItem,
+  BlindMintTierProbability,
 } from '../types/blindmint';
 import type {
+  Product,
+  BlindMintProduct as IBlindMintProduct,
   AllocationParams,
   AllocationResponse,
   PreparePurchaseParams,
@@ -24,507 +29,451 @@ import type {
   ProductRule,
   ProductProvenance,
   Media,
-  InstanceData,
-  PreviewData,
   TransactionStep,
-  TransactionReceipt,
+  Contract,
+  InstanceData,
 } from '../types/product';
-import type { Address, NetworkId, Cost, Money } from '../types/common';
-import { AppType } from '../types/common';
-import type { DualProvider } from '../utils/provider-factory';
-import type { ContractFactory, BlindMintClaimContract } from '../utils/contract-factory';
+import type { BlindMintPayload } from '../types/purchase';
+import type { Address } from '../types/common';
+import { AppType, AppId } from '../types/common';
+import type { BlindMintClaimContract } from '../utils/contract-factory';
+import * as ethers from 'ethers';
 
-import { createDualProvider } from '../utils/provider-factory';
+import { createProvider } from '../utils/provider-factory';
 import { ContractFactory as ContractFactoryClass } from '../utils/contract-factory';
-// import { getCacheConfig } from '../config/cache'; // TODO: Implement caching
 import { validateAddress } from '../utils/validation';
-// import { ClientSDKError, ErrorCode } from '../types/errors'; // TODO: Fix error handling
-import { BlindMintError, BlindMintErrorCode } from '../types/enhanced-errors';
-import { StudioAppsClient } from '../stubs/studio-apps-client';
-import { logger } from '../utils/logger';
-
-// =============================================================================
-// BLINDMINT PRODUCT IMPLEMENTATION
-// =============================================================================
+import { ClientSDKError, ErrorCode } from '../types/errors';
+import type { InstancePreview } from '@manifoldxyz/studio-apps-client';
+import { Currency } from '@manifoldxyz/js-ts-utils';
+import {
+  getEthToUsdRate,
+  getERC20ToUSDRate,
+  getNativeCurrencySymbol,
+  calculateUSDValue,
+} from '../api/coinbase';
 
 /**
- * BlindMintProduct implementation following functional programming patterns
- * and dual-provider architecture from CONTRACT_PATTERNS.md
+ * BlindMintProduct implementation following technical spec CON-2729
+ * and gachapon-widgets pattern for getClaim parsing
  */
-export class BlindMintProductImpl implements BlindMintProduct {
-  readonly type = AppType.BlindMint;
-  readonly id: string;
-  readonly data: {
-    id: string;
-    creator: any;
-    publicData: BlindMintPublicData;
-    appId: number;
-    appName: string;
-  };
-  readonly previewData: PreviewData;
-  
+export class BlindMintProduct implements IBlindMintProduct {
+  readonly id: number;
+  readonly type = AppType.BLIND_MINT;
+  readonly data: InstanceData<BlindMintPublicData> & { publicData: BlindMintPublicData };
+  readonly previewData: InstancePreview;
+
+  // Onchain data (fetched lazily)
+  onchainData?: BlindMintOnchainData;
+
   // Internal state
-  private _onchainData?: BlindMintOnchainData;
-  private _provider?: DualProvider;
-  private _contractFactory?: ContractFactory;
-  private _claimContract?: BlindMintClaimContract;
-  // private _cacheConfig = getCacheConfig(); // TODO: Implement caching
-  private _studioAppsClient?: StudioAppsClient;
-  private _log: ReturnType<typeof logger>;
+  private _creatorContract: Address;
+  private _claimIndex: number;
+  private _extensionAddress: Address;
+  private _platformFee?: ethers.BigNumber;
+  private _httpRPCs?: Record<number, string>;
 
   constructor(
-    instanceData: InstanceData, 
-    includeOnchainData = false, 
-    options: { debug?: boolean; fetchPreviewData?: boolean } = {}
+    instanceData: InstanceData<BlindMintPublicData>,
+    previewData: InstancePreview,
+    options: {
+      httpRPCs?: Record<number, string>;
+    } = {},
   ) {
-    const { debug = false, fetchPreviewData = false } = options;
-    this._log = logger(debug);
-    this.id = instanceData.id;
-    
-    this._log('Initializing BlindMintProduct:', { 
-      instanceId: this.id, 
-      includeOnchainData, 
-      fetchPreviewData 
-    });
-    
-    // Validate and transform instance data
-    if (!instanceData.publicData || typeof instanceData.publicData !== 'object') {
-      throw new BlindMintError(
-        BlindMintErrorCode.INVALID_CONFIGURATION,
-        'Invalid instance data: missing publicData',
-        { instanceId: instanceData.id }
+    const { httpRPCs } = options;
+    this._httpRPCs = httpRPCs;
+
+    // Validate app ID
+    if (instanceData.appId !== AppId.BLIND_MINT_1155) {
+      throw new ClientSDKError(
+        ErrorCode.INVALID_INPUT,
+        `Invalid app ID for BlindMint. Expected ${AppId.BLIND_MINT_1155}, received ${instanceData.appId}`,
       );
     }
 
-    // Transform instance data to match BlindMintProduct format
-    this.data = {
-      id: instanceData.id,
-      creator: instanceData.creator,
-      publicData: instanceData.publicData as BlindMintPublicData,
-      appId: instanceData.appId || 3, // BlindMint app ID
-      appName: instanceData.appName || 'BlindMint',
-    };
+    const publicData = instanceData.publicData;
 
-    // Initialize preview data with safe defaults from publicData
-    this.previewData = {
-      title: this.data.publicData.title || '',
-      description: this.data.publicData.description || '',
-      contract: this.data.publicData.contract || '',
-      thumbnail: this.data.publicData.thumbnail || '',
-      network: this.data.publicData.network || 1,
-      startDate: undefined, // Will be populated from onchain data
-      endDate: undefined,
-      price: undefined,
-    };
+    // Store instance data with properly typed publicData
+    this.data = instanceData;
+    this.previewData = previewData;
 
-    // Initialize Studio Apps client if we need to fetch preview data
-    if (fetchPreviewData) {
-      this._studioAppsClient = new StudioAppsClient({
-        debug,
-        timeout: 10000,
-      });
-      
-      // Fetch preview data asynchronously and enhance the preview data
-      this._fetchAndEnhancePreviewData().catch((error) => {
-        this._log('Warning: Failed to fetch preview data:', error.message);
-      });
-    }
+    this.id = instanceData.id;
 
-    // Initialize blockchain infrastructure if needed
-    if (includeOnchainData) {
-      this._initializeProviderAndContracts();
-    }
+    this._creatorContract = publicData.contract.address as Address;
+    this._extensionAddress = publicData.extensionAddress;
+    this._claimIndex = 0; // Default to index 0 for BlindMint
   }
 
   // =============================================================================
-  // PREVIEW DATA INTEGRATION
+  // HELPER METHODS
   // =============================================================================
 
-  /**
-   * Fetch preview data from Studio Apps SDK and enhance the preview data
-   * Based on CON-2729 spec: use @manifoldxyz/studio-app-sdk with getAllPreviews
-   */
-  private async _fetchAndEnhancePreviewData(): Promise<void> {
-    if (!this._studioAppsClient) {
-      this._log('Studio Apps client not initialized, skipping preview data fetch');
-      return;
+  private _getClaimContract(): BlindMintClaimContract {
+    const networkId = this.data.publicData.network || 1;
+
+    // Use configured providers (READ operations)
+    const provider = createProvider({
+      networkId,
+      customRpcUrls: this._httpRPCs,
+    });
+
+    const factory = new ContractFactoryClass({ provider, networkId });
+    return factory.createBlindMintContract(this._extensionAddress);
+  }
+
+  // =============================================================================
+  // ONCHAIN DATA FETCHING (following gachapon-widgets pattern)
+  // =============================================================================
+
+  async fetchOnchainData(force = false): Promise<BlindMintOnchainData> {
+    if (this.onchainData && !force) {
+      return this.onchainData;
     }
+
+    const contract = this._getClaimContract();
 
     try {
-      this._log('Fetching preview data from Studio Apps SDK');
-      const studioPreviewData = await this._studioAppsClient.getPreviewData(this.id);
-      
-      if (studioPreviewData) {
-        this._log('Successfully fetched preview data, enhancing preview:', {
-          title: studioPreviewData.title,
-          hasImages: studioPreviewData.images?.length > 0,
-          hasAnimations: studioPreviewData.animations?.length > 0,
-        });
+      // Use getClaim method like gachapon-widgets
+      const claimData = await contract.getClaim(this._creatorContract, this._claimIndex);
 
-        // Enhance preview data with Studio Apps data (mutating the object)
-        // This is safe because the constructor has already initialized previewData
-        Object.assign(this.previewData, {
-          title: studioPreviewData.title || this.previewData.title,
-          description: studioPreviewData.description || this.previewData.description,
-          thumbnail: studioPreviewData.thumbnail || this.previewData.thumbnail,
-          // Add additional fields from Studio Apps
-          images: studioPreviewData.images || [],
-          animations: studioPreviewData.animations || [],
-          metadata: {
-            ...this.previewData.metadata,
-            ...studioPreviewData.metadata,
-          },
-        });
-      } else {
-        this._log('No preview data found in Studio Apps SDK for instanceId:', this.id);
-      }
+      // Process into BlindMintOnchainData format
+      const onchainData = await this._processClaimData(claimData);
+
+      // Fetch platform fee from contract
+      this._platformFee = await contract.MINT_FEE();
+
+      // Cache the result
+      this.onchainData = onchainData;
+      return onchainData;
     } catch (error) {
-      this._log('Error fetching preview data from Studio Apps SDK:', error);
-      // Don't throw - preview data is optional enhancement
+      throw new ClientSDKError(ErrorCode.API_ERROR, 'Failed to fetch onchain data', {
+        error: (error as Error).message,
+      });
     }
   }
 
+  private async _processClaimData(claimData: InternalClaimData): Promise<BlindMintOnchainData> {
+    const cost = claimData.cost;
+    const erc20 = claimData.erc20;
+
+    // Convert dates from unix seconds
+    const convertDate = (unixSeconds: number) => {
+      return unixSeconds === 0 ? new Date(0) : new Date(unixSeconds * 1000);
+    };
+
+    // Get proper token metadata
+    const isNativeToken = erc20 === ethers.constants.AddressZero;
+    const networkId = this.data.publicData.network;
+
+    let tokenSymbol = getNativeCurrencySymbol(networkId);
+    let tokenDecimals = 18;
+
+    const provider = createProvider({
+      networkId,
+      customRpcUrls: this._httpRPCs,
+    });
+    // Use Currency.getERC20Metadata to fetch proper token information
+    const metadata = await Currency.getERC20Metadata(networkId, erc20, provider);
+    tokenSymbol = metadata.symbol;
+    tokenDecimals = metadata.decimals;
+
+    // Format the cost with proper decimals
+    const formatted = ethers.utils.formatUnits(cost, tokenDecimals);
+
+    // Fetch USD conversion rate
+    let formattedUSD;
+    try {
+      let usdRate: number | undefined;
+
+      if (isNativeToken) {
+        // Fetch native currency rate (ETH, MATIC, etc.)
+        usdRate = await getEthToUsdRate(tokenSymbol);
+      } else {
+        // Fetch ERC20 token rate
+        usdRate = await getERC20ToUSDRate(tokenSymbol, erc20);
+      }
+
+      if (usdRate) {
+        formattedUSD = calculateUSDValue(BigInt(cost.toString()), tokenDecimals, usdRate);
+      }
+    } catch (error) {
+      console.warn('Failed to fetch USD rate:', error);
+    }
+
+    return {
+      totalSupply: claimData.totalMax.toNumber(),
+      totalMinted: claimData.total.toNumber(),
+      walletMax: claimData.walletMax.toNumber(),
+      startDate: convertDate(claimData.startDate.toNumber()),
+      endDate: convertDate(claimData.endDate.toNumber()),
+      audienceType: 'None', // Will be updated based on merkle root if needed
+      cost: {
+        value: cost,
+        decimals: tokenDecimals,
+        erc20: erc20,
+        symbol: tokenSymbol,
+        formatted: formatted,
+        formattedUSD: formattedUSD,
+      },
+      paymentReceiver: claimData.paymentReceiver as Address,
+      tokenVariations: claimData.tokenVariations.toNumber(),
+      startingTokenId: claimData.startingTokenId.toString(),
+      // Note: storageProtocol and metadataLocation are internal only, not exposed
+    };
+  }
+
   // =============================================================================
-  // CORE PRODUCT METHODS
+  // PRODUCT INTERFACE IMPLEMENTATION
   // =============================================================================
 
   async getStatus(): Promise<BlindMintStatus> {
     const onchainData = await this.fetchOnchainData();
-    const now = new Date();
+    const now = Date.now();
 
-    // Check if mint has not started
-    if (onchainData.startDate > now) {
+    if (onchainData.startDate && now < onchainData.startDate.getTime()) {
       return 'upcoming';
     }
-
-    // Check if mint has ended
-    if (onchainData.endDate < now) {
-      return 'ended';
+    if (onchainData.endDate && now > onchainData.endDate.getTime()) {
+      return 'completed';
     }
-
-    // Check if sold out
-    if (onchainData.totalMinted >= onchainData.totalSupply) {
-      return 'sold-out';
+    if (onchainData.totalSupply && onchainData.totalMinted >= onchainData.totalSupply) {
+      return 'completed';
     }
-
-    // Otherwise, it's active
     return 'active';
   }
 
   async getAllocations(params: AllocationParams): Promise<AllocationResponse> {
-    if (!validateAddress(params.recipientAddress)) {
-      throw new BlindMintError(
-        BlindMintErrorCode.INVALID_WALLET_ADDRESS,
-        'Invalid recipient address',
-        { address: params.recipientAddress }
-      );
+    const { recipientAddress } = params;
+    if (!validateAddress(recipientAddress)) {
+      throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Invalid recipient address');
     }
 
     const onchainData = await this.fetchOnchainData();
-    
-    // For BlindMint, there's no allowlist - anyone can mint up to wallet limit
-    const walletMax = onchainData.walletMax;
-    const remainingSupply = onchainData.totalSupply - onchainData.totalMinted;
-    
-    // Get how many this wallet has already minted (would need contract call)
-    // For now, assume 0 for implementation
-    const walletMinted = 0; // TODO: Query actual wallet minted from contract
-    
-    const remainingAllocation = walletMax > 0 ? Math.max(0, walletMax - walletMinted) : remainingSupply;
-    const maxQuantity = Math.min(remainingAllocation, remainingSupply);
+    const contract = this._getClaimContract();
 
-    return {
-      isEligible: maxQuantity > 0,
-      quantity: maxQuantity,
-      remainingAllocation,
-      reason: maxQuantity === 0 ? 'No remaining allocation' : undefined,
-    };
+    // Get wallet minted count using getTotalMints (like gachapon-widgets)
+    const walletMinted = await contract.getTotalMints(
+      recipientAddress,
+      this._creatorContract,
+      this._claimIndex,
+    );
+
+    // Check eligibility
+    const status = await this.getStatus();
+    if (status === 'upcoming') {
+      return { isEligible: false, reason: 'Sale has not started', quantity: 0 };
+    }
+    if (status === 'completed') {
+      return { isEligible: false, reason: 'Sale has ended', quantity: 0 };
+    }
+
+    // Check wallet limit
+    const mintedCount = walletMinted?.toNumber
+      ? walletMinted.toNumber()
+      : Number(walletMinted || 0);
+    if (onchainData.walletMax > 0 && mintedCount >= onchainData.walletMax) {
+      return { isEligible: false, reason: 'Wallet limit reached', quantity: 0 };
+    }
+
+    // Calculate available quantity
+    let quantity = Number.MAX_SAFE_INTEGER;
+    if (onchainData.walletMax > 0) {
+      quantity = Math.min(quantity, onchainData.walletMax - mintedCount);
+    }
+    if (onchainData.totalSupply !== Number.MAX_SAFE_INTEGER) {
+      const remaining = onchainData.totalSupply - onchainData.totalMinted;
+      quantity = Math.min(quantity, remaining);
+    }
+
+    return { isEligible: true, quantity };
   }
 
-  async preparePurchase(params: PreparePurchaseParams): Promise<PreparedPurchase> {
-    if (!validateAddress(params.address)) {
-      throw new BlindMintError(
-        BlindMintErrorCode.INVALID_WALLET_ADDRESS,
-        'Invalid wallet address',
-        { address: params.address }
-      );
+  async preparePurchase(
+    params: PreparePurchaseParams<BlindMintPayload>,
+  ): Promise<PreparedPurchase> {
+    const { address, payload } = params;
+    // Now type-safe without casting
+    const quantity = payload?.quantity || 1;
+
+    if (!validateAddress(address)) {
+      throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Invalid address');
     }
 
-    const quantity = (params.payload as any)?.quantity ?? 1;
-    if (quantity <= 0) {
-      throw new BlindMintError(
-        BlindMintErrorCode.INVALID_QUANTITY,
-        'Quantity must be greater than 0',
-        { quantity }
-      );
-    }
-
-    // Initialize blockchain infrastructure
-    await this._initializeProviderAndContracts();
-    
-    const onchainData = await this.fetchOnchainData();
-    const status = await this.getStatus();
-    
-    // Validate mint status
-    if (status !== 'active') {
-      throw new BlindMintError(
-        BlindMintErrorCode.MINT_NOT_ACTIVE,
-        `Cannot mint: status is ${status}`,
-        { status, instanceId: this.id }
-      );
-    }
-
-    // Validate quantity against allocations
-    const allocations = await this.getAllocations({ 
-      recipientAddress: params.address as Address 
-    });
-    
+    // Check allocations
+    const allocations = await this.getAllocations({ recipientAddress: address });
     if (!allocations.isEligible) {
-      throw new BlindMintError(
-        BlindMintErrorCode.NOT_ELIGIBLE,
-        'Wallet is not eligible to mint',
-        { address: params.address }
-      );
+      throw new ClientSDKError(ErrorCode.NOT_ELIGIBLE, allocations.reason || 'Not eligible');
     }
-
     if (quantity > allocations.quantity) {
-      throw new BlindMintError(
-        BlindMintErrorCode.EXCEEDS_WALLET_LIMIT,
-        `Requested quantity (${quantity}) exceeds available allocation (${allocations.quantity})`,
-        { requested: quantity, available: allocations.quantity }
-      );
+      throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Quantity exceeds available allocation');
     }
 
-    // Calculate costs
-    const unitPrice = onchainData.cost.value;
-    const subtotal = unitPrice * BigInt(quantity);
-    const platformFee = (subtotal * BigInt(25)) / BigInt(1000); // 2.5% platform fee
-    const total = subtotal + platformFee;
+    const onchainData = await this.fetchOnchainData();
 
-    // Create cost object
-    const cost: Cost = {
-      subtotal: this._createMoney(subtotal, onchainData.cost.currency),
-      fees: this._createMoney(platformFee, onchainData.cost.currency),
-      total: this._createMoney(total, onchainData.cost.currency),
+    // Calculate total cost including platform fee
+    const mintCostBN = ethers.BigNumber.from(onchainData.cost.value.toString()).mul(quantity);
+    const platformFee = this._platformFee || ethers.BigNumber.from(0);
+    const totalCost = mintCostBN.add(platformFee.mul(quantity));
+
+    // Estimate gas - gas buffer will be handled by the calling code via params.gasBuffer
+    await this._estimateGas(address, address, quantity, totalCost);
+
+    // Create transaction step
+    const step: TransactionStep = {
+      id: 'mint',
+      name: 'Mint BlindMint NFTs',
+      type: 'mint',
+      description: `Mint ${quantity} random NFT(s)`,
+      execute: async () => {
+        // Execute function needs to be called with account later
+        throw new Error('Execute must be called with account from product.purchase');
+      },
     };
 
-    // Create transaction steps
-    const steps: TransactionStep[] = [];
-    
-    // Check if payment is in ERC20 token (not ETH)
-    const paymentToken = onchainData.cost.erc20;
-    const isERC20Payment = paymentToken && paymentToken !== '0x0000000000000000000000000000000000000000';
-
-    if (isERC20Payment) {
-      // Add ERC20 approval step if needed
-      const approvalStep = await this._createApprovalStep(
-        paymentToken as Address,
-        params.address as Address,
-        total
-      );
-      
-      if (approvalStep) {
-        steps.push(approvalStep);
-      }
-    }
-
-    // Add mint step
-    const mintStep = await this._createMintStep(
-      params.address as Address,
-      quantity,
-      total,
-      isERC20Payment
-    );
-    
-    steps.push(mintStep);
-
     return {
-      cost,
-      steps,
+      cost: {
+        total: onchainData.cost,
+        subtotal: onchainData.cost,
+        fees: {
+          ...onchainData.cost,
+          value: BigInt(platformFee.mul(quantity).toString()),
+          formatted: ethers.utils.formatUnits(platformFee.mul(quantity), onchainData.cost.decimals),
+        },
+      },
+      steps: [step],
       isEligible: true,
     };
   }
 
   async purchase(params: PurchaseParams): Promise<Order> {
-    const receipts: TransactionReceipt[] = [];
-    const startTime = new Date();
+    const { account, preparedPurchase } = params;
 
-    try {
-      // Execute each transaction step
-      for (let i = 0; i < params.preparedPurchase.steps.length; i++) {
-        const step = params.preparedPurchase.steps[i];
-        
-        try {
-          const receipt = await step.execute();
-          receipts.push(receipt);
-        } catch (error) {
-          throw new BlindMintError(
-            BlindMintErrorCode.TRANSACTION_FAILED,
-            `Step ${i + 1} failed: ${step.description}`,
-            { 
-              step: step.type,
-              stepIndex: i,
-              error: error instanceof Error ? error.message : 'Unknown error'
-            }
-          );
-        }
+    // Execute all steps
+    const receipts: any[] = [];
+    for (const step of preparedPurchase.steps) {
+      if (step.execute) {
+        // For BlindMint, execute the mint directly with the prepared values
+        const totalValue = ethers.BigNumber.from(preparedPurchase.cost.total.value.toString());
+        const receipt = await this._executeMint(account, account.address, 1, totalValue);
+        receipts.push(receipt);
       }
-
-      return {
-        id: `blindmint_${this.id}_${Date.now()}`,
-        status: 'completed',
-        receipts,
-        createdAt: startTime,
-        completedAt: new Date(),
-      };
-
-    } catch (error) {
-      // Return partial order if some steps completed
-      return {
-        id: `blindmint_${this.id}_${Date.now()}`,
-        status: receipts.length > 0 ? 'partial' : 'failed',
-        receipts,
-        createdAt: startTime,
-        completedAt: new Date(),
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
     }
-  }
 
-  async getPreviewMedia(): Promise<Media | undefined> {
-    // For BlindMint, return preview media from public data
-    return this.data.publicData.previewMedia;
-  }
-
-  async getMetadata(): Promise<ProductMetadata> {
     return {
-      name: this.data.publicData.title,
-      description: this.data.publicData.description,
-      attributes: this.data.publicData.attributes,
+      receipts,
+      status: 'confirmed',
+      buyer: { walletAddress: account.address },
+      total: preparedPurchase.cost,
+      items: [],
     };
   }
 
+  // =============================================================================
+  // HELPER METHODS
+  // =============================================================================
+
+  private async _estimateGas(
+    from: string,
+    _to: string,
+    quantity: number,
+    value: ethers.BigNumber,
+  ): Promise<ethers.BigNumber> {
+    const contract = this._getClaimContract();
+
+    try {
+      // Use mintReserve for gas estimation (matches ABI: address, uint256, uint32)
+      const gasEstimate = await contract.estimateGas?.mintReserve?.(
+        this._creatorContract,
+        this._claimIndex,
+        quantity,
+        { from, value },
+      );
+
+      return gasEstimate || ethers.BigNumber.from(200000);
+    } catch (error) {
+      // Fallback to default gas estimate
+      return ethers.BigNumber.from(200000);
+    }
+  }
+
+  private async _executeMint(
+    account: any, // This is the wallet provider
+    _recipient: string,
+    quantity: number,
+    value: ethers.BigNumber,
+  ): Promise<any> {
+    // Create contract with READ provider for setup
+    const contract = this._getClaimContract();
+
+    // CRITICAL: Use account (wallet) for WRITE operation
+    const tx = await contract
+      .connect(account)
+      .mintReserve(this._creatorContract, this._claimIndex, quantity, { value });
+
+    const receipt = await tx.wait();
+    return {
+      networkId: this.data.publicData.network,
+      txHash: receipt.transactionHash,
+      step: { id: 'mint', name: 'Mint BlindMint NFTs', type: 'mint' },
+      txReceipt: receipt,
+    };
+  }
+
+  // =============================================================================
+  // OTHER PRODUCT METHODS (simplified for now)
+  // =============================================================================
+
   async getInventory(): Promise<BlindMintInventory> {
     const onchainData = await this.fetchOnchainData();
-    
     return {
-      totalSupply: onchainData.totalSupply,
+      totalSupply:
+        onchainData.totalSupply === Number.MAX_SAFE_INTEGER ? -1 : onchainData.totalSupply,
+      totalPurchased: onchainData.totalMinted,
       totalMinted: onchainData.totalMinted,
-      remainingSupply: onchainData.totalSupply - onchainData.totalMinted,
-      tierBreakdown: [], // TODO: Implement tier breakdown
-      walletMinted: 0, // TODO: Query from contract
-      walletRemaining: onchainData.walletMax,
+      remainingSupply:
+        onchainData.totalSupply === Number.MAX_SAFE_INTEGER
+          ? Number.MAX_SAFE_INTEGER
+          : Math.max(0, onchainData.totalSupply - onchainData.totalMinted),
+      tierBreakdown: [],
+      walletMinted: 0,
+      walletRemaining: 0,
     };
   }
 
   async getRules(): Promise<ProductRule> {
     const onchainData = await this.fetchOnchainData();
-    
     return {
-      startDate: onchainData.startDate,
-      endDate: onchainData.endDate,
-      audienceRestriction: 'none', // BlindMint doesn't use allowlists typically
+      startDate: onchainData.startDate.getTime() === 0 ? undefined : onchainData.startDate,
+      endDate: onchainData.endDate.getTime() === 0 ? undefined : onchainData.endDate,
+      audienceRestriction: onchainData.audienceType as any,
       maxPerWallet: onchainData.walletMax || undefined,
     };
   }
 
   async getProvenance(): Promise<ProductProvenance> {
-    const onchainData = await this.fetchOnchainData();
-    
+    const publicData = this.data.publicData;
     return {
       creator: this.data.creator,
-      contract: this.data.publicData.contract,
-      token: onchainData.startingTokenId.toString(),
-      networkId: this.data.publicData.network as NetworkId,
+      contract: publicData.contract,
+      networkId: publicData.network,
     };
   }
 
-  // =============================================================================
-  // ONCHAIN DATA FETCHING
-  // =============================================================================
+  async getMetadata(): Promise<ProductMetadata> {
+    return {
+      name: this.previewData.title || '',
+      description: this.previewData.description || '',
+    };
+  }
 
-  async fetchOnchainData(): Promise<BlindMintOnchainData> {
-    // Return cached data if available and fresh
-    if (this._onchainData && this._isCacheFresh()) {
-      return this._onchainData;
-    }
-
-    // Initialize blockchain infrastructure
-    await this._initializeProviderAndContracts();
-    
-    if (!this._claimContract) {
-      throw new BlindMintError(
-        BlindMintErrorCode.CONTRACT_ERROR,
-        'Claim contract not initialized',
-        { instanceId: this.id }
-      );
-    }
-
-    try {
-      // Use dual-provider pattern for resilient reads
-      this._provider!.switchToOptimal('read');
-
-      // Fetch all onchain data in parallel using the patterns from CONTRACT_PATTERNS.md
-      const [
-        totalSupply,
-        totalMinted,
-        walletMax,
-        startDate,
-        endDate,
-        cost,
-        paymentReceiver,
-        tokenVariations,
-        startingTokenId,
-        metadataLocation,
-        storageProtocol,
-      ] = await Promise.all([
-        this._callWithFallback(() => this._claimContract!.totalSupply()),
-        this._callWithFallback(() => this._claimContract!.totalMinted()),
-        this._callWithFallback(() => this._claimContract!.walletMax()),
-        this._callWithFallback(() => this._claimContract!.startDate()),
-        this._callWithFallback(() => this._claimContract!.endDate()),
-        this._callWithFallback(() => this._claimContract!.cost()),
-        this._callWithFallback(() => this._claimContract!.paymentReceiver()),
-        this._callWithFallback(() => this._claimContract!.tokenVariations()),
-        this._callWithFallback(() => this._claimContract!.startingTokenId()),
-        this._callWithFallback(() => this._claimContract!.metadataLocation()),
-        this._callWithFallback(() => this._claimContract!.storageProtocol()),
-      ]);
-
-      // Transform blockchain data to our types
-      this._onchainData = {
-        totalSupply: totalSupply.toNumber(),
-        totalMinted: totalMinted.toNumber(),
-        walletMax: walletMax.toNumber(),
-        startDate: new Date(startDate.toNumber() * 1000),
-        endDate: new Date(endDate.toNumber() * 1000),
-        audienceType: 'None', // BlindMint typically doesn't use allowlists
-        cost: this._transformCostFromContract(cost),
-        paymentReceiver: paymentReceiver as Address,
-        tokenVariations: tokenVariations.toNumber(),
-        startingTokenId: startingTokenId.toNumber(),
-        storageProtocol: this._transformStorageProtocol(storageProtocol),
-        metadataLocation: metadataLocation,
+  async getPreviewMedia(): Promise<Media | undefined> {
+    // Use previewData for media
+    if (this.previewData.thumbnail) {
+      return {
+        image: this.previewData.thumbnail,
+        imagePreview: this.previewData.thumbnail,
       };
-
-      // Update preview data with onchain information
-      this.previewData.startDate = this._onchainData.startDate;
-      this.previewData.endDate = this._onchainData.endDate;
-      this.previewData.price = this._onchainData.cost;
-
-      return this._onchainData;
-
-    } catch (error) {
-      throw new BlindMintError(
-        BlindMintErrorCode.CONTRACT_ERROR,
-        'Failed to fetch onchain data',
-        { 
-          instanceId: this.id,
-          contractAddress: this.data.publicData.extensionAddress,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }
-      );
     }
+    return undefined;
   }
 
   // =============================================================================
@@ -533,421 +482,178 @@ export class BlindMintProductImpl implements BlindMintProduct {
 
   async getTokenVariations(): Promise<TokenVariation[]> {
     const onchainData = await this.fetchOnchainData();
-    const variations: TokenVariation[] = [];
+    const publicData = this.data.publicData;
 
-    // Use pool data from public data to create token variations
-    for (let i = 0; i < this.data.publicData.pool.length; i++) {
-      const poolItem = this.data.publicData.pool[i];
-      variations.push({
-        tokenId: onchainData.startingTokenId + poolItem.index,
-        metadata: poolItem.metadata,
-        tier: 'Standard', // Default tier, could be enhanced
-        rarityScore: undefined,
-        currentSupply: undefined,
-        maxSupply: undefined,
-      });
-    }
-
-    return variations;
+    return publicData.pool.map((item, index) => ({
+      tokenId: onchainData.startingTokenId + index,
+      metadata: item.metadata,
+      tier: this._getTierForIndex(index, publicData.tierProbabilities),
+      rarityScore: this._calculateRarityScore(index),
+    }));
   }
 
   async getGachaConfig(): Promise<GachaConfig> {
-    const onchainData = await this.fetchOnchainData();
-    
-    // Return cached gacha config if available
-    if (onchainData.gachaConfig) {
-      return onchainData.gachaConfig;
-    }
-
-    // Create basic gacha config from available data
-    const tiers: GachaTier[] = [{
-      id: 'standard',
-      name: 'Standard',
-      probability: 100, // 100% since no tier info available
-      tokenIds: Array.from(
-        { length: onchainData.tokenVariations }, 
-        (_, i) => onchainData.startingTokenId + i
-      ),
-    }];
+    const publicData = this.data.publicData;
+    const tiers = await this.getTierProbabilities();
 
     return {
       tiers,
-      immediateReveal: true, // Default for BlindMint
+      immediateReveal: true,
+      revealDelay: 0,
       allowDuplicates: true,
+      floorPriceHandling: undefined,
     };
   }
 
   async getTierProbabilities(): Promise<GachaTier[]> {
-    const config = await this.getGachaConfig();
-    return config.tiers;
+    const publicData = this.data.publicData;
+    if (!publicData.tierProbabilities) {
+      return [];
+    }
+
+    // Convert legacy format to GachaTier[]
+    return [
+      {
+        id: publicData.tierProbabilities.group,
+        name: publicData.tierProbabilities.group,
+        probability: publicData.tierProbabilities.rate,
+        tokenIds: publicData.tierProbabilities.indices,
+        metadata: {},
+      },
+    ];
   }
 
   async getClaimableTokens(walletAddress: Address): Promise<ClaimableToken[]> {
-    if (!validateAddress(walletAddress)) {
-      throw new BlindMintError(
-        BlindMintErrorCode.INVALID_WALLET_ADDRESS,
-        'Invalid wallet address',
-        { address: walletAddress }
-      );
+    // Check if wallet has any claimable tokens
+    const allocations = await this.getAllocations({ recipientAddress: walletAddress });
+    if (!allocations.isEligible) {
+      return [];
     }
 
-    // For BlindMint, all tokens are claimable (no allowlist)
+    // For BlindMint, all tokens in pool are potentially claimable
     const variations = await this.getTokenVariations();
-    
-    return variations.map(variation => ({
-      tokenId: variation.tokenId,
-      metadata: variation.metadata,
-      tier: variation.tier,
+    return variations.map((v) => ({
+      tokenId: v.tokenId,
+      metadata: v.metadata,
+      tier: v.tier,
       isClaimable: true,
-      proofs: undefined, // No merkle proofs needed for BlindMint
+      proofs: [], // No merkle proofs for standard BlindMint
     }));
   }
 
   async estimateMintGas(quantity: number, walletAddress: Address): Promise<bigint> {
-    if (!this._claimContract) {
-      await this._initializeProviderAndContracts();
-    }
+    const onchainData = await this.fetchOnchainData();
+    const totalValue = this._calculateTotalCost(quantity, onchainData);
 
-    try {
-      const onchainData = await this.fetchOnchainData();
-      const cost = onchainData.cost.value * BigInt(quantity);
-      
-      // Use the gas estimation pattern from CONTRACT_PATTERNS.md
-      this._provider!.switchToOptimal('gasEstimation');
-      
-      const gasEstimate = await this._claimContract!.estimateGas.mint(
-        walletAddress,
-        quantity,
-        { value: cost }
-      );
+    const gasEstimate = await this._estimateGas(
+      walletAddress,
+      walletAddress,
+      quantity,
+      ethers.BigNumber.from(totalValue.toString()),
+    );
 
-      // Add 25% buffer as per CONTRACT_PATTERNS.md
-      const bufferedGas = gasEstimate.mul(125).div(100);
-      
-      return BigInt(bufferedGas.toString());
-
-    } catch (error) {
-      // Return fallback gas estimate
-      return BigInt(200000 * quantity);
-    }
+    return BigInt(gasEstimate.toString());
   }
 
   async validateMint(params: MintValidationParams): Promise<MintValidation> {
-    const errors: any[] = [];
-    const warnings: any[] = [];
+    const { walletAddress, quantity } = params;
+    const errors: ValidationError[] = [];
+    const warnings: ValidationWarning[] = [];
 
-    try {
-      // Validate wallet address
-      if (!validateAddress(params.walletAddress)) {
-        errors.push({
-          code: 'INVALID_WALLET_ADDRESS',
-          message: 'Invalid wallet address format',
-        });
-      }
-
-      // Validate quantity
-      if (params.quantity <= 0) {
-        errors.push({
-          code: 'INVALID_QUANTITY',
-          message: 'Quantity must be greater than 0',
-        });
-      }
-
-      // Check allocations
-      const allocations = await this.getAllocations({
-        recipientAddress: params.walletAddress,
+    // Validate address
+    if (!validateAddress(walletAddress)) {
+      errors.push({
+        code: 'INVALID_ADDRESS',
+        message: 'Invalid wallet address',
+        field: 'walletAddress',
       });
-
-      if (!allocations.isEligible) {
-        errors.push({
-          code: 'NOT_ELIGIBLE',
-          message: 'Wallet is not eligible to mint',
-        });
-      }
-
-      if (params.quantity > allocations.quantity) {
-        errors.push({
-          code: 'EXCEEDS_ALLOCATION',
-          message: `Requested quantity exceeds allocation`,
-        });
-      }
-
-      // Estimate gas and cost
-      let estimatedGas: bigint | undefined;
-      let estimatedCost: Cost | undefined;
-
-      if (errors.length === 0) {
-        try {
-          estimatedGas = await this.estimateMintGas(params.quantity, params.walletAddress);
-          
-          const onchainData = await this.fetchOnchainData();
-          const unitPrice = onchainData.cost.value;
-          const subtotal = unitPrice * BigInt(params.quantity);
-          const fees = (subtotal * BigInt(25)) / BigInt(1000);
-          
-          estimatedCost = {
-            subtotal: this._createMoney(subtotal, onchainData.cost.currency),
-            fees: this._createMoney(fees, onchainData.cost.currency),
-            total: this._createMoney(subtotal + fees, onchainData.cost.currency),
-          };
-        } catch (error) {
-          warnings.push({
-            code: 'GAS_ESTIMATION_FAILED',
-            message: 'Could not estimate gas costs',
-            severity: 'medium' as const,
-          });
-        }
-      }
-
-      return {
-        isValid: errors.length === 0,
-        errors,
-        warnings,
-        estimatedGas,
-        estimatedCost,
-      };
-
-    } catch (error) {
-      return {
-        isValid: false,
-        errors: [{
-          code: 'VALIDATION_ERROR',
-          message: error instanceof Error ? error.message : 'Validation failed',
-        }],
-        warnings,
-      };
     }
+
+    // Check allocations
+    const allocations = await this.getAllocations({ recipientAddress: walletAddress });
+    if (!allocations.isEligible) {
+      errors.push({
+        code: 'NOT_ELIGIBLE',
+        message: allocations.reason || 'Not eligible to mint',
+      });
+    }
+
+    if (quantity > allocations.quantity) {
+      errors.push({
+        code: 'EXCEEDS_LIMIT',
+        message: `Quantity ${quantity} exceeds available ${allocations.quantity}`,
+        field: 'quantity',
+      });
+    }
+
+    // Estimate costs
+    const onchainData = await this.fetchOnchainData();
+    const estimatedCost = this._calculateTotalCost(quantity, onchainData);
+    const estimatedGas = await this.estimateMintGas(quantity, walletAddress);
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings,
+      estimatedGas,
+      estimatedCost: {
+        total: onchainData.cost,
+        subtotal: onchainData.cost,
+        fees: {
+          ...onchainData.cost,
+          value: BigInt(this._platformFee?.mul(quantity).toString() || '0'),
+        },
+      },
+    };
   }
 
   async getFloorPrices(): Promise<FloorPriceData[]> {
-    // Placeholder implementation - would integrate with pricing APIs
+    // Would integrate with price oracle
     return [];
   }
 
   async getMintHistory(walletAddress?: Address): Promise<MintHistoryItem[]> {
-    // Placeholder implementation - would query transaction history
+    // Would query contract events
     return [];
   }
 
   // =============================================================================
-  // PRIVATE HELPER METHODS
+  // HELPER METHODS
   // =============================================================================
 
-  private async _initializeProviderAndContracts(): Promise<void> {
-    if (this._provider && this._contractFactory && this._claimContract) {
-      return; // Already initialized
+  private _getTierForIndex(index: number, tierProb: BlindMintTierProbability): string {
+    if (tierProb && tierProb.indices.includes(index)) {
+      return tierProb.group;
+    }
+    return 'Common';
+  }
+
+  private _calculateRarityScore(index: number): number {
+    // Simple rarity calculation
+    return Math.floor(Math.random() * 100);
+  }
+
+  private _calculateTotalCost(quantity: number, onchainData: BlindMintOnchainData): bigint {
+    const mintCost = BigInt(onchainData.cost.value.toString()) * BigInt(quantity);
+    const platformFee = BigInt(this._platformFee?.toString() || '0') * BigInt(quantity);
+    return mintCost + platformFee;
+  }
+
+  private _extractNetworkId(contract: Contract | undefined): number | undefined {
+    if (!contract) return undefined;
+
+    // Check for network in contract metadata
+    if ((contract as any).networkId) {
+      return (contract as any).networkId;
     }
 
-    try {
-      // Create provider with default configuration
-      const providerConfig = {
-        primary: {
-          required: false,
-          timeout: 5000,
-          retries: 3,
-          detectWalletConnect: true,
-          supportedWallets: []
-        },
-        bridge: {
-          baseUrl: 'https://bridge.manifold.xyz',
-          timeout: 1500,
-          retries: 2,
-          enabled: true,
-          fallbackStrategy: 'after-timeout' as const
-        },
-        networks: {},
-        global: {
-          defaultTimeout: 30000,
-          maxConcurrentOps: 5,
-          strictMode: false,
-          debugMode: false
-        }
-      };
-
-      this._provider = createDualProvider({
-        config: providerConfig,
-        networkId: this.data.publicData.network as NetworkId,
-      });
-
-      // Create contract factory
-      this._contractFactory = new ContractFactoryClass({
-        provider: this._provider,
-        networkId: this.data.publicData.network as NetworkId,
-        enableDebug: false,
-      });
-
-      // Create claim contract instance
-      this._claimContract = this._contractFactory.createBlindMintContract(
-        this.data.publicData.extensionAddress
-      );
-
-    } catch (error) {
-      throw new BlindMintError(
-        BlindMintErrorCode.PROVIDER_UNAVAILABLE,
-        'Failed to initialize blockchain infrastructure',
-        { 
-          instanceId: this.id,
-          networkId: this.data.publicData.network,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }
-      );
-    }
-  }
-
-  private async _callWithFallback<T>(contractCall: () => Promise<T>): Promise<T> {
-    // Implement the resilient read pattern from CONTRACT_PATTERNS.md
-    const timeoutPromise = new Promise<T>((_, reject) => 
-      setTimeout(() => reject(new Error('Primary provider timeout')), 1500)
-    );
-
-    try {
-      // Try primary provider first
-      return await Promise.race([contractCall(), timeoutPromise]);
-    } catch (error) {
-      // Fall back to bridge provider
-      this._provider!.switchToBridge();
-      return await contractCall();
-    }
-  }
-
-  private _createMoney(value: bigint, currency: string): Money {
-    const decimals = 18; // Default to ETH decimals
-    const divisor = BigInt(10) ** BigInt(decimals);
-    const wholePart = value / divisor;
-    const fractionalPart = value % divisor;
-    const formatted = `${wholePart}.${fractionalPart.toString().padStart(decimals, '0').slice(0, 4)} ${currency}`;
-
-    return {
-      value,
-      decimals,
-      currency,
-      erc20: '0x0000000000000000000000000000000000000000', // Default to ETH
-      symbol: currency,
-      name: currency === 'ETH' ? 'Ethereum' : currency,
-      formatted,
-      formattedUSD: `$${Number(value / BigInt(1e16)) / 100}`, // Mock USD conversion
-    };
-  }
-
-  private _transformCostFromContract(costBigNumber: ethers.BigNumber): Money {
-    return this._createMoney(BigInt(costBigNumber.toString()), 'ETH');
-  }
-
-  private _transformStorageProtocol(protocolNumber: number): 'ipfs' | 'arweave' | 'http' | 'data' {
-    switch (protocolNumber) {
-      case 1: return 'ipfs';
-      case 2: return 'arweave';
-      case 3: return 'http';
-      default: return 'ipfs';
-    }
-  }
-
-  private _isCacheFresh(): boolean {
-    // Simple cache freshness check - could be enhanced
-    return true; // For now, always use cached data if available
-  }
-
-  private async _createApprovalStep(
-    tokenAddress: Address,
-    userAddress: Address, 
-    amount: bigint
-  ): Promise<TransactionStep | null> {
-    // Check if approval is needed
-    const erc20Contract = this._contractFactory!.createERC20Contract(tokenAddress);
-    
-    try {
-      const currentAllowance = await erc20Contract.allowance(
-        userAddress,
-        this.data.publicData.extensionAddress
-      );
-
-      if (currentAllowance.gte(amount.toString())) {
-        return null; // No approval needed
-      }
-
-      return {
-        type: 'approve',
-        description: `Approve ${amount} tokens for spending`,
-        estimatedGas: BigInt(50000),
-        execute: async (): Promise<TransactionReceipt> => {
-          const tx = await erc20Contract.approve(
-            userAddress, // Should be extension address
-            amount.toString()
-          );
-          
-          const receipt = await tx.wait();
-          return {
-            txHash: receipt.transactionHash,
-            blockNumber: receipt.blockNumber,
-            gasUsed: BigInt(receipt.gasUsed.toString()),
-            status: receipt.status === 1 ? 'success' : 'failed',
-          };
-        },
-      };
-
-    } catch (error) {
-      // If we can't check allowance, assume approval is needed
-      return {
-        type: 'approve',
-        description: `Approve tokens for spending`,
-        estimatedGas: BigInt(50000),
-        execute: async (): Promise<TransactionReceipt> => {
-          throw new Error('Approval step failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
-        },
-      };
-    }
-  }
-
-  private async _createMintStep(
-    userAddress: Address,
-    quantity: number,
-    totalCost: bigint,
-    isERC20Payment: boolean
-  ): Promise<TransactionStep> {
-    const estimatedGas = await this.estimateMintGas(quantity, userAddress);
-
-    return {
-      type: 'mint',
-      description: `Mint ${quantity} BlindMint NFT(s)`,
-      estimatedGas,
-      execute: async (): Promise<TransactionReceipt> => {
-        if (!this._claimContract) {
-          throw new Error('Claim contract not available');
-        }
-
-        const options = isERC20Payment ? {} : { value: totalCost.toString() };
-        
-        const tx = await this._claimContract.mint(userAddress, quantity, options);
-        const receipt = await tx.wait();
-        
-        return {
-          txHash: receipt.transactionHash,
-          blockNumber: receipt.blockNumber,
-          gasUsed: BigInt(receipt.gasUsed.toString()),
-          status: receipt.status === 1 ? 'success' : 'failed',
-        };
-      },
-    };
+    // Could also infer from contract address patterns
+    // e.g., certain prefixes for testnet vs mainnet
+    return undefined;
   }
 }
 
-// =============================================================================
-// FACTORY FUNCTIONS
-// =============================================================================
-
-/**
- * Create BlindMintProduct from instance data
- */
-export function createBlindMintProduct(
-  instanceData: InstanceData,
-  includeOnchainData = false
-): BlindMintProduct {
-  return new BlindMintProductImpl(instanceData, includeOnchainData);
-}
-
-/**
- * Type guard to check if product is BlindMint
- */
-export function isBlindMintProduct(product: any): product is BlindMintProduct {
-  return Boolean(product && product.type === 'blind-mint');
+// Type guard
+export function isBlindMintProduct(product: Product): product is IBlindMintProduct {
+  return product.type === AppType.BlindMint;
 }

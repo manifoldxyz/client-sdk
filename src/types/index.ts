@@ -32,10 +32,12 @@ export type {
   AllocationRequest,
   AllocationResponse as BlindMintAllocationResponse,
   PriceCalculation,
-  MintValidation,
   ApiError as BlindMintApiError,
   TransformationRule as BlindMintTransformationRule
 } from './data-flow';
+
+// Export MintValidation from blindmint where it's actually defined
+export type { MintValidation } from './blindmint';
 
 export type {
   BlindMintError,
@@ -48,5 +50,5 @@ export type {
 export type {
   NetworkConfig,
   CacheConfig,
-  APIConfig
+  ApiConfig as APIConfig
 } from './config';

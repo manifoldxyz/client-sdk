@@ -1,45 +1,20 @@
-import type { Address, AppType, ProductStatus } from './common';
-import type { 
-  PreparedPurchase, 
-  PurchaseParams, 
-  PreparePurchaseParams, 
-  Order,
-  TransactionStep,
-  TransactionReceipt
-} from './purchase';
+import type { InstancePreview, PublicInstance } from '@manifoldxyz/studio-apps-client';
+import type { Address, AppId, AppType, ProductStatus } from './common';
+import type { PreparedPurchase, PurchaseParams, PreparePurchaseParams, Order } from './purchase';
+import type { BigNumber } from 'ethers';
 
 // Base Product type as per documentation (lines 1231-1238)
-export interface BaseProduct {
-  id: string;
+export interface BaseProduct<T> {
+  id: number;
   type: AppType;
-  data: InstanceData;
-  previewData: PreviewData;
+  data: PublicInstance<T>;
+  previewData: InstancePreview;
 }
 
-// Preview Data type as per documentation (lines 1243-1256)
-export interface PreviewData {
-  title?: string;
-  description?: string;
-  contract?: Contract;
-  thumbnail?: string;
-  payoutAddress?: string;
-  network?: number;
-  startDate?: Date;
-  endDate?: Date;
-  price?: Money;
-}
-
-// Instance Data structure (lines 1479-1488)
-export interface InstanceData {
-  id: string;
-  creator: Workspace;
-  publicData: EditionPublicData | BurnRedeemPublicData | BlindMintPublicData;
-  appId: number;
-  appName: string;
-}
+export type InstanceData<T> = PublicInstance<T> & { appId: AppId };
 
 // Workspace type (lines 1314-1322)
-export interface Workspace {
+export interface Creator {
   id: string;
   slug: string;
   address: string;
@@ -107,10 +82,9 @@ export interface Explorer {
 }
 
 // Specific product types that extend base Product (lines 1239-1248)
-export interface EditionProduct extends BaseProduct {
-  type: AppType.Edition;
-  data: InstanceData & { publicData: EditionPublicData };
-  previewData: PreviewData;
+export interface EditionProduct extends BaseProduct<EditionPublicData> {
+  type: AppType.EDITION;
+  data: PublicInstance<EditionPublicData>;
   onchainData?: EditionOnchainData;
 
   // Methods
@@ -126,10 +100,10 @@ export interface EditionProduct extends BaseProduct {
   fetchOnchainData(): Promise<EditionOnchainData>;
 }
 
-export interface BurnRedeemProduct extends BaseProduct {
-  type: AppType.BurnRedeem;
-  data: InstanceData & { publicData: BurnRedeemPublicData };
-  previewData: PreviewData;
+export interface BurnRedeemProduct extends BaseProduct<BurnRedeemPublicData> {
+  type: AppType.BURN_REDEEM;
+  data: PublicInstance<BurnRedeemPublicData> & { publicData: BurnRedeemPublicData };
+
   onchainData?: BurnRedeemOnchainData;
 
   // Methods
@@ -145,10 +119,9 @@ export interface BurnRedeemProduct extends BaseProduct {
   fetchOnchainData(): Promise<BurnRedeemOnchainData>;
 }
 
-export interface BlindMintProduct extends BaseProduct {
-  type: AppType.BlindMint;
-  data: InstanceData & { publicData: BlindMintPublicData };
-  previewData: PreviewData;
+export interface BlindMintProduct extends BaseProduct<BlindMintPublicData> {
+  type: AppType.BLIND_MINT;
+  data: PublicInstance<BlindMintPublicData> & { publicData: BlindMintPublicData };
   onchainData?: BlindMintOnchainData;
 
   // Methods
@@ -191,19 +164,6 @@ export interface BurnRedeemOnchainData {
   burnSet: BurnSetData;
 }
 
-export interface BlindMintOnchainData {
-  totalSupply: number;
-  totalMinted: number;
-  walletMax: number;
-  startDate: Date;
-  endDate: Date;
-  audienceType: AudienceType;
-  cost: Money;
-  paymentReceiver: string;
-  tokenVariations: number;
-  startingTokenId: number;
-}
-
 // Additional types from documentation
 export interface ProductMetadata {
   name: string;
@@ -237,14 +197,12 @@ export interface Token {
 
 // Enhanced Money type as per documentation (lines 1351-1362)
 export interface Money {
-  value: bigint;
+  value: BigNumber;
   decimals: number;
-  currency: string;
   erc20: string;
   symbol: string;
-  name: string;
   formatted: string;
-  formattedUSD: string;
+  formattedUSD?: string;
 }
 
 // Parameter types
@@ -298,5 +256,5 @@ export type {
   PurchaseParams,
   Order,
   TransactionStep,
-  TransactionReceipt
+  TransactionReceipt,
 } from './purchase';
