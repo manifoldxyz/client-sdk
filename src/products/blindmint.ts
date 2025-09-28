@@ -250,15 +250,31 @@ export class BlindMintProduct implements IBlindMintProduct {
     const onchainData = await this.fetchOnchainData();
     const contract = this._getClaimContract();
 
-    // Get wallet minted count using getUserMints
-    const userMints = await contract.getUserMints(
-      recipientAddress,
-      this._creatorContract,
-      this.id, // Use id as instanceId
-    );
-
-    // Check wallet limit - use deliveredCount from getUserMints
-    const mintedCount = userMints?.deliveredCount || 0;
+    // Get wallet minted count using getTotalMints (as per spec)
+    let mintedCount = 0;
+    try {
+      if (contract && typeof contract.getTotalMints === 'function') {
+        mintedCount = await contract.getTotalMints(
+          recipientAddress,
+          this._creatorContract,
+          this.id, // Use id as claimIndex
+        );
+      } else {
+        console.warn('getTotalMints method not available on contract');
+        // Fallback: try getUserMints directly if available
+        if (contract && typeof contract.getUserMints === 'function') {
+          const userMints = await contract.getUserMints(
+            recipientAddress,
+            this._creatorContract,
+            this.id,
+          );
+          mintedCount = userMints.reservedCount + userMints.deliveredCount;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to get minted count:', error);
+      // Continue with mintedCount = 0 (assume no previous mints)
+    }
     if (onchainData.walletMax > 0 && mintedCount >= onchainData.walletMax) {
       return { isEligible: false, reason: 'Wallet limit reached', quantity: 0 };
     }
@@ -448,11 +464,17 @@ export class BlindMintProduct implements IBlindMintProduct {
         const gasBuffer = params.gasBuffer || {};
         const contract = this._getClaimContract();
 
+        // Prepare mint parameters - empty arrays for indices and proofs (random mint)
+        const mintIndices: number[] = [];
+        const merkleProofs: string[][] = [];
+
         // Estimate gas inside execute
         const gasEstimate = await contract.connect(account).estimateGas.mintReserve!(
           this._creatorContract,
           this.id,
           quantity,
+          mintIndices,
+          merkleProofs,
           {
             value: nativePaymentValue,
           },
@@ -463,10 +485,17 @@ export class BlindMintProduct implements IBlindMintProduct {
 
         const tx = (await contract
           .connect(account)
-          .mintReserve(this._creatorContract, this.id, quantity, {
-            value: nativePaymentValue,
-            gasLimit,
-          })) as ethers.ContractTransaction;
+          .mintReserve(
+            this._creatorContract, 
+            this.id, 
+            quantity, 
+            mintIndices, 
+            merkleProofs,
+            {
+              value: nativePaymentValue,
+              gasLimit,
+            }
+          )) as ethers.ContractTransaction;
         const receipt = await tx.wait();
         return {
           txHash: receipt.transactionHash,
@@ -524,11 +553,14 @@ export class BlindMintProduct implements IBlindMintProduct {
     }
 
     return {
+      id: `blindmint_order_${Date.now()}`,
       receipts,
-      status: 'confirmed',
+      status: 'completed' as const,
       buyer: { walletAddress: account.address },
       total: preparedPurchase.cost,
       items: [],
+      createdAt: new Date(),
+      completedAt: new Date(),
     };
   }
 
@@ -544,10 +576,14 @@ export class BlindMintProduct implements IBlindMintProduct {
   ): Promise<ethers.BigNumber> {
     const contract = this._getClaimContract();
 
+    // Use proper mintReserve signature with indices and proofs
+    const mintIndices: number[] = [];
+    const merkleProofs: string[][] = [];
+
     return await estimateGas({
       contract,
       method: 'mintReserve',
-      args: [this._creatorContract, this.id, quantity],
+      args: [this._creatorContract, this.id, quantity, mintIndices, merkleProofs],
       from,
       value,
       fallbackGas: ethers.BigNumber.from(200000),

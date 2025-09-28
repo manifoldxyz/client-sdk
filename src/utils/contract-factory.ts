@@ -112,6 +112,13 @@ export type BlindMintClaimContract = ethers.Contract & {
     reservedCount: number;
     deliveredCount: number;
   }>;
+  
+  // Total mints method (sum of reserved + delivered)
+  getTotalMints(
+    minter: string,
+    creatorContractAddress: string,
+    instanceId: number,
+  ): Promise<number>;
 
   // MintReserve - the main minting method (ABIv2)
   mintReserve(
@@ -226,11 +233,34 @@ export class ContractFactory {
     // Use primary provider for write operations if signer is available
     const providerOrSigner = this.signer || this.provider.current;
 
-    return new ethers.Contract(
+    const contract = new ethers.Contract(
       address,
       BLINDMINT_CLAIM_ABI,
       providerOrSigner,
     ) as BlindMintClaimContract;
+
+    // Add getTotalMints method implementation using getUserMints
+    contract.getTotalMints = async (
+      minter: string,
+      creatorContractAddress: string,
+      instanceId: number,
+    ): Promise<number> => {
+      try {
+        const userMints = await contract.getUserMints(
+          minter,
+          creatorContractAddress,
+          instanceId,
+        );
+        // Return sum of reserved and delivered counts
+        return userMints.reservedCount + userMints.deliveredCount;
+      } catch (error) {
+        // If getUserMints fails, return 0 (no mints found)
+        console.warn('Failed to get user mints:', error);
+        return 0;
+      }
+    };
+
+    return contract;
   }
 
   /**
