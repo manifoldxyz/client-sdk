@@ -58,12 +58,12 @@ export interface Media {
 
 // Contract type (lines 1331-1342)
 export interface Contract {
+  id: number;
+  name: string;
+  symbol: string;
+  contractAddress: string;
   networkId: number;
-  address: string;
-  explorer: Explorer;
-  name?: string;
-  symbol?: string;
-  spec: 'erc1155' | 'erc721';
+  spec: string;
 }
 
 // Explorer type (lines 1364-1371)

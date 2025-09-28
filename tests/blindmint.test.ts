@@ -6,6 +6,10 @@ import { BlindMintError, BlindMintErrorCode } from '../src/types/enhanced-errors
 
 // Mock the external dependencies
 vi.mock('../src/utils/provider-factory', () => ({
+  createProvider: vi.fn(() => ({
+    getBlockNumber: vi.fn().mockResolvedValue(1000000),
+    getBalance: vi.fn().mockResolvedValue({ toString: () => '1000000000000000000' }), // 1 ETH
+  })),
   createDualProvider: vi.fn(() => ({
     switchToOptimal: vi.fn(),
     switchToBridge: vi.fn(),
@@ -18,19 +22,26 @@ vi.mock('../src/utils/provider-factory', () => ({
 vi.mock('../src/utils/contract-factory', () => ({
   ContractFactory: vi.fn().mockImplementation(() => ({
     createBlindMintContract: vi.fn(() => ({
-      totalSupply: vi.fn().mockResolvedValue({ toNumber: () => 10000 }),
-      totalMinted: vi.fn().mockResolvedValue({ toNumber: () => 2500 }),
-      walletMax: vi.fn().mockResolvedValue({ toNumber: () => 5 }),
-      startDate: vi.fn().mockResolvedValue({ toNumber: () => Date.now() / 1000 - 3600 }),
-      endDate: vi.fn().mockResolvedValue({ toNumber: () => Date.now() / 1000 + 86400 }),
-      cost: vi.fn().mockResolvedValue({ toString: () => '100000000000000000' }), // 0.1 ETH
-      paymentReceiver: vi.fn().mockResolvedValue('0x1234567890123456789012345678901234567890'),
-      tokenVariations: vi.fn().mockResolvedValue({ toNumber: () => 10 }),
-      startingTokenId: vi.fn().mockResolvedValue({ toNumber: () => 1 }),
-      metadataLocation: vi.fn().mockResolvedValue('ipfs://test'),
-      storageProtocol: vi.fn().mockResolvedValue(1), // IPFS
+      MINT_FEE: vi.fn().mockResolvedValue({ toString: () => '10000000000000000' }), // 0.01 ETH
+      getClaim: vi.fn().mockResolvedValue({
+        storageProtocol: 1,
+        total: 2500,
+        totalMax: 10000,
+        startDate: Math.floor(Date.now() / 1000) - 3600, // Started 1 hour ago
+        endDate: Math.floor(Date.now() / 1000) + 86400, // Ends in 24 hours
+        startingTokenId: { toString: () => '1' },
+        tokenVariations: 10,
+        location: 'ipfs://test',
+        paymentReceiver: '0x1234567890123456789012345678901234567890',
+        cost: { toString: () => '100000000000000000' }, // 0.1 ETH
+        erc20: '0x0000000000000000000000000000000000000000', // ETH
+      }),
+      getUserMints: vi.fn().mockResolvedValue({
+        reservedCount: 1,
+        deliveredCount: 1,
+      }),
       estimateGas: {
-        mint: vi.fn().mockResolvedValue({ mul: vi.fn().mockReturnValue({ div: vi.fn().mockReturnValue({ toString: () => '200000' }) }) })
+        mintReserve: vi.fn().mockResolvedValue({ toString: () => '200000' })
       }
     }))
   }))
@@ -51,6 +62,64 @@ vi.mock('../src/utils/validation', () => ({
   validateAddress: vi.fn((address: string) => address.startsWith('0x') && address.length === 42)
 }));
 
+vi.mock('../src/libs/money', () => ({
+  Money: {
+    create: vi.fn().mockResolvedValue({
+      value: { toString: () => '100000000000000000' },
+      decimals: 18,
+      symbol: 'ETH',
+      erc20: '0x0000000000000000000000000000000000000000',
+      formatted: '0.1',
+      formattedUSD: '$250.00',
+      isPositive: () => true,
+      isERC20: () => false,
+      multiplyInt: vi.fn().mockReturnValue({
+        value: { toString: () => '200000000000000000' },
+        decimals: 18,
+        symbol: 'ETH',
+        erc20: '0x0000000000000000000000000000000000000000',
+        formatted: '0.2',
+        formattedUSD: '$500.00',
+        isPositive: () => true,
+        isERC20: () => false,
+      }),
+      add: vi.fn().mockReturnValue({
+        value: { toString: () => '200000000000000000' },
+        decimals: 18,
+        symbol: 'ETH',
+        erc20: '0x0000000000000000000000000000000000000000',
+        formatted: '0.2',
+        formattedUSD: '$500.00',
+        isPositive: () => true,
+        isERC20: () => false,
+      }),
+      raw: { toString: () => '100000000000000000' },
+    }),
+    zero: vi.fn().mockResolvedValue({
+      value: { toString: () => '0' },
+      decimals: 18,
+      symbol: 'ETH',
+      erc20: '0x0000000000000000000000000000000000000000',
+      formatted: '0.0',
+      formattedUSD: '$0.00',
+      isPositive: () => false,
+      isERC20: () => false,
+      raw: { toString: () => '0' },
+    }),
+    fromData: vi.fn().mockReturnValue({
+      value: { toString: () => '0' },
+      decimals: 18,
+      symbol: 'ETH',
+      erc20: '0x0000000000000000000000000000000000000000',
+      formatted: '0.0',
+      formattedUSD: '$0.00',
+      isPositive: () => false,
+      isERC20: () => false,
+      raw: { toString: () => '0' },
+    }),
+  }
+}));
+
 describe('BlindMintProduct', () => {
   let mockInstanceData: InstanceData;
   let blindMintProduct: BlindMintProductImpl;
@@ -69,55 +138,57 @@ describe('BlindMintProduct', () => {
         name: 'Test Creator',
       },
       publicData: {
-        title: 'Test BlindMint Collection',
+        name: 'Test BlindMint Collection',
         description: 'A test BlindMint collection',
         network: 1 as NetworkId,
         contract: {
+          id: 123,
           networkId: 1 as NetworkId,
-          address: '0x2234567890123456789012345678901234567890' as Address,
+          contractAddress: '0x2234567890123456789012345678901234567890',
           spec: 'erc1155',
           name: 'Test Collection',
           symbol: 'TEST',
-          explorer: {
-            etherscanUrl: 'https://etherscan.io/address/0x2234567890123456789012345678901234567890',
-          },
         },
-        extensionAddress: '0x3234567890123456789012345678901234567890' as Address,
-        tierProbabilities: {
+        extensionAddress1155: {
+          value: '0x3234567890123456789012345678901234567890' as Address,
+          version: 1,
+        },
+        tierProbabilities: [{
           group: 'Standard',
           indices: [0, 1, 2],
           rate: 10000,
-        },
+        }],
         pool: [
           {
-            index: 0,
+            seriesIndex: 1,
             metadata: {
               name: 'Common Item',
               description: 'A common item',
-              media: {
-                image: 'https://example.com/common.png',
-                imagePreview: 'https://example.com/common-preview.png',
-              },
+              image: 'https://example.com/common.png',
             },
           },
           {
-            index: 1,
+            seriesIndex: 2,
             metadata: {
               name: 'Rare Item',
               description: 'A rare item',
-              media: {
-                image: 'https://example.com/rare.png',
-                imagePreview: 'https://example.com/rare-preview.png',
-              },
+              image: 'https://example.com/rare.png',
             },
           },
         ],
       },
-      appId: 3,
+      appId: 2526777015, // AppId.BLIND_MINT_1155
       appName: 'BlindMint',
     } as any;
 
-    blindMintProduct = new BlindMintProductImpl(mockInstanceData);
+    const mockPreviewData = {
+      id: 'test-blindmint-123',
+      title: 'Test BlindMint Collection',
+      description: 'A test BlindMint collection',
+      thumbnail: 'https://example.com/thumbnail.png',
+    } as any;
+
+    blindMintProduct = new BlindMintProductImpl(mockInstanceData, mockPreviewData);
   });
 
   describe('Constructor', () => {
@@ -140,7 +211,14 @@ describe('BlindMintProduct', () => {
 
   describe('Factory Functions', () => {
     it('should create BlindMint product using factory function', () => {
-      const product = createBlindMintProduct(mockInstanceData);
+      const mockPreviewData = {
+        id: 'test-blindmint-123',
+        title: 'Test BlindMint Collection',
+        description: 'A test BlindMint collection',
+        thumbnail: 'https://example.com/thumbnail.png',
+      } as any;
+      
+      const product = createBlindMintProduct(mockInstanceData, mockPreviewData);
       
       expect(product.type).toBe('blind-mint');
       expect(product.id).toBe('test-blindmint-123');

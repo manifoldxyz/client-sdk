@@ -32,7 +32,6 @@ export function createProvider(options: ProviderFactoryOptions): ethers.provider
 
   // Create primary provider from custom RPC URLs if available
   const primary = createPrimaryProvider(networkId, customRpcUrls);
-
   return primary || bridge; // fallback to bridge if primary is not available
 }
 
@@ -59,6 +58,7 @@ function createPrimaryProvider(
 
     return null;
   } catch (error) {
+    console.log('errrr', error)
     return null;
   }
 }

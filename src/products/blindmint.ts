@@ -98,8 +98,8 @@ export class BlindMintProduct implements IBlindMintProduct {
 
     this.id = instanceData.id;
 
-    this._creatorContract = publicData.contract.address as Address;
-    this._extensionAddress = publicData.extensionAddress;
+    this._creatorContract = publicData.contract.contractAddress as Address;
+    this._extensionAddress = publicData.extensionAddress1155.value;
   }
 
   // =============================================================================
@@ -185,7 +185,7 @@ export class BlindMintProduct implements IBlindMintProduct {
 
     // Convert dates from unix seconds
     const convertDate = (unixSeconds: number) => {
-      return unixSeconds === 0 ? new Date(0) : new Date(unixSeconds * 1000);
+      return unixSeconds === 0 ? 0 : new Date(unixSeconds * 1000);
     };
 
     const networkId = this.data.publicData.network;
@@ -224,7 +224,7 @@ export class BlindMintProduct implements IBlindMintProduct {
   async getStatus(): Promise<BlindMintStatus> {
     const onchainData = await this.fetchOnchainData();
     const now = Date.now();
-
+    console.log('endDate', onchainData.endDate)
     if (onchainData.startDate && now < onchainData.startDate.getTime()) {
       return 'upcoming';
     }
@@ -251,30 +251,8 @@ export class BlindMintProduct implements IBlindMintProduct {
     const contract = this._getClaimContract();
 
     // Get wallet minted count using getTotalMints (as per spec)
-    let mintedCount = 0;
-    try {
-      if (contract && typeof contract.getTotalMints === 'function') {
-        mintedCount = await contract.getTotalMints(
-          recipientAddress,
-          this._creatorContract,
-          this.id, // Use id as claimIndex
-        );
-      } else {
-        console.warn('getTotalMints method not available on contract');
-        // Fallback: try getUserMints directly if available
-        if (contract && typeof contract.getUserMints === 'function') {
-          const userMints = await contract.getUserMints(
-            recipientAddress,
-            this._creatorContract,
-            this.id,
-          );
-          mintedCount = userMints.reservedCount + userMints.deliveredCount;
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to get minted count:', error);
-      // Continue with mintedCount = 0 (assume no previous mints)
-    }
+    const userMints = await contract.getUserMints(recipientAddress, this._creatorContract, this.id);
+    const mintedCount = userMints.reservedCount + userMints.deliveredCount;
     if (onchainData.walletMax > 0 && mintedCount >= onchainData.walletMax) {
       return { isEligible: false, reason: 'Wallet limit reached', quantity: 0 };
     }
@@ -300,35 +278,30 @@ export class BlindMintProduct implements IBlindMintProduct {
     const networkId = this.data.publicData.network;
 
     if (!validateAddress(address)) {
-      throw new BlindMintError(
-        BlindMintErrorCode.INVALID_WALLET_ADDRESS,
-        'Invalid address',
-        { walletAddress: address },
-      );
+      throw new BlindMintError(BlindMintErrorCode.INVALID_WALLET_ADDRESS, 'Invalid address', {
+        walletAddress: address,
+      });
     }
 
     // Check status first
     const status = await this.getStatus();
     if (status === 'upcoming') {
-      throw new BlindMintError(
-        BlindMintErrorCode.MINT_NOT_STARTED,
-        'Sale has not started',
-        { instanceId: String(this.id), mintStatus: status },
-      );
+      throw new BlindMintError(BlindMintErrorCode.MINT_NOT_STARTED, 'Sale has not started', {
+        instanceId: String(this.id),
+        mintStatus: status,
+      });
     }
     if (status === 'completed') {
-      throw new BlindMintError(
-        BlindMintErrorCode.MINT_ENDED,
-        'Sale has ended',
-        { instanceId: String(this.id), mintStatus: status },
-      );
+      throw new BlindMintError(BlindMintErrorCode.MINT_ENDED, 'Sale has ended', {
+        instanceId: String(this.id),
+        mintStatus: status,
+      });
     }
     if (status === 'sold-out') {
-      throw new BlindMintError(
-        BlindMintErrorCode.SOLD_OUT,
-        'Product is sold out',
-        { instanceId: String(this.id), mintStatus: status },
-      );
+      throw new BlindMintError(BlindMintErrorCode.SOLD_OUT, 'Product is sold out', {
+        instanceId: String(this.id),
+        mintStatus: status,
+      });
     }
 
     // Check allocations
@@ -464,17 +437,11 @@ export class BlindMintProduct implements IBlindMintProduct {
         const gasBuffer = params.gasBuffer || {};
         const contract = this._getClaimContract();
 
-        // Prepare mint parameters - empty arrays for indices and proofs (random mint)
-        const mintIndices: number[] = [];
-        const merkleProofs: string[][] = [];
-
         // Estimate gas inside execute
         const gasEstimate = await contract.connect(account).estimateGas.mintReserve!(
           this._creatorContract,
           this.id,
           quantity,
-          mintIndices,
-          merkleProofs,
           {
             value: nativePaymentValue,
           },
@@ -485,17 +452,10 @@ export class BlindMintProduct implements IBlindMintProduct {
 
         const tx = (await contract
           .connect(account)
-          .mintReserve(
-            this._creatorContract, 
-            this.id, 
-            quantity, 
-            mintIndices, 
-            merkleProofs,
-            {
-              value: nativePaymentValue,
-              gasLimit,
-            }
-          )) as ethers.ContractTransaction;
+          .mintReserve(this._creatorContract, this.id, quantity, {
+            value: nativePaymentValue,
+            gasLimit,
+          })) as ethers.ContractTransaction;
         const receipt = await tx.wait();
         return {
           txHash: receipt.transactionHash,
@@ -622,15 +582,22 @@ export class BlindMintProduct implements IBlindMintProduct {
         address: this.data.creator.address || '',
         name: this.data.creator.name,
       },
-      contract: publicData.contract,
+      contract: {
+        id: publicData.contract.id,
+        networkId: publicData.contract.networkId,
+        contractAddress: publicData.contract.contractAddress,
+        name: publicData.contract.name,
+        symbol: publicData.contract.symbol,
+        spec: publicData.contract.spec,
+      },
       networkId: publicData.network,
     };
   }
 
   async getMetadata(): Promise<ProductMetadata> {
     return {
-      name: this.previewData.title || '',
-      description: this.previewData.description || '',
+      name: this.data.publicData.name || this.previewData.title || '',
+      description: this.data.publicData.description || this.previewData.description || '',
     };
   }
 
@@ -653,11 +620,11 @@ export class BlindMintProduct implements IBlindMintProduct {
     const onchainData = await this.fetchOnchainData();
     const publicData = this.data.publicData;
 
-    return publicData.pool.map((item, index) => ({
-      tokenId: parseInt(onchainData.startingTokenId) + index,
+    return publicData.pool.map((item) => ({
+      tokenId: parseInt(onchainData.startingTokenId) + (item.seriesIndex - 1), // seriesIndex is 1-based
       metadata: item.metadata,
-      tier: this._getTierForIndex(index, publicData.tierProbabilities),
-      rarityScore: this._calculateRarityScore(index),
+      tier: this._getTierForIndex(item.seriesIndex - 1, publicData.tierProbabilities),
+      rarityScore: this._calculateRarityScore(item.seriesIndex - 1),
     }));
   }
 
@@ -675,20 +642,18 @@ export class BlindMintProduct implements IBlindMintProduct {
 
   async getTierProbabilities(): Promise<GachaTier[]> {
     const publicData = this.data.publicData;
-    if (!publicData.tierProbabilities) {
+    if (!publicData.tierProbabilities || publicData.tierProbabilities.length === 0) {
       return [];
     }
 
-    // Convert legacy format to GachaTier[]
-    return [
-      {
-        id: publicData.tierProbabilities.group,
-        name: publicData.tierProbabilities.group,
-        probability: publicData.tierProbabilities.rate,
-        tokenIds: publicData.tierProbabilities.indices,
-        metadata: {},
-      },
-    ];
+    // Convert array format to GachaTier[]
+    return publicData.tierProbabilities.map((tier) => ({
+      id: tier.group,
+      name: tier.group,
+      probability: tier.rate,
+      tokenIds: tier.indices,
+      metadata: {},
+    }));
   }
 
   async getClaimableTokens(walletAddress: Address): Promise<ClaimableToken[]> {
@@ -795,9 +760,13 @@ export class BlindMintProduct implements IBlindMintProduct {
   // HELPER METHODS
   // =============================================================================
 
-  private _getTierForIndex(index: number, tierProb: BlindMintTierProbability): string {
-    if (tierProb && tierProb.indices.includes(index)) {
-      return tierProb.group;
+  private _getTierForIndex(index: number, tierProbs: BlindMintTierProbability[]): string {
+    if (tierProbs && tierProbs.length > 0) {
+      for (const tierProb of tierProbs) {
+        if (tierProb.indices.includes(index)) {
+          return tierProb.group;
+        }
+      }
     }
     return 'Common';
   }
@@ -837,5 +806,5 @@ export function createBlindMintProduct(
 
 // Type guard
 export function isBlindMintProduct(product: Product): product is IBlindMintProduct {
-  return product.type === AppType.BLIND_MINT;
+  return product?.type === AppType.BLIND_MINT;
 }

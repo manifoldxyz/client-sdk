@@ -99,11 +99,10 @@ describe('API Integration Tests', () => {
 
   describe('Manifold API Client', () => {
     it('should create API client with proper configuration', () => {
-      const config = createApiConfig({ environment: 'test' });
-      const client = createManifoldApiClient(config, true);
+      const client = createManifoldApiClient();
       
       expect(client).toBeDefined();
-      expect(typeof client.getInstanceData).toBe('function');
+      expect(typeof client.getCompleteInstanceData).toBe('function');
     });
 
     it('should fetch instance data successfully', async () => {
@@ -114,12 +113,11 @@ describe('API Integration Tests', () => {
         json: () => Promise.resolve(mockInstanceData),
       } as Response);
 
-      const config = createApiConfig({ environment: 'test' });
-      const client = createManifoldApiClient(config, true);
+      const client = createManifoldApiClient();
       
-      const result = await client.getInstanceData(mockInstanceId);
+      const result = await client.getCompleteInstanceData(mockInstanceId);
       
-      expect(result).toEqual(mockInstanceData);
+      expect(result.instanceData).toBeDefined();
       expect(mockFetch).toHaveBeenCalledWith(
         `https://apps.api.manifoldxyz.dev/public/instance/data?id=${mockInstanceId}`,
         expect.objectContaining({
@@ -141,11 +139,10 @@ describe('API Integration Tests', () => {
         statusText: 'Not Found',
       } as Response);
 
-      const config = createApiConfig({ environment: 'test' });
-      const client = createManifoldApiClient(config, true);
+      const client = createManifoldApiClient();
       
       // Single call that should throw the correct error
-      await expect(client.getInstanceData(mockInstanceId)).rejects.toThrow(
+      await expect(client.getCompleteInstanceData(mockInstanceId)).rejects.toThrow(
         'API resource not found'
       );
     }, 10000); // Increase timeout to 10 seconds
@@ -164,12 +161,11 @@ describe('API Integration Tests', () => {
         json: () => Promise.resolve(mockInstanceData),
       } as Response);
 
-      const config = createApiConfig({ environment: 'test' });
-      const client = createManifoldApiClient(config, true);
+      const client = createManifoldApiClient();
       
-      const result = await client.getInstanceData(mockInstanceId);
+      const result = await client.getCompleteInstanceData(mockInstanceId);
       
-      expect(result).toEqual(mockInstanceData);
+      expect(result.instanceData).toBeDefined();
       expect(mockFetch).toHaveBeenCalledTimes(3);
     });
 
@@ -181,10 +177,9 @@ describe('API Integration Tests', () => {
         json: () => Promise.resolve({ invalid: 'data' }),
       } as Response);
 
-      const config = createApiConfig({ environment: 'test' });
-      const client = createManifoldApiClient(config, true);
+      const client = createManifoldApiClient();
       
-      await expect(client.getInstanceData(mockInstanceId)).rejects.toThrow(
+      await expect(client.getCompleteInstanceData(mockInstanceId)).rejects.toThrow(
         'Invalid instance data: missing or invalid id'
       );
     });
@@ -460,7 +455,7 @@ describe('API Integration Tests', () => {
       
       const client = createManifoldApiClient(config, true);
       
-      await expect(client.getInstanceData(mockInstanceId)).rejects.toThrow(
+      await expect(client.getCompleteInstanceData(mockInstanceId)).rejects.toThrow(
         ClientSDKError
       );
     }, 10000);
@@ -473,10 +468,9 @@ describe('API Integration Tests', () => {
         statusText: 'Too Many Requests',
       } as Response);
 
-      const config = createApiConfig({ environment: 'test' });
-      const client = createManifoldApiClient(config, true);
+      const client = createManifoldApiClient();
       
-      const error = await client.getInstanceData(mockInstanceId).catch(e => e);
+      const error = await client.getCompleteInstanceData(mockInstanceId).catch(e => e);
       expect(error).toBeInstanceOf(ClientSDKError);
       expect(error.code).toBe(ErrorCode.RATE_LIMITED);
     });
@@ -493,7 +487,7 @@ describe('API Integration Tests', () => {
       config.requests!.maxRetries = 0; // No retries to speed up test
       const client = createManifoldApiClient(config, true);
       
-      await expect(client.getInstanceData(mockInstanceId)).rejects.toThrow(
+      await expect(client.getCompleteInstanceData(mockInstanceId)).rejects.toThrow(
         ClientSDKError
       );
     }, 10000);

@@ -112,13 +112,6 @@ export type BlindMintClaimContract = ethers.Contract & {
     reservedCount: number;
     deliveredCount: number;
   }>;
-  
-  // Total mints method (sum of reserved + delivered)
-  getTotalMints(
-    minter: string,
-    creatorContractAddress: string,
-    instanceId: number,
-  ): Promise<number>;
 
   // MintReserve - the main minting method (ABIv2)
   mintReserve(

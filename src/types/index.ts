@@ -43,8 +43,9 @@ export type {
   BlindMintError,
   BlindMintErrorCode,
   ValidationError as BlindMintValidationError,
-  ErrorClassification,
-  RecoveryAction
+  ErrorSeverity,
+  ErrorCategory,
+  ErrorMetadata
 } from './enhanced-errors';
 
 export type {

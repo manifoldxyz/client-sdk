@@ -55,18 +55,37 @@ export interface BlindMintOnchainData {
  * This is the main public data structure for BlindMint products
  */
 export interface BlindMintPublicData {
-  /** Display title for the mint */
-  title: string;
+  /** Display name for the mint */
+  name: string;
   /** Description of the mint */
   description?: string;
   /** Network ID where the contract is deployed */
   network: number;
   /** Contract details */
-  contract: Contract;
+  contract: {
+    id: number;
+    name: string;
+    symbol: string;
+    contractAddress: string;
+    networkId: number;
+    spec: string;
+  };
   /** Claim extension contract address */
-  extensionAddress: Address;
+  extensionAddress1155: {
+    value: Address;
+    version: number;
+  };
+  /** Price configuration */
+  price?: {
+    value: string;
+    decimals: number;
+    currency: string;
+    erc20: string;
+    symbol: string;
+    name: string;
+  };
   /** Tier probability configuration */
-  tierProbabilities: BlindMintTierProbability;
+  tierProbabilities: BlindMintTierProbability[];
   /** Pool of available tokens */
   pool: BlindMintPool[];
   /** Preview media for the collection */
@@ -140,8 +159,8 @@ export interface BlindMintTierProbability {
  * Pool item configuration (legacy support)
  */
 export interface BlindMintPool {
-  /** Pool index */
-  index: number;
+  /** Series index */
+  seriesIndex: number;
   /** Token metadata */
   metadata: Asset;
 }

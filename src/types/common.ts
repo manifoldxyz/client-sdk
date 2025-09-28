@@ -1,4 +1,4 @@
-export type Address = `0x${string}`;
+export type Address = string;
 
 export type NetworkId = number;
 

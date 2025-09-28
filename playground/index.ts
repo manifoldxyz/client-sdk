@@ -28,7 +28,7 @@ const getNetworkRPCs = (): Record<number, string> => {
 
 async function testProduct(product: Product, wallet?: ethers.Wallet) {
   console.log(`\n📦 Testing ${product.type} Product`);
-  console.log(`   Name: ${product.data.publicData.title || 'Unknown'}`);
+  console.log(`   Name: ${product.data.appName || 'Unknown'}`);
   console.log(`   ID: ${product.id}`);
   console.log(`   Network: ${product.data.publicData.network}`);
 
@@ -40,7 +40,7 @@ async function testProduct(product: Product, wallet?: ethers.Wallet) {
     // Test allocation check
     const testAddress = wallet ? wallet.address : '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0';
     const allocation = await product.getAllocations({
-      recipientAddress: testAddress,
+      recipientAddress: testAddress as `0x${string}`,
     });
     console.log(`\n   🎫 Allocation for ${testAddress.slice(0, 10)}...`);
     console.log(`      Eligible: ${allocation.isEligible}`);
@@ -65,16 +65,13 @@ async function testProduct(product: Product, wallet?: ethers.Wallet) {
         payload,
       });
 
-      console.log(`      Total Cost: ${prepared.cost.total.formatted}`);
-      console.log(`      Subtotal: ${prepared.cost.subtotal.formatted}`);
-      console.log(`      Fees: ${prepared.cost.fees.formatted}`);
+      console.log(`      Total Cost: ${prepared.cost.total}`);
+      console.log(`      Subtotal: ${prepared.cost.breakdown.product}`);
+      console.log(`      Fees: ${prepared.cost.breakdown.platformFee}`);
       console.log(`      Steps: ${prepared.steps.length}`);
       
       prepared.steps.forEach((step, i) => {
         console.log(`      Step ${i + 1}: ${step.name} (${step.type})`);
-        if (step.gasEstimate) {
-          console.log(`         Gas: ${step.gasEstimate.toString()}`);
-        }
       });
 
       // Execute purchase if wallet provided
@@ -83,11 +80,11 @@ async function testProduct(product: Product, wallet?: ethers.Wallet) {
         console.log(`      (Skipping actual transaction in playground)`);
         
         // Uncomment to actually execute:
-        // const order = await product.purchase({
-        //   account: wallet,
-        //   preparedPurchase: prepared,
-        // });
-        // console.log(`   ✅ Order completed: ${order.receipts[0]?.txHash}`);
+        const order = await product.purchase({
+          account: wallet,
+          preparedPurchase: prepared,
+        });
+        console.log(`   ✅ Order completed: ${order.receipts[0]?.txHash}`);
       }
     }
   } catch (error) {
@@ -103,7 +100,7 @@ async function main() {
   const debug = process.env.DEBUG === 'true';
   const httpRPCs = getNetworkRPCs();
   const testNetworkId = parseInt(getEnvVar('TEST_NETWORK_ID', '11155111'));
-  const testInstanceId = getEnvVar('TEST_INSTANCE_ID', '4150231280');
+  const testInstanceId = getEnvVar('TEST_INSTANCE_ID', '4149776624');
   const privateKey = process.env.TEST_PRIVATE_KEY;
 
   console.log('📋 Configuration:');
@@ -131,7 +128,6 @@ async function main() {
 
   // Create client
   const client = createClient({
-    debug,
     httpRPCs,
   });
 
@@ -182,30 +178,9 @@ async function main() {
   
   try {
     const product = await client.getProduct(testUrl);
-    console.log(`✅ Successfully parsed URL and got product: ${product.data.publicData.title || product.id}`);
+    console.log(`✅ Successfully parsed URL and got product: ${product.data.appName || product.id}`);
   } catch (error) {
     console.error('❌ Error parsing URL:', error);
-  }
-
-  // Test 4: Workspace products
-  if (process.env.TEST_WORKSPACE) {
-    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('Test 4: Workspace Products');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-    try {
-      const products = await client.getProductsByWorkspace(process.env.TEST_WORKSPACE, {
-        limit: 5,
-        networkId: testNetworkId,
-      });
-      
-      console.log(`\nFound ${products.length} products in workspace:`);
-      for (const product of products) {
-        console.log(`   - ${product.data.publicData.title || 'Untitled'} (${product.type})`);
-      }
-    } catch (error) {
-      console.error('❌ Error getting workspace products:', error);
-    }
   }
 
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

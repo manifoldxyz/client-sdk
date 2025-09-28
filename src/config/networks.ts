@@ -74,6 +74,15 @@ const ETHEREUM_EXPLORER: ExplorerConfig = {
   apiEndpoint: 'https://api.etherscan.io/api'
 };
 
+const SEPOLIA_EXPLORER: ExplorerConfig = {
+  baseUrl: 'https://sepolia.etherscan.io',
+  txUrlTemplate: 'https://sepolia.etherscan.io/tx/{hash}',
+  addressUrlTemplate: 'https://sepolia.etherscan.io/address/{address}',
+  blockUrlTemplate: 'https://sepolia.etherscan.io/block/{block}',
+  apiEndpoint: 'https://api.sepolia.etherscan.io/api'
+};
+
+
 const POLYGON_EXPLORER: ExplorerConfig = {
   baseUrl: 'https://polygonscan.com',
   txUrlTemplate: 'https://polygonscan.com/tx/{hash}',
@@ -289,6 +298,34 @@ export const NETWORK_CONFIGS: Record<NetworkId, NetworkConfig> = {
     gas: POLYGON_GAS_CONFIG,
     contracts: POLYGON_CONTRACTS,
     features: POLYGON_FEATURES
+  },
+
+  // Sepolia
+  11155111: {
+    networkId: 11155111,
+    chainId: 11155111,
+    name: 'Sepolia',
+    nativeCurrency: BASE_CURRENCY,
+    rpc: createRpcConfig(
+      'https://rpc.manifold.xyz/base',
+      [
+        'https://base.llamarpc.com',
+        'https://sepolia.base.org',
+        'https://base.publicnode.com'
+      ]
+    ),
+    explorer: SEPOLIA_EXPLORER,
+    gas: {
+      ...L2_GAS_CONFIG,
+      fees: {
+        ...L2_GAS_CONFIG.fees,
+        networkAdjustments: { 8453: 0.01 }
+      }
+    },
+    contracts: {
+      ...POLYGON_CONTRACTS, // Base uses similar contract setup
+    },
+    features: L2_FEATURES
   },
 
   // Base

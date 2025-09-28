@@ -41,6 +41,7 @@ export function createClient(config?: ClientConfig): ManifoldClient {
       }
 
       try {
+        console.log('grabbing instanceId', instanceId)
         // Fetch both instance and preview data using Studio Apps Client
         const { instanceData, previewData } = await manifoldApi.getCompleteInstanceData(instanceId);
 
@@ -57,6 +58,7 @@ export function createClient(config?: ClientConfig): ManifoldClient {
         // For now, fallback to mock for other product types
         return createMockProduct(instanceId);
       } catch (error) {
+        console.log('error', error)
         // Re-throw SDK errors
         if (error instanceof ClientSDKError) {
           throw error;
