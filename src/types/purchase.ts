@@ -1,6 +1,7 @@
 import type { Address, Cost, NetworkId } from './common';
+import type { Money } from './product';
 
-export interface PreparePurchaseParams<T = any> {
+export interface PreparePurchaseParams<T> {
   address: Address;
   recipientAddress?: Address;
   networkId?: NetworkId;
@@ -27,17 +28,38 @@ export interface BlindMintPayload {
 }
 
 export interface PreparedPurchase {
-  cost: Cost;
+  cost: EnhancedCost;
   steps: TransactionStep[];
   isEligible: boolean;
   reason?: string;
 }
 
+export interface EnhancedCost {
+  // Total tokens the user needs to have
+  total: {
+    native?: Money; // Native tokens needed (if any)
+    erc20s: Money[]; // Array of ERC20 tokens needed (can be multiple different tokens)
+  };
+
+  // Breakdown by purpose (for transparency)
+  breakdown: {
+    product: Money; // Product cost (could be native or ERC20)
+    platformFee: Money; // Platform fee (could be native or ERC20)
+  };
+}
+
 export interface TransactionStep {
   id: string;
   name: string;
-  type: 'mint' | 'approve';
-  execute?: () => Promise<TransactionReceipt>;
+  type: 'mint' | 'approval' | 'burn' | 'transfer';
+
+  // What tokens are consumed by this step
+  cost?: {
+    native?: Money; // Native tokens consumed
+    erc20s?: Money[]; // Array of ERC20 tokens consumed
+  };
+
+  execute?: (account: any) => Promise<TransactionReceipt>;
   description?: string;
 }
 

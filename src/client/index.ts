@@ -1,11 +1,18 @@
 import type { ClientConfig, ManifoldClient, WorkspaceProductsOptions } from '../types/client';
-import type { Product } from '../types/product';
+import type { Product, InstanceData, BlindMintPublicData } from '../types/product';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import { AppId } from '../types/common';
 import { BlindMintProduct } from '../products/blindmint';
 import { createMockProduct } from '../products/mock';
 import { validateInstanceId, parseManifoldUrl } from '../utils/validation';
 import { createManifoldApiClient } from '../api/manifold-api';
+
+// Type guard to check if instanceData is for BlindMint
+function isBlindMintInstanceData(
+  instanceData: InstanceData<unknown>,
+): instanceData is InstanceData<BlindMintPublicData> {
+  return (instanceData.appId as AppId) === AppId.BLIND_MINT_1155;
+}
 
 export function createClient(config?: ClientConfig): ManifoldClient {
   const httpRPCs = config?.httpRPCs ?? {};
@@ -37,10 +44,9 @@ export function createClient(config?: ClientConfig): ManifoldClient {
         // Fetch both instance and preview data using Studio Apps Client
         const { instanceData, previewData } = await manifoldApi.getCompleteInstanceData(instanceId);
 
-        const appId = instanceData.appId as AppId;
-
         // Create BlindMint product if it matches the app ID or name
-        if (appId === AppId.BLIND_MINT_1155) {
+        if (isBlindMintInstanceData(instanceData)) {
+          // TypeScript now knows instanceData is InstanceData<BlindMintPublicData>
           // Create BlindMintProduct with both instance and preview data
           // Following technical spec pattern
           return new BlindMintProduct(instanceData, previewData, {

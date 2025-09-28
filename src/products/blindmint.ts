@@ -3,7 +3,6 @@ import type {
   BlindMintOnchainData,
   BlindMintStatus,
   BlindMintInventory,
-  InternalClaimData,
   TokenVariation,
   GachaConfig,
   GachaTier,
@@ -15,25 +14,29 @@ import type {
   FloorPriceData,
   MintHistoryItem,
   BlindMintTierProbability,
+  BlindMintProduct as IBlindMintProduct,
 } from '../types/blindmint';
 import type {
   Product,
-  BlindMintProduct as IBlindMintProduct,
   AllocationParams,
   AllocationResponse,
   PreparePurchaseParams,
-  PreparedPurchase,
   PurchaseParams,
   Order,
   ProductMetadata,
   ProductRule,
   ProductProvenance,
   Media,
-  TransactionStep,
-  Contract,
   InstanceData,
 } from '../types/product';
-import type { BlindMintPayload } from '../types/purchase';
+import type {
+  BlindMintPayload,
+  PreparedPurchase,
+  TransactionStep,
+  EnhancedCost,
+  TransactionReceipt,
+  GasBuffer,
+} from '../types/purchase';
 import type { Address } from '../types/common';
 import { AppType, AppId } from '../types/common';
 import type { BlindMintClaimContract } from '../utils/contract-factory';
@@ -43,14 +46,11 @@ import { createProvider } from '../utils/provider-factory';
 import { ContractFactory as ContractFactoryClass } from '../utils/contract-factory';
 import { validateAddress } from '../utils/validation';
 import { ClientSDKError, ErrorCode } from '../types/errors';
+import { BlindMintError, BlindMintErrorCode } from '../types/enhanced-errors';
 import type { InstancePreview } from '@manifoldxyz/studio-apps-client';
-import { Currency } from '@manifoldxyz/js-ts-utils';
-import {
-  getEthToUsdRate,
-  getERC20ToUSDRate,
-  getNativeCurrencySymbol,
-  calculateUSDValue,
-} from '../api/coinbase';
+import { estimateGas, checkERC20Balance, checkERC20Allowance } from '../utils/gas-estimation';
+import { Money } from '../libs/money';
+import { getNativeCurrencySymbol } from '../api/coinbase';
 
 /**
  * BlindMintProduct implementation following technical spec CON-2729
@@ -59,7 +59,7 @@ import {
 export class BlindMintProduct implements IBlindMintProduct {
   readonly id: number;
   readonly type = AppType.BLIND_MINT;
-  readonly data: InstanceData<BlindMintPublicData> & { publicData: BlindMintPublicData };
+  readonly data: InstanceData<BlindMintPublicData>;
   readonly previewData: InstancePreview;
 
   // Onchain data (fetched lazily)
@@ -67,9 +67,8 @@ export class BlindMintProduct implements IBlindMintProduct {
 
   // Internal state
   private _creatorContract: Address;
-  private _claimIndex: number;
   private _extensionAddress: Address;
-  private _platformFee?: ethers.BigNumber;
+  private _platformFee?: Money;
   private _httpRPCs?: Record<number, string>;
 
   constructor(
@@ -84,9 +83,10 @@ export class BlindMintProduct implements IBlindMintProduct {
 
     // Validate app ID
     if (instanceData.appId !== AppId.BLIND_MINT_1155) {
-      throw new ClientSDKError(
-        ErrorCode.INVALID_INPUT,
+      throw new BlindMintError(
+        BlindMintErrorCode.INVALID_CONFIGURATION,
         `Invalid app ID for BlindMint. Expected ${AppId.BLIND_MINT_1155}, received ${instanceData.appId}`,
+        { instanceId: String(instanceData.id) },
       );
     }
 
@@ -100,7 +100,6 @@ export class BlindMintProduct implements IBlindMintProduct {
 
     this._creatorContract = publicData.contract.address as Address;
     this._extensionAddress = publicData.extensionAddress;
-    this._claimIndex = 0; // Default to index 0 for BlindMint
   }
 
   // =============================================================================
@@ -116,7 +115,10 @@ export class BlindMintProduct implements IBlindMintProduct {
       customRpcUrls: this._httpRPCs,
     });
 
-    const factory = new ContractFactoryClass({ provider, networkId });
+    const factory = new ContractFactoryClass({
+      provider: { current: provider } as { current: ethers.providers.Provider },
+      networkId,
+    });
     return factory.createBlindMintContract(this._extensionAddress);
   }
 
@@ -133,13 +135,26 @@ export class BlindMintProduct implements IBlindMintProduct {
 
     try {
       // Use getClaim method like gachapon-widgets
-      const claimData = await contract.getClaim(this._creatorContract, this._claimIndex);
+      // Using id as claimIndex
+      const claimData = await contract.getClaim(this._creatorContract, this.id);
 
       // Process into BlindMintOnchainData format
       const onchainData = await this._processClaimData(claimData);
 
-      // Fetch platform fee from contract
-      this._platformFee = await contract.MINT_FEE();
+      // Fetch platform fee from contract and create Money object
+      const mintFee = await contract.MINT_FEE();
+      const networkId = this.data.publicData.network;
+      const provider = createProvider({
+        networkId,
+        customRpcUrls: this._httpRPCs,
+      });
+
+      this._platformFee = await Money.create({
+        value: mintFee,
+        networkId,
+        provider,
+        fetchUSD: true,
+      });
 
       // Cache the result
       this.onchainData = onchainData;
@@ -151,8 +166,21 @@ export class BlindMintProduct implements IBlindMintProduct {
     }
   }
 
-  private async _processClaimData(claimData: InternalClaimData): Promise<BlindMintOnchainData> {
-    const cost = claimData.cost;
+  private async _processClaimData(claimData: {
+    storageProtocol: number;
+    total: number;
+    totalMax: number;
+    startDate: number;
+    endDate: number;
+    startingTokenId: ethers.BigNumber;
+    tokenVariations: number;
+    location: string;
+    paymentReceiver: string;
+    cost: ethers.BigNumber;
+    erc20: string;
+  }): Promise<BlindMintOnchainData> {
+    // Handle the actual structure from ABIv2 getClaim
+    const cost = ethers.BigNumber.from(claimData.cost);
     const erc20 = claimData.erc20;
 
     // Convert dates from unix seconds
@@ -160,64 +188,32 @@ export class BlindMintProduct implements IBlindMintProduct {
       return unixSeconds === 0 ? new Date(0) : new Date(unixSeconds * 1000);
     };
 
-    // Get proper token metadata
-    const isNativeToken = erc20 === ethers.constants.AddressZero;
     const networkId = this.data.publicData.network;
-
-    let tokenSymbol = getNativeCurrencySymbol(networkId);
-    let tokenDecimals = 18;
-
     const provider = createProvider({
       networkId,
       customRpcUrls: this._httpRPCs,
     });
-    // Use Currency.getERC20Metadata to fetch proper token information
-    const metadata = await Currency.getERC20Metadata(networkId, erc20, provider);
-    tokenSymbol = metadata.symbol;
-    tokenDecimals = metadata.decimals;
 
-    // Format the cost with proper decimals
-    const formatted = ethers.utils.formatUnits(cost, tokenDecimals);
-
-    // Fetch USD conversion rate
-    let formattedUSD;
-    try {
-      let usdRate: number | undefined;
-
-      if (isNativeToken) {
-        // Fetch native currency rate (ETH, MATIC, etc.)
-        usdRate = await getEthToUsdRate(tokenSymbol);
-      } else {
-        // Fetch ERC20 token rate
-        usdRate = await getERC20ToUSDRate(tokenSymbol, erc20);
-      }
-
-      if (usdRate) {
-        formattedUSD = calculateUSDValue(BigInt(cost.toString()), tokenDecimals, usdRate);
-      }
-    } catch (error) {
-      console.warn('Failed to fetch USD rate:', error);
-    }
+    // Create Money object which will fetch all metadata automatically
+    const costMoney = await Money.create({
+      value: cost,
+      networkId,
+      erc20,
+      provider,
+      fetchUSD: true,
+    });
 
     return {
-      totalSupply: claimData.totalMax.toNumber(),
-      totalMinted: claimData.total.toNumber(),
-      walletMax: claimData.walletMax.toNumber(),
-      startDate: convertDate(claimData.startDate.toNumber()),
-      endDate: convertDate(claimData.endDate.toNumber()),
+      totalSupply: claimData.totalMax || Number.MAX_SAFE_INTEGER,
+      totalMinted: claimData.total || 0,
+      walletMax: 0, // ABIv2 doesn't have walletMax in getClaim, need different approach
+      startDate: convertDate(claimData.startDate || 0),
+      endDate: convertDate(claimData.endDate || 0),
       audienceType: 'None', // Will be updated based on merkle root if needed
-      cost: {
-        value: cost,
-        decimals: tokenDecimals,
-        erc20: erc20,
-        symbol: tokenSymbol,
-        formatted: formatted,
-        formattedUSD: formattedUSD,
-      },
+      cost: costMoney,
       paymentReceiver: claimData.paymentReceiver as Address,
-      tokenVariations: claimData.tokenVariations.toNumber(),
-      startingTokenId: claimData.startingTokenId.toString(),
-      // Note: storageProtocol and metadataLocation are internal only, not exposed
+      tokenVariations: claimData.tokenVariations || 0,
+      startingTokenId: claimData.startingTokenId ? claimData.startingTokenId.toString() : '0',
     };
   }
 
@@ -236,7 +232,7 @@ export class BlindMintProduct implements IBlindMintProduct {
       return 'completed';
     }
     if (onchainData.totalSupply && onchainData.totalMinted >= onchainData.totalSupply) {
-      return 'completed';
+      return 'sold-out';
     }
     return 'active';
   }
@@ -244,32 +240,25 @@ export class BlindMintProduct implements IBlindMintProduct {
   async getAllocations(params: AllocationParams): Promise<AllocationResponse> {
     const { recipientAddress } = params;
     if (!validateAddress(recipientAddress)) {
-      throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Invalid recipient address');
+      throw new BlindMintError(
+        BlindMintErrorCode.INVALID_WALLET_ADDRESS,
+        'Invalid recipient address',
+        { walletAddress: recipientAddress },
+      );
     }
 
     const onchainData = await this.fetchOnchainData();
     const contract = this._getClaimContract();
 
-    // Get wallet minted count using getTotalMints (like gachapon-widgets)
-    const walletMinted = await contract.getTotalMints(
+    // Get wallet minted count using getUserMints
+    const userMints = await contract.getUserMints(
       recipientAddress,
       this._creatorContract,
-      this._claimIndex,
+      this.id, // Use id as instanceId
     );
 
-    // Check eligibility
-    const status = await this.getStatus();
-    if (status === 'upcoming') {
-      return { isEligible: false, reason: 'Sale has not started', quantity: 0 };
-    }
-    if (status === 'completed') {
-      return { isEligible: false, reason: 'Sale has ended', quantity: 0 };
-    }
-
-    // Check wallet limit
-    const mintedCount = walletMinted?.toNumber
-      ? walletMinted.toNumber()
-      : Number(walletMinted || 0);
+    // Check wallet limit - use deliveredCount from getUserMints
+    const mintedCount = userMints?.deliveredCount || 0;
     if (onchainData.walletMax > 0 && mintedCount >= onchainData.walletMax) {
       return { isEligible: false, reason: 'Wallet limit reached', quantity: 0 };
     }
@@ -291,11 +280,39 @@ export class BlindMintProduct implements IBlindMintProduct {
     params: PreparePurchaseParams<BlindMintPayload>,
   ): Promise<PreparedPurchase> {
     const { address, payload } = params;
-    // Now type-safe without casting
     const quantity = payload?.quantity || 1;
+    const networkId = this.data.publicData.network;
 
     if (!validateAddress(address)) {
-      throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Invalid address');
+      throw new BlindMintError(
+        BlindMintErrorCode.INVALID_WALLET_ADDRESS,
+        'Invalid address',
+        { walletAddress: address },
+      );
+    }
+
+    // Check status first
+    const status = await this.getStatus();
+    if (status === 'upcoming') {
+      throw new BlindMintError(
+        BlindMintErrorCode.MINT_NOT_STARTED,
+        'Sale has not started',
+        { instanceId: String(this.id), mintStatus: status },
+      );
+    }
+    if (status === 'completed') {
+      throw new BlindMintError(
+        BlindMintErrorCode.MINT_ENDED,
+        'Sale has ended',
+        { instanceId: String(this.id), mintStatus: status },
+      );
+    }
+    if (status === 'sold-out') {
+      throw new BlindMintError(
+        BlindMintErrorCode.SOLD_OUT,
+        'Product is sold out',
+        { instanceId: String(this.id), mintStatus: status },
+      );
     }
 
     // Check allocations
@@ -308,38 +325,173 @@ export class BlindMintProduct implements IBlindMintProduct {
     }
 
     const onchainData = await this.fetchOnchainData();
+    const provider = createProvider({
+      networkId,
+      customRpcUrls: this._httpRPCs,
+    });
 
-    // Calculate total cost including platform fee
-    const mintCostBN = ethers.BigNumber.from(onchainData.cost.value.toString()).mul(quantity);
-    const platformFee = this._platformFee || ethers.BigNumber.from(0);
-    const totalCost = mintCostBN.add(platformFee.mul(quantity));
+    // Calculate costs - onchainData.cost is already a Money instance from _processClaimData
+    const productCost = onchainData.cost.multiplyInt(quantity);
+    const platformFee = this._platformFee
+      ? this._platformFee.multiplyInt(quantity)
+      : await Money.zero({ networkId, provider });
 
-    // Estimate gas - gas buffer will be handled by the calling code via params.gasBuffer
-    await this._estimateGas(address, address, quantity, totalCost);
+    // Aggregate costs by currency type
+    const costsByToken = new Map<string, Money>();
 
-    // Create transaction step
-    const step: TransactionStep = {
+    // Helper to add cost to map
+    const addCostToMap = (cost: Money) => {
+      if (cost.isPositive()) {
+        const key = cost.erc20;
+        const existing = costsByToken.get(key);
+        costsByToken.set(key, existing ? existing.add(cost) : cost);
+      }
+    };
+
+    addCostToMap(productCost);
+    addCostToMap(platformFee);
+
+    // Build steps array
+    const steps: TransactionStep[] = [];
+
+    // Check balances and create approvals for each token type
+    for (const [tokenAddress, totalCost] of Array.from(costsByToken)) {
+      if (totalCost.isERC20()) {
+        // Check ERC20 balance
+        const balance = await checkERC20Balance(tokenAddress, address, provider);
+        if (balance.lt(totalCost.raw)) {
+          throw new ClientSDKError(
+            ErrorCode.INSUFFICIENT_FUNDS,
+            `Insufficient ${totalCost.symbol} balance. Need ${totalCost.formatted} but have ${ethers.utils.formatUnits(balance, totalCost.decimals)}`,
+          );
+        }
+
+        // Check approval
+        const currentAllowance = await checkERC20Allowance(
+          tokenAddress,
+          address,
+          this._extensionAddress,
+          provider,
+        );
+
+        if (currentAllowance.lt(totalCost.raw)) {
+          steps.push({
+            id: `approve-${totalCost.symbol.toLowerCase()}`,
+            name: `Approve ${totalCost.symbol} Spending`,
+            type: 'approval',
+            description: `Approve ${totalCost.formatted} ${totalCost.symbol}`,
+            execute: async (account: ethers.Signer) => {
+              // Estimate gas inside execute with proper buffer
+              const gasBuffer = params.gasBuffer || {};
+              const erc20Contract = new ethers.Contract(
+                tokenAddress,
+                ['function approve(address,uint256)'],
+                account,
+              );
+
+              // Estimate gas for approval
+              const gasEstimate = await erc20Contract.estimateGas.approve!(
+                this._extensionAddress,
+                totalCost.raw,
+              );
+
+              // Apply gas buffer
+              const gasLimit = this._applyGasBuffer(gasEstimate, gasBuffer);
+
+              const tx = (await erc20Contract.approve(this._extensionAddress, totalCost.raw, {
+                gasLimit,
+              })) as ethers.ContractTransaction;
+              const receipt = await tx.wait();
+              return {
+                txHash: receipt.transactionHash,
+                blockNumber: receipt.blockNumber,
+                gasUsed: BigInt(receipt.gasUsed.toString()),
+                status: receipt.status === 1 ? 'success' : 'failed',
+              } as TransactionReceipt;
+            },
+          });
+        }
+      } else {
+        // Check native balance
+        const nativeBalance = await provider.getBalance(address);
+        if (nativeBalance.lt(totalCost.raw)) {
+          throw new ClientSDKError(
+            ErrorCode.INSUFFICIENT_FUNDS,
+            `Insufficient ${totalCost.symbol} balance. Need ${totalCost.formatted} but have ${ethers.utils.formatUnits(nativeBalance, 18)}`,
+          );
+        }
+      }
+    }
+
+    // Calculate native payment value for mint transaction
+    const nativePaymentValue =
+      costsByToken.get(ethers.constants.AddressZero)?.raw || ethers.BigNumber.from(0);
+
+    // Build cost breakdown for mint step and enhanced cost
+    const nativeCost = costsByToken.get(ethers.constants.AddressZero);
+    const erc20Costs = Array.from(costsByToken.entries())
+      .filter(([address]) => address !== ethers.constants.AddressZero)
+      .map(([, cost]) => cost);
+
+    // Build mint step
+    const mintCost: { native?: Money; erc20s?: Money[] } = {};
+    if (nativeCost) mintCost.native = nativeCost;
+    if (erc20Costs.length > 0) mintCost.erc20s = erc20Costs;
+
+    steps.push({
       id: 'mint',
       name: 'Mint BlindMint NFTs',
       type: 'mint',
       description: `Mint ${quantity} random NFT(s)`,
-      execute: async () => {
-        // Execute function needs to be called with account later
-        throw new Error('Execute must be called with account from product.purchase');
+      cost: mintCost,
+      execute: async (account: ethers.Signer) => {
+        const gasBuffer = params.gasBuffer || {};
+        const contract = this._getClaimContract();
+
+        // Estimate gas inside execute
+        const gasEstimate = await contract.connect(account).estimateGas.mintReserve!(
+          this._creatorContract,
+          this.id,
+          quantity,
+          {
+            value: nativePaymentValue,
+          },
+        );
+
+        // Apply gas buffer
+        const gasLimit = this._applyGasBuffer(gasEstimate, gasBuffer);
+
+        const tx = (await contract
+          .connect(account)
+          .mintReserve(this._creatorContract, this.id, quantity, {
+            value: nativePaymentValue,
+            gasLimit,
+          })) as ethers.ContractTransaction;
+        const receipt = await tx.wait();
+        return {
+          txHash: receipt.transactionHash,
+          blockNumber: receipt.blockNumber,
+          gasUsed: BigInt(receipt.gasUsed.toString()),
+          status: receipt.status === 1 ? 'success' : 'failed',
+        } as TransactionReceipt;
+      },
+    });
+
+    // Build EnhancedCost structure (reuse the already computed values)
+    const cost: EnhancedCost = {
+      total: {
+        ...(nativeCost && { native: nativeCost }),
+        erc20s: erc20Costs,
+      },
+      breakdown: {
+        product: productCost,
+        platformFee,
       },
     };
 
     return {
-      cost: {
-        total: onchainData.cost,
-        subtotal: onchainData.cost,
-        fees: {
-          ...onchainData.cost,
-          value: BigInt(platformFee.mul(quantity).toString()),
-          formatted: ethers.utils.formatUnits(platformFee.mul(quantity), onchainData.cost.decimals),
-        },
-      },
-      steps: [step],
+      cost,
+      steps,
       isEligible: true,
     };
   }
@@ -347,14 +499,27 @@ export class BlindMintProduct implements IBlindMintProduct {
   async purchase(params: PurchaseParams): Promise<Order> {
     const { account, preparedPurchase } = params;
 
-    // Execute all steps
+    // Execute all steps sequentially
     const receipts: any[] = [];
+
     for (const step of preparedPurchase.steps) {
       if (step.execute) {
-        // For BlindMint, execute the mint directly with the prepared values
-        const totalValue = ethers.BigNumber.from(preparedPurchase.cost.total.value.toString());
-        const receipt = await this._executeMint(account, account.address, 1, totalValue);
-        receipts.push(receipt);
+        try {
+          // Call step.execute with the account
+          const receipt = await step.execute(account);
+          receipts.push(receipt);
+        } catch (error) {
+          // If any step fails, throw error with context
+          throw new ClientSDKError(
+            ErrorCode.TRANSACTION_FAILED,
+            `Transaction failed at step ${step.id}: ${(error as Error).message}`,
+            {
+              step: step.id,
+              receipts, // Include successful receipts
+              error: error as Error,
+            },
+          );
+        }
       }
     }
 
@@ -379,43 +544,14 @@ export class BlindMintProduct implements IBlindMintProduct {
   ): Promise<ethers.BigNumber> {
     const contract = this._getClaimContract();
 
-    try {
-      // Use mintReserve for gas estimation (matches ABI: address, uint256, uint32)
-      const gasEstimate = await contract.estimateGas?.mintReserve?.(
-        this._creatorContract,
-        this._claimIndex,
-        quantity,
-        { from, value },
-      );
-
-      return gasEstimate || ethers.BigNumber.from(200000);
-    } catch (error) {
-      // Fallback to default gas estimate
-      return ethers.BigNumber.from(200000);
-    }
-  }
-
-  private async _executeMint(
-    account: any, // This is the wallet provider
-    _recipient: string,
-    quantity: number,
-    value: ethers.BigNumber,
-  ): Promise<any> {
-    // Create contract with READ provider for setup
-    const contract = this._getClaimContract();
-
-    // CRITICAL: Use account (wallet) for WRITE operation
-    const tx = await contract
-      .connect(account)
-      .mintReserve(this._creatorContract, this._claimIndex, quantity, { value });
-
-    const receipt = await tx.wait();
-    return {
-      networkId: this.data.publicData.network,
-      txHash: receipt.transactionHash,
-      step: { id: 'mint', name: 'Mint BlindMint NFTs', type: 'mint' },
-      txReceipt: receipt,
-    };
+    return await estimateGas({
+      contract,
+      method: 'mintReserve',
+      args: [this._creatorContract, this.id, quantity],
+      from,
+      value,
+      fallbackGas: ethers.BigNumber.from(200000),
+    });
   }
 
   // =============================================================================
@@ -428,14 +564,6 @@ export class BlindMintProduct implements IBlindMintProduct {
       totalSupply:
         onchainData.totalSupply === Number.MAX_SAFE_INTEGER ? -1 : onchainData.totalSupply,
       totalPurchased: onchainData.totalMinted,
-      totalMinted: onchainData.totalMinted,
-      remainingSupply:
-        onchainData.totalSupply === Number.MAX_SAFE_INTEGER
-          ? Number.MAX_SAFE_INTEGER
-          : Math.max(0, onchainData.totalSupply - onchainData.totalMinted),
-      tierBreakdown: [],
-      walletMinted: 0,
-      walletRemaining: 0,
     };
   }
 
@@ -452,7 +580,12 @@ export class BlindMintProduct implements IBlindMintProduct {
   async getProvenance(): Promise<ProductProvenance> {
     const publicData = this.data.publicData;
     return {
-      creator: this.data.creator,
+      creator: {
+        id: this.data.creator.id.toString(),
+        slug: this.data.creator.slug || '',
+        address: this.data.creator.address || '',
+        name: this.data.creator.name,
+      },
       contract: publicData.contract,
       networkId: publicData.network,
     };
@@ -485,7 +618,7 @@ export class BlindMintProduct implements IBlindMintProduct {
     const publicData = this.data.publicData;
 
     return publicData.pool.map((item, index) => ({
-      tokenId: onchainData.startingTokenId + index,
+      tokenId: parseInt(onchainData.startingTokenId) + index,
       metadata: item.metadata,
       tier: this._getTierForIndex(index, publicData.tierProbabilities),
       rarityScore: this._calculateRarityScore(index),
@@ -493,7 +626,6 @@ export class BlindMintProduct implements IBlindMintProduct {
   }
 
   async getGachaConfig(): Promise<GachaConfig> {
-    const publicData = this.data.publicData;
     const tiers = await this.getTierProbabilities();
 
     return {
@@ -588,7 +720,6 @@ export class BlindMintProduct implements IBlindMintProduct {
 
     // Estimate costs
     const onchainData = await this.fetchOnchainData();
-    const estimatedCost = this._calculateTotalCost(quantity, onchainData);
     const estimatedGas = await this.estimateMintGas(quantity, walletAddress);
 
     return {
@@ -599,10 +730,17 @@ export class BlindMintProduct implements IBlindMintProduct {
       estimatedCost: {
         total: onchainData.cost,
         subtotal: onchainData.cost,
-        fees: {
-          ...onchainData.cost,
-          value: BigInt(this._platformFee?.mul(quantity).toString() || '0'),
-        },
+        fees: this._platformFee
+          ? this._platformFee.multiplyInt(quantity)
+          : Money.fromData({
+              value: ethers.BigNumber.from(0),
+              decimals: 18,
+              erc20: ethers.constants.AddressZero,
+              symbol: getNativeCurrencySymbol(this.data.publicData.network),
+              networkId: this.data.publicData.network,
+              formattedUSD: undefined,
+              formatted: '0.0', // fromData requires formatted field
+            }),
       },
     };
   }
@@ -612,7 +750,7 @@ export class BlindMintProduct implements IBlindMintProduct {
     return [];
   }
 
-  async getMintHistory(walletAddress?: Address): Promise<MintHistoryItem[]> {
+  async getMintHistory(_walletAddress?: Address): Promise<MintHistoryItem[]> {
     // Would query contract events
     return [];
   }
@@ -628,32 +766,40 @@ export class BlindMintProduct implements IBlindMintProduct {
     return 'Common';
   }
 
-  private _calculateRarityScore(index: number): number {
+  private _calculateRarityScore(_index: number): number {
     // Simple rarity calculation
     return Math.floor(Math.random() * 100);
   }
 
   private _calculateTotalCost(quantity: number, onchainData: BlindMintOnchainData): bigint {
     const mintCost = BigInt(onchainData.cost.value.toString()) * BigInt(quantity);
-    const platformFee = BigInt(this._platformFee?.toString() || '0') * BigInt(quantity);
+    const platformFee = BigInt(this._platformFee?.value.toString() || '0') * BigInt(quantity);
     return mintCost + platformFee;
   }
 
-  private _extractNetworkId(contract: Contract | undefined): number | undefined {
-    if (!contract) return undefined;
-
-    // Check for network in contract metadata
-    if ((contract as any).networkId) {
-      return (contract as any).networkId;
+  private _applyGasBuffer(gasEstimate: ethers.BigNumber, gasBuffer?: GasBuffer): ethers.BigNumber {
+    if (!gasBuffer) {
+      return gasEstimate.mul(120).div(100); // Default 20% buffer
     }
-
-    // Could also infer from contract address patterns
-    // e.g., certain prefixes for testnet vs mainnet
-    return undefined;
+    return gasBuffer.fixed
+      ? gasEstimate.add(gasBuffer.fixed)
+      : gasEstimate.mul(gasBuffer.multiplier || 120).div(100);
   }
+}
+
+// Export the implementation class as BlindMintProductImpl for tests
+export { BlindMintProduct as BlindMintProductImpl };
+
+// Factory function
+export function createBlindMintProduct(
+  instanceData: InstanceData<BlindMintPublicData>,
+  previewData: InstancePreview = {} as InstancePreview,
+  options: { httpRPCs?: Record<number, string> } = {},
+): BlindMintProduct {
+  return new BlindMintProduct(instanceData, previewData, options);
 }
 
 // Type guard
 export function isBlindMintProduct(product: Product): product is IBlindMintProduct {
-  return product.type === AppType.BlindMint;
+  return product.type === AppType.BLIND_MINT;
 }

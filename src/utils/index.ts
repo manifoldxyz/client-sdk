@@ -47,6 +47,19 @@ export type {
   ERC20Contract
 } from './contract-factory';
 
+// Gas estimation utilities
+export {
+  estimateGas,
+  applyGasBuffer,
+  checkERC20Balance,
+  checkERC20Allowance,
+  createERC20ApprovalTx
+} from './gas-estimation';
+
+export type {
+  GasEstimationParams
+} from './gas-estimation';
+
 // =============================================================================
 // ADDITIONAL UTILITY FUNCTIONS
 // =============================================================================
