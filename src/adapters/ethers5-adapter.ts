@@ -1,11 +1,11 @@
 import { ethers } from 'ethers';
-import type { 
-  IAccountAdapter, 
-  UniversalTransactionRequest, 
+import type {
+  IAccountAdapter,
+  UniversalTransactionRequest,
   UniversalTransactionResponse,
   AccountAdapterError,
   AccountAdapterErrorCode,
-  AdapterType
+  AdapterType,
 } from '../types/account-adapter';
 import { Money } from '../libs/money';
 import { ClientSDKError, ErrorCode } from '../types/errors';
@@ -31,19 +31,19 @@ import { checkERC20Balance } from '../utils/gas-estimation';
 
 /**
  * Account adapter implementation for ethers.js v5.x
- * 
+ *
  * Provides a unified interface for wallet operations across different Web3 libraries.
  * This adapter specifically handles ethers v5 Provider and Signer instances.
- * 
+ *
  * @example
  * ```typescript
  * import { ethers } from 'ethers'; // v5
  * import { Ethers5Adapter } from './adapters/ethers5-adapter';
- * 
+ *
  * const provider = new ethers.providers.Web3Provider(window.ethereum);
  * const signer = provider.getSigner();
  * const adapter = new Ethers5Adapter(signer);
- * 
+ *
  * // Use unified interface
  * const balance = await adapter.getBalance();
  * const networkId = await adapter.getConnectedNetworkId();
@@ -51,14 +51,14 @@ import { checkERC20Balance } from '../utils/gas-estimation';
  */
 export class Ethers5Adapter implements IAccountAdapter {
   readonly adapterType: AdapterType = 'ethers5';
-  
+
   private _address: string | null = null;
   private _provider: ethers.providers.Provider;
   private _signer: ethers.Signer | null;
 
   /**
    * Initialize adapter with ethers v5 provider or signer
-   * 
+   *
    * @param providerOrSigner - ethers v5 Provider or Signer instance
    * @throws {ClientSDKError} When provider is invalid or missing account
    */
@@ -69,17 +69,14 @@ export class Ethers5Adapter implements IAccountAdapter {
     } else if (this._isSigner(providerOrSigner)) {
       this._signer = providerOrSigner;
       this._provider = providerOrSigner.provider!;
-      
+
       if (!this._provider) {
-        throw new ClientSDKError(
-          ErrorCode.INVALID_INPUT,
-          'Signer must have a connected provider'
-        );
+        throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Signer must have a connected provider');
       }
     } else {
       throw new ClientSDKError(
         ErrorCode.INVALID_INPUT,
-        'Invalid provider or signer instance for ethers v5'
+        'Invalid provider or signer instance for ethers v5',
       );
     }
   }
@@ -91,7 +88,7 @@ export class Ethers5Adapter implements IAccountAdapter {
     if (!this._address) {
       throw new ClientSDKError(
         ErrorCode.INVALID_INPUT,
-        'Address not initialized. Call an async method first to initialize address.'
+        'Address not initialized. Call an async method first to initialize address.',
       );
     }
     return this._address;
@@ -99,25 +96,26 @@ export class Ethers5Adapter implements IAccountAdapter {
 
   /**
    * Send a transaction through the connected wallet
-   * 
+   *
    * @param request - Universal transaction request
    * @returns Promise resolving to universal transaction response
    * @throws {AccountAdapterError} When transaction fails or is rejected
    */
-  async sendTransaction(request: UniversalTransactionRequest): Promise<UniversalTransactionResponse> {
+  async sendTransaction(
+    request: UniversalTransactionRequest,
+  ): Promise<UniversalTransactionResponse> {
     try {
       const signer = await this._getSigner();
       await this._ensureAddress();
-      
+
       // Convert universal request to ethers v5 transaction request
       const ethersRequest = this._convertToEthersRequest(request);
-      
+
       // Send transaction
       const tx = await signer.sendTransaction(ethersRequest);
-      
+
       // Convert response to universal format
       return this._convertToUniversalResponse(tx);
-      
     } catch (error) {
       throw this._wrapError(error, 'sendTransaction', { request });
     }
@@ -125,7 +123,7 @@ export class Ethers5Adapter implements IAccountAdapter {
 
   /**
    * Get token balance for connected wallet
-   * 
+   *
    * @param tokenAddress - ERC-20 token address (optional, defaults to native token)
    * @returns Promise resolving to Money instance with balance
    * @throws {AccountAdapterError} When balance query fails
@@ -134,26 +132,30 @@ export class Ethers5Adapter implements IAccountAdapter {
     try {
       await this._ensureAddress();
       const networkId = await this.getConnectedNetworkId();
-      
+
       if (!tokenAddress || tokenAddress === ethers.constants.AddressZero) {
         // Get native token balance
         const balance = await this._provider.getBalance(this._address!);
-        
+
         return Money.create({
           value: balance,
           networkId,
-          provider: this._provider as ethers.providers.JsonRpcProvider | ethers.providers.Web3Provider,
+          provider: this._provider as
+            | ethers.providers.JsonRpcProvider
+            | ethers.providers.Web3Provider,
           fetchUSD: true,
         });
       } else {
         // Get ERC-20 token balance
         const balance = await checkERC20Balance(tokenAddress, this._address!, this._provider);
-        
+
         return Money.create({
           value: balance,
           networkId,
           erc20: tokenAddress,
-          provider: this._provider as ethers.providers.JsonRpcProvider | ethers.providers.Web3Provider,
+          provider: this._provider as
+            | ethers.providers.JsonRpcProvider
+            | ethers.providers.Web3Provider,
           fetchUSD: true,
         });
       }
@@ -164,7 +166,7 @@ export class Ethers5Adapter implements IAccountAdapter {
 
   /**
    * Get the currently connected network ID
-   * 
+   *
    * @returns Promise resolving to network ID (chain ID)
    * @throws {AccountAdapterError} When network query fails
    */
@@ -179,7 +181,7 @@ export class Ethers5Adapter implements IAccountAdapter {
 
   /**
    * Switch to a different network
-   * 
+   *
    * @param chainId - Target network ID to switch to
    * @returns Promise resolving when network switch is complete
    * @throws {AccountAdapterError} When network switch fails or is rejected
@@ -187,18 +189,18 @@ export class Ethers5Adapter implements IAccountAdapter {
   async switchNetwork(chainId: number): Promise<void> {
     try {
       // For ethers v5, we need to use the provider's request method if available
-      const provider = this._provider as any;
-      
-      if (provider.request) {
+      const provider = this._provider as unknown as Record<string, unknown>;
+
+      if (typeof provider.request === 'function') {
         // This is likely a Web3Provider connected to MetaMask or similar
-        await provider.request({
+        await (provider.request as (params: unknown) => Promise<unknown>)({
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: `0x${chainId.toString(16)}` }],
         });
       } else {
         throw new ClientSDKError(
           ErrorCode.UNSUPPORTED_TYPE,
-          'Network switching not supported by this provider'
+          'Network switching not supported by this provider',
         );
       }
     } catch (error) {
@@ -208,7 +210,7 @@ export class Ethers5Adapter implements IAccountAdapter {
 
   /**
    * Sign a message with the connected wallet
-   * 
+   *
    * @param message - Message to sign
    * @returns Promise resolving to signature string
    * @throws {AccountAdapterError} When signing fails or is rejected
@@ -229,20 +231,27 @@ export class Ethers5Adapter implements IAccountAdapter {
   /**
    * Type guard to check if object is an ethers v5 Provider
    */
-  private _isProvider(obj: any): obj is ethers.providers.Provider {
-    return obj && 
-           typeof obj.getNetwork === 'function' &&
-           typeof obj.getBalance === 'function' &&
-           !obj.signTransaction; // Signer has signTransaction, Provider doesn't
+  private _isProvider(obj: unknown): obj is ethers.providers.Provider {
+    if (!obj || typeof obj !== 'object') {
+      return false;
+    }
+    const provider = obj as Record<string, unknown>;
+    return (
+      typeof provider.getNetwork === 'function' &&
+      typeof provider.getBalance === 'function' &&
+      !provider.signTransaction
+    ); // Signer has signTransaction, Provider doesn't
   }
 
   /**
    * Type guard to check if object is an ethers v5 Signer
    */
-  private _isSigner(obj: any): obj is ethers.Signer {
-    return obj && 
-           typeof obj.signTransaction === 'function' &&
-           typeof obj.getAddress === 'function';
+  private _isSigner(obj: unknown): obj is ethers.Signer {
+    if (!obj || typeof obj !== 'object') {
+      return false;
+    }
+    const signer = obj as Record<string, unknown>;
+    return typeof signer.signTransaction === 'function' && typeof signer.getAddress === 'function';
   }
 
   /**
@@ -252,10 +261,10 @@ export class Ethers5Adapter implements IAccountAdapter {
     if (this._signer) {
       return this._signer;
     }
-    
+
     throw new ClientSDKError(
       ErrorCode.INVALID_INPUT,
-      'No signer available. Cannot perform transactions with read-only provider.'
+      'No signer available. Cannot perform transactions with read-only provider.',
     );
   }
 
@@ -269,7 +278,7 @@ export class Ethers5Adapter implements IAccountAdapter {
       } else {
         throw new ClientSDKError(
           ErrorCode.INVALID_INPUT,
-          'Cannot get address from read-only provider'
+          'Cannot get address from read-only provider',
         );
       }
     }
@@ -278,7 +287,9 @@ export class Ethers5Adapter implements IAccountAdapter {
   /**
    * Convert universal transaction request to ethers v5 format
    */
-  private _convertToEthersRequest(request: UniversalTransactionRequest): ethers.providers.TransactionRequest {
+  private _convertToEthersRequest(
+    request: UniversalTransactionRequest,
+  ): ethers.providers.TransactionRequest {
     const ethersRequest: ethers.providers.TransactionRequest = {
       to: request.to,
     };
@@ -321,7 +332,9 @@ export class Ethers5Adapter implements IAccountAdapter {
   /**
    * Convert ethers v5 transaction response to universal format
    */
-  private _convertToUniversalResponse(tx: ethers.providers.TransactionResponse): UniversalTransactionResponse {
+  private _convertToUniversalResponse(
+    tx: ethers.providers.TransactionResponse,
+  ): UniversalTransactionResponse {
     const response: UniversalTransactionResponse = {
       hash: tx.hash,
       from: tx.from,
@@ -362,11 +375,7 @@ export class Ethers5Adapter implements IAccountAdapter {
   /**
    * Wrap errors in AccountAdapterError format
    */
-  private _wrapError(
-    error: any, 
-    method?: string, 
-    params?: unknown
-  ): AccountAdapterError {
+  private _wrapError(error: unknown, method?: string, params?: unknown): AccountAdapterError {
     // Determine error code based on error type
     let code: AccountAdapterErrorCode = 'UNKNOWN_ERROR';
     let message = 'An unexpected error occurred';
@@ -376,32 +385,46 @@ export class Ethers5Adapter implements IAccountAdapter {
       throw error;
     }
 
-    if (error?.code === 4001 || error?.message?.includes('User denied')) {
+    const errorObj = error as Record<string, unknown>;
+
+    if (
+      errorObj?.code === 4001 ||
+      (typeof errorObj?.message === 'string' && errorObj.message.includes('User denied'))
+    ) {
       code = 'TRANSACTION_REJECTED';
       message = 'Transaction was rejected by user';
-    } else if (error?.code === 'INSUFFICIENT_FUNDS' || error?.message?.includes('insufficient funds')) {
+    } else if (
+      errorObj?.code === 'INSUFFICIENT_FUNDS' ||
+      (typeof errorObj?.message === 'string' && errorObj.message.includes('insufficient funds'))
+    ) {
       code = 'INSUFFICIENT_BALANCE';
       message = 'Insufficient balance for transaction';
-    } else if (error?.code === 'NETWORK_ERROR' || error?.message?.includes('network')) {
+    } else if (
+      errorObj?.code === 'NETWORK_ERROR' ||
+      (typeof errorObj?.message === 'string' && errorObj.message.includes('network'))
+    ) {
       code = 'NETWORK_MISMATCH';
       message = 'Network error occurred';
-    } else if (error?.message?.includes('timeout')) {
+    } else if (typeof errorObj?.message === 'string' && errorObj.message.includes('timeout')) {
       code = 'TIMEOUT';
       message = 'Operation timed out';
-    } else if (error?.message?.includes('revert') || error?.message?.includes('reverted')) {
+    } else if (
+      typeof errorObj?.message === 'string' &&
+      (errorObj.message.includes('revert') || errorObj.message.includes('reverted'))
+    ) {
       code = 'TRANSACTION_FAILED';
       message = 'Transaction reverted';
-    } else if (error?.message) {
-      message = error.message;
+    } else if (typeof errorObj?.message === 'string') {
+      message = errorObj.message;
     }
 
     const adapterError: AccountAdapterError = Object.assign(new Error(message), {
       code,
-      adapterType: this.adapterType as AdapterType,
+      adapterType: this.adapterType,
       context: {
         method,
         params,
-        originalError: error,
+        originalError: error instanceof Error ? error : undefined,
       },
     });
 
@@ -415,16 +438,16 @@ export class Ethers5Adapter implements IAccountAdapter {
 
 /**
  * Create Ethers5Adapter from ethers v5 provider or signer
- * 
+ *
  * @param provider - ethers v5 Provider or Signer instance
  * @returns Ethers5Adapter instance
  * @throws {ClientSDKError} When provider is invalid
- * 
+ *
  * @example
  * ```typescript
  * import { ethers } from 'ethers'; // v5
  * import { createEthers5Adapter } from './adapters/ethers5-adapter';
- * 
+ *
  * const provider = new ethers.providers.Web3Provider(window.ethereum);
  * const signer = provider.getSigner();
  * const adapter = createEthers5Adapter(signer);
@@ -434,7 +457,7 @@ export function createEthers5Adapter(provider: unknown): IAccountAdapter {
   if (!provider || typeof provider !== 'object') {
     throw new ClientSDKError(
       ErrorCode.INVALID_INPUT,
-      'Provider must be a valid ethers v5 Provider or Signer instance'
+      'Provider must be a valid ethers v5 Provider or Signer instance',
     );
   }
 
@@ -447,7 +470,7 @@ export function createEthers5Adapter(provider: unknown): IAccountAdapter {
 
 /**
  * Detect if a provider instance is compatible with ethers v5
- * 
+ *
  * @param provider - Unknown provider instance
  * @returns True if provider appears to be ethers v5 compatible
  */
@@ -456,26 +479,32 @@ export function isEthers5Compatible(provider: unknown): boolean {
     return false;
   }
 
-  const obj = provider as any;
-  
+  const obj = provider as Record<string, unknown>;
+
   // Check for ethers v5 specific patterns
-  const hasProviderMethods = typeof obj.getNetwork === 'function' &&
-                             typeof obj.getBalance === 'function';
-  
-  const hasSignerMethods = typeof obj.signTransaction === 'function' &&
-                          typeof obj.getAddress === 'function';
-  
+  const hasProviderMethods =
+    typeof obj.getNetwork === 'function' && typeof obj.getBalance === 'function';
+
+  const hasSignerMethods =
+    typeof obj.signTransaction === 'function' && typeof obj.getAddress === 'function';
+
   // Must have either provider or signer methods
   if (!hasProviderMethods && !hasSignerMethods) {
     return false;
   }
-  
+
   // Check for ethers v5 specific properties (not present in v6)
-  const hasV5Properties = obj._isProvider === true || // ethers v5 providers have this
-                         (obj.provider && obj.provider._isProvider === true); // signers reference providers
-  
+  const providerObj = obj.provider as Record<string, unknown> | undefined;
+  const hasV5Properties =
+    obj._isProvider === true || // ethers v5 providers have this
+    (providerObj && providerObj._isProvider === true); // signers reference providers
+
   // Check for v6-like patterns that should be rejected
-  const hasV6Patterns = obj.request?.constructor?.name?.includes('v6') || false;
-  
+  const requestObj = obj.request as Record<string, unknown> | undefined;
+  const hasV6Patterns =
+    (requestObj?.constructor as Record<string, unknown> | undefined)?.name
+      ?.toString()
+      .includes('v6') || false;
+
   return Boolean(hasV5Properties) && !hasV6Patterns;
 }

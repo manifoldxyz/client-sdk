@@ -1,8 +1,8 @@
-import type { 
+import type {
   IAccountAdapter,
   FactoryError,
   FactoryErrorCode,
-  ProviderDetection 
+  ProviderDetection,
 } from '../types/account-adapter';
 import { ClientSDKError } from '../types/errors';
 import { createEthers5Adapter, isEthers5Compatible } from './ethers5-adapter';
@@ -16,12 +16,12 @@ import { createViemAdapter, isViemCompatible } from './viem-adapter';
  * Factory class for creating account adapters with explicit type safety.
  * Provides type-safe methods for each supported Web3 library and includes
  * backward compatibility with auto-detection.
- * 
+ *
  * @example
  * ```typescript
  * // Recommended: Explicit factory methods (type-safe)
  * const ethers5Adapter = AccountAdapterFactory.fromEthers5(signer);
- * 
+ *
  * // Legacy: Auto-detect (may be deprecated in future)
  * const adapter = AccountAdapterFactory.create(provider);
  * ```
@@ -29,15 +29,15 @@ import { createViemAdapter, isViemCompatible } from './viem-adapter';
 export class AccountAdapterFactory {
   /**
    * Create adapter from ethers v5 provider or signer
-   * 
+   *
    * @param provider - ethers v5 Provider or Signer instance
    * @returns IAccountAdapter instance configured for ethers v5
    * @throws {FactoryError} When provider is invalid or unsupported
-   * 
+   *
    * @example
    * ```typescript
    * import { ethers } from 'ethers'; // v5
-   * 
+   *
    * const provider = new ethers.providers.Web3Provider(window.ethereum);
    * const signer = provider.getSigner();
    * const adapter = AccountAdapterFactory.fromEthers5(signer);
@@ -49,7 +49,7 @@ export class AccountAdapterFactory {
         throw this._createFactoryError(
           'INVALID_PROVIDER',
           'Provider is not compatible with ethers v5',
-          { provider, attemptedType: 'ethers5' }
+          { provider, attemptedType: 'ethers5' },
         );
       }
 
@@ -59,7 +59,7 @@ export class AccountAdapterFactory {
         throw this._createFactoryError(
           'INITIALIZATION_FAILED',
           `Failed to create ethers v5 adapter: ${error.message}`,
-          { provider, originalError: error }
+          { provider, originalError: error },
         );
       }
       throw error;
@@ -68,15 +68,15 @@ export class AccountAdapterFactory {
 
   /**
    * Create adapter from ethers v6 provider or signer
-   * 
+   *
    * @param provider - ethers v6 Provider or Signer instance
    * @returns IAccountAdapter instance configured for ethers v6
    * @throws {FactoryError} When provider is invalid or unsupported
-   * 
+   *
    * @example
    * ```typescript
    * import { ethers } from 'ethers'; // v6
-   * 
+   *
    * const provider = new ethers.BrowserProvider(window.ethereum);
    * const signer = await provider.getSigner();
    * const adapter = AccountAdapterFactory.fromEthers6(signer);
@@ -86,22 +86,22 @@ export class AccountAdapterFactory {
     throw this._createFactoryError(
       'UNSUPPORTED_PROVIDER',
       'Ethers v6 adapter not yet implemented',
-      { provider, attemptedType: 'ethers6' }
+      { provider, attemptedType: 'ethers6' },
     );
   }
 
   /**
    * Create adapter from viem wallet client
-   * 
+   *
    * @param client - viem WalletClient or PublicClient with account
    * @returns IAccountAdapter instance configured for viem
    * @throws {FactoryError} When client is invalid or unsupported
-   * 
+   *
    * @example
    * ```typescript
    * import { createWalletClient, custom } from 'viem';
    * import { mainnet } from 'viem/chains';
-   * 
+   *
    * const client = createWalletClient({
    *   chain: mainnet,
    *   transport: custom(window.ethereum)
@@ -112,11 +112,10 @@ export class AccountAdapterFactory {
   static fromViem(client: unknown): IAccountAdapter {
     try {
       if (!isViemCompatible(client)) {
-        throw this._createFactoryError(
-          'INVALID_PROVIDER',
-          'Client is not compatible with viem',
-          { provider: client, attemptedType: 'viem' }
-        );
+        throw this._createFactoryError('INVALID_PROVIDER', 'Client is not compatible with viem', {
+          provider: client,
+          attemptedType: 'viem',
+        });
       }
 
       return createViemAdapter(client);
@@ -125,7 +124,7 @@ export class AccountAdapterFactory {
         throw this._createFactoryError(
           'INITIALIZATION_FAILED',
           `Failed to create viem adapter: ${error.message}`,
-          { provider: client, originalError: error }
+          { provider: client, originalError: error },
         );
       }
       throw error;
@@ -134,32 +133,32 @@ export class AccountAdapterFactory {
 
   /**
    * Auto-detect provider type and create appropriate adapter
-   * 
+   *
    * @deprecated Use explicit factory methods (fromEthers5, fromEthers6, fromViem) for better type safety
    * @param provider - Unknown provider instance to auto-detect
    * @returns IAccountAdapter instance for detected provider type
    * @throws {FactoryError} When provider type cannot be detected
-   * 
+   *
    * @example
    * ```typescript
    * // Legacy usage (may be deprecated)
    * const adapter = AccountAdapterFactory.create(unknownProvider);
-   * 
+   *
    * // Preferred: Use explicit methods
    * const adapter = AccountAdapterFactory.fromEthers5(ethersSigner);
    * ```
    */
   static create(provider: unknown): IAccountAdapter {
     const detection = this.detectProvider(provider);
-    
+
     if (detection.confidence < 0.7) {
       throw this._createFactoryError(
         'DETECTION_FAILED',
         `Unable to detect provider type with sufficient confidence (${detection.confidence})`,
-        { 
-          provider, 
+        {
+          provider,
           detectedFeatures: detection.features,
-        }
+        },
       );
     }
 
@@ -174,19 +173,19 @@ export class AccountAdapterFactory {
     throw this._createFactoryError(
       'UNSUPPORTED_PROVIDER',
       'Provider type could not be determined or is not supported',
-      { 
+      {
         provider,
         detectedFeatures: detection.features,
-      }
+      },
     );
   }
 
   /**
    * Detect provider type for debugging and validation
-   * 
+   *
    * @param provider - Unknown provider instance
    * @returns ProviderDetection with detailed analysis
-   * 
+   *
    * @example
    * ```typescript
    * const detection = AccountAdapterFactory.detectProvider(provider);
@@ -210,7 +209,7 @@ export class AccountAdapterFactory {
       };
     }
 
-    const obj = provider as any;
+    const obj = provider as Record<string, unknown>;
 
     // Check for ethers common methods
     if (typeof obj.getNetwork === 'function') {
@@ -244,14 +243,20 @@ export class AccountAdapterFactory {
       ethers6Score -= 0.2; // v6 doesn't have this
     }
 
-    if (obj.provider && obj.provider._isProvider === true) {
+    const providerObj = obj.provider as Record<string, unknown> | undefined;
+    if (providerObj && providerObj._isProvider === true) {
       features.push('provider._isProvider');
       ethers5Score += 0.3;
       ethers6Score -= 0.1;
     }
 
     // Check for potential ethers v6 patterns
-    if (obj.constructor?.name?.includes('Provider') && !obj._isProvider) {
+    const constructorObj = obj.constructor as unknown as Record<string, unknown> | undefined;
+    if (
+      typeof constructorObj?.name === 'string' &&
+      constructorObj.name.includes('Provider') &&
+      !obj._isProvider
+    ) {
       features.push('v6Provider');
       ethers6Score += 0.3;
       ethers5Score -= 0.1;
@@ -268,23 +273,28 @@ export class AccountAdapterFactory {
       viemScore += 0.3;
     }
 
-    if (obj.chain && typeof obj.chain === 'object' && obj.chain.id) {
+    const chainObj = obj.chain as Record<string, unknown> | undefined;
+    if (chainObj && typeof chainObj === 'object' && chainObj.id) {
       features.push('viemChain');
       viemScore += 0.3;
     }
 
     // Check for viem WalletClient specific methods
-    if (typeof obj.sendTransaction === 'function' && 
-        typeof obj.signMessage === 'function' && 
-        (obj.account || typeof obj.getAddresses === 'function')) {
+    if (
+      typeof obj.sendTransaction === 'function' &&
+      typeof obj.signMessage === 'function' &&
+      (obj.account || typeof obj.getAddresses === 'function')
+    ) {
       features.push('viemWalletClient');
       viemScore += 0.4;
     }
 
     // Check for viem PublicClient specific methods
-    if (typeof obj.readContract === 'function' && 
-        typeof obj.getChainId === 'function' && 
-        !obj.sendTransaction) {
+    if (
+      typeof obj.readContract === 'function' &&
+      typeof obj.getChainId === 'function' &&
+      !obj.sendTransaction
+    ) {
       features.push('viemPublicClient');
       viemScore += 0.4;
     }
@@ -325,7 +335,7 @@ export class AccountAdapterFactory {
       attemptedType?: string;
       detectedFeatures?: string[];
       originalError?: Error;
-    }
+    },
   ): FactoryError {
     const error: FactoryError = Object.assign(new Error(message), {
       code,
@@ -346,11 +356,11 @@ export class AccountAdapterFactory {
 
 /**
  * Static instance for convenience access
- * 
+ *
  * @example
  * ```typescript
  * import { AccountAdapterFactory } from './adapters/account-adapter-factory';
- * 
+ *
  * const adapter = AccountAdapterFactory.fromEthers5(signer);
  * ```
  */
