@@ -16,8 +16,6 @@ export type {
   ClaimableToken,
   MintValidationParams,
   MintValidation,
-  FloorPriceData,
-  MintHistoryItem,
 } from '../types/blindmint';
 
 export type {

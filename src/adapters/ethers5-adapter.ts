@@ -453,15 +453,15 @@ export class Ethers5Adapter implements IAccountAdapter {
  * const adapter = createEthers5Adapter(signer);
  * ```
  */
-export function createEthers5Adapter(provider: unknown): IAccountAdapter {
-  if (!provider || typeof provider !== 'object') {
+export function createEthers5Adapter(signer: ethers.Signer): IAccountAdapter {
+  if (!signer || typeof signer !== 'object') {
     throw new ClientSDKError(
       ErrorCode.INVALID_INPUT,
       'Provider must be a valid ethers v5 Provider or Signer instance',
     );
   }
 
-  return new Ethers5Adapter(provider as ethers.providers.Provider | ethers.Signer);
+  return new Ethers5Adapter(signer);
 }
 
 // =============================================================================

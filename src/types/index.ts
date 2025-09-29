@@ -11,7 +11,6 @@ export type {
   BlindMintOnchainData,
   BlindMintPublicData,
   BlindMintTierProbability,
-  GachaConfig,
   TokenVariation,
   MintValidation,
 } from './blindmint';
