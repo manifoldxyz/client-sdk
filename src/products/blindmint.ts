@@ -48,7 +48,8 @@ import { ClientSDKError, ErrorCode } from '../types/errors';
 import { BlindMintError, BlindMintErrorCode } from '../types/enhanced-errors';
 import type { InstancePreview } from '@manifoldxyz/studio-apps-client';
 import { estimateGas, checkERC20Balance, checkERC20Allowance } from '../utils/gas-estimation';
-import { Money } from '../libs/money';\nimport type { Cost } from '../types/money';
+import { Money } from '../libs/money';
+import type { Cost } from '../types/money';
 
 /**
  * BlindMintProduct implementation following technical spec CON-2729
