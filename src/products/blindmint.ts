@@ -13,6 +13,10 @@ import type {
   BlindMintProduct as IBlindMintProduct,
 } from '../types/blindmint';
 import type {
+  IAccountAdapter,
+  UniversalTransactionRequest,
+} from '../types/account-adapter';
+import type {
   Product,
   AllocationParams,
   AllocationResponse,
@@ -44,7 +48,7 @@ import { ClientSDKError, ErrorCode } from '../types/errors';
 import { BlindMintError, BlindMintErrorCode } from '../types/enhanced-errors';
 import type { InstancePreview } from '@manifoldxyz/studio-apps-client';
 import { estimateGas, checkERC20Balance, checkERC20Allowance } from '../utils/gas-estimation';
-import { Money, Cost } from '../libs/money';
+import { Money } from '../libs/money';\nimport type { Cost } from '../types/money';
 
 /**
  * BlindMintProduct implementation following technical spec CON-2729
@@ -267,13 +271,45 @@ export class BlindMintProduct implements IBlindMintProduct {
   async preparePurchase(
     params: PreparePurchaseParams<BlindMintPayload>,
   ): Promise<PreparedPurchase> {
-    const { address, payload } = params;
+    const { address, accountAdapter, payload } = params;
     const quantity = payload?.quantity || 1;
     const networkId = this.data.publicData.network;
 
-    if (!validateAddress(address)) {
-      throw new BlindMintError(BlindMintErrorCode.INVALID_WALLET_ADDRESS, 'Invalid address', {
-        walletAddress: address,
+    // Support both legacy address and new accountAdapter patterns
+    let walletAddress: string;
+    let adapter: IAccountAdapter | undefined;
+
+    if (accountAdapter) {
+      walletAddress = accountAdapter.address;
+      adapter = accountAdapter;
+      
+      // Verify adapter is connected to correct network
+      const adapterNetworkId = await adapter.getConnectedNetworkId();
+      if (adapterNetworkId !== networkId) {
+        throw new BlindMintError(
+          BlindMintErrorCode.NETWORK_MISMATCH,
+          `Wallet connected to network ${adapterNetworkId}, but product requires network ${networkId}`,
+          { 
+            expectedNetworkId: networkId, 
+            actualNetworkId: adapterNetworkId,
+            instanceId: String(this.id)
+          }
+        );
+      }
+    } else if (address) {
+      walletAddress = address;
+      // Legacy mode - no adapter available
+    } else {
+      throw new BlindMintError(
+        BlindMintErrorCode.INVALID_WALLET_ADDRESS,
+        'Either address or accountAdapter must be provided',
+        { instanceId: String(this.id) }
+      );
+    }
+
+    if (!validateAddress(walletAddress)) {
+      throw new BlindMintError(BlindMintErrorCode.INVALID_WALLET_ADDRESS, 'Invalid wallet address', {
+        walletAddress,
       });
     }
 
@@ -299,7 +335,7 @@ export class BlindMintProduct implements IBlindMintProduct {
     }
 
     // Check allocations
-    const allocations = await this.getAllocations({ recipientAddress: address });
+    const allocations = await this.getAllocations({ recipientAddress: walletAddress });
     if (!allocations.isEligible) {
       throw new ClientSDKError(ErrorCode.NOT_ELIGIBLE, allocations.reason || 'Not eligible');
     }
@@ -340,8 +376,15 @@ export class BlindMintProduct implements IBlindMintProduct {
     // Check balances and create approvals for each token type
     for (const [tokenAddress, totalCost] of Array.from(costsByToken)) {
       if (totalCost.isERC20()) {
-        // Check ERC20 balance
-        const balance = await checkERC20Balance(tokenAddress, address, provider);
+        // Check ERC20 balance using adapter if available, fallback to provider
+        let balance: ethers.BigNumber;
+        if (adapter) {
+          const adapterBalance = await adapter.getBalance(tokenAddress);
+          balance = ethers.BigNumber.from(adapterBalance.raw.toString());
+        } else {
+          balance = await checkERC20Balance(tokenAddress, walletAddress, provider);
+        }
+        
         if (balance.lt(totalCost.raw)) {
           throw new ClientSDKError(
             ErrorCode.INSUFFICIENT_FUNDS,
@@ -352,35 +395,30 @@ export class BlindMintProduct implements IBlindMintProduct {
         // Check approval
         const currentAllowance = await checkERC20Allowance(
           tokenAddress,
-          address,
+          walletAddress,
           this._extensionAddress,
           provider,
         );
 
         if (currentAllowance.lt(totalCost.raw)) {
-          steps.push({
+          const approvalStep: TransactionStep = {
             id: `approve-${totalCost.symbol.toLowerCase()}`,
             name: `Approve ${totalCost.symbol} Spending`,
-            type: 'approval',
+            type: 'approve',
             description: `Approve ${totalCost.formatted} ${totalCost.symbol}`,
+            // Legacy execute for backward compatibility
             execute: async (account: ethers.Signer) => {
-              // Estimate gas inside execute with proper buffer
               const gasBuffer = params.gasBuffer || {};
               const erc20Contract = new ethers.Contract(
                 tokenAddress,
                 ['function approve(address,uint256)'],
                 account,
               );
-
-              // Estimate gas for approval
               const gasEstimate = await erc20Contract.estimateGas.approve!(
                 this._extensionAddress,
                 totalCost.raw,
               );
-
-              // Apply gas buffer
               const gasLimit = this._applyGasBuffer(gasEstimate, gasBuffer);
-
               const tx = (await erc20Contract.approve(this._extensionAddress, totalCost.raw, {
                 gasLimit,
               })) as ethers.ContractTransaction;
@@ -392,11 +430,56 @@ export class BlindMintProduct implements IBlindMintProduct {
                 status: receipt.status === 1 ? 'success' : 'failed',
               } as TransactionReceipt;
             },
-          });
+          };
+
+          // Add adapter-compatible execute method
+          if (adapter) {
+            approvalStep.executeWithAdapter = async (accountAdapter: IAccountAdapter) => {
+              const gasBuffer = params.gasBuffer || {};
+              
+              // Build universal transaction request
+              const txRequest: UniversalTransactionRequest = {
+                to: tokenAddress,
+                data: this._buildApprovalData(this._extensionAddress, totalCost.raw.toString()),
+                gasLimit: this._calculateGasLimitWithBuffer('200000', gasBuffer), // Standard ERC20 approval gas
+              };
+
+              try {
+                const response = await accountAdapter.sendTransaction(txRequest);
+                return {
+                  networkId,
+                  step: approvalStep.id,
+                  txHash: response.hash,
+                  blockNumber: response.blockNumber,
+                  gasUsed: response.gasUsed ? BigInt(response.gasUsed) : undefined,
+                  status: response.status || 'pending',
+                };
+              } catch (error) {
+                throw new BlindMintError(
+                  BlindMintErrorCode.TRANSACTION_FAILED,
+                  `Approval transaction failed: ${(error as Error).message}`,
+                  { 
+                    step: approvalStep.id,
+                    tokenAddress,
+                    originalError: error as Error
+                  }
+                );
+              }
+            };
+          }
+          
+          steps.push(approvalStep);
         }
       } else {
-        // Check native balance
-        const nativeBalance = await provider.getBalance(address);
+        // Check native balance using adapter if available, fallback to provider
+        let nativeBalance: ethers.BigNumber;
+        if (adapter) {
+          const adapterBalance = await adapter.getBalance();
+          nativeBalance = ethers.BigNumber.from(adapterBalance.raw.toString());
+        } else {
+          nativeBalance = await provider.getBalance(walletAddress);
+        }
+        
         if (nativeBalance.lt(totalCost.raw)) {
           throw new ClientSDKError(
             ErrorCode.INSUFFICIENT_FUNDS,
@@ -421,29 +504,23 @@ export class BlindMintProduct implements IBlindMintProduct {
     if (nativeCost) mintCost.native = nativeCost;
     if (erc20Costs.length > 0) mintCost.erc20s = erc20Costs;
 
-    steps.push({
+    const mintStep: TransactionStep = {
       id: 'mint',
       name: 'Mint BlindMint NFTs',
       type: 'mint',
       description: `Mint ${quantity} random NFT(s)`,
       cost: mintCost,
+      // Legacy execute for backward compatibility
       execute: async (account: ethers.Signer) => {
         const gasBuffer = params.gasBuffer || {};
         const contract = this._getClaimContract();
-
-        // Estimate gas inside execute
         const gasEstimate = await contract.connect(account).estimateGas.mintReserve!(
           this._creatorContract,
           this.id,
           quantity,
-          {
-            value: nativePaymentValue,
-          },
+          { value: nativePaymentValue },
         );
-
-        // Apply gas buffer
         const gasLimit = this._applyGasBuffer(gasEstimate, gasBuffer);
-
         const tx = (await contract
           .connect(account)
           .mintReserve(this._creatorContract, this.id, quantity, {
@@ -458,7 +535,46 @@ export class BlindMintProduct implements IBlindMintProduct {
           status: receipt.status === 1 ? 'success' : 'failed',
         } as TransactionReceipt;
       },
-    });
+    };
+
+    // Add adapter-compatible execute method
+    if (adapter) {
+      mintStep.executeWithAdapter = async (accountAdapter: IAccountAdapter) => {
+        const gasBuffer = params.gasBuffer || {};
+        
+        // Build universal transaction request
+        const txRequest: UniversalTransactionRequest = {
+          to: this._extensionAddress,
+          data: this._buildMintData(this._creatorContract, this.id, quantity),
+          value: nativePaymentValue.toString(),
+          gasLimit: this._calculateGasLimitWithBuffer('300000', gasBuffer), // Estimated mint gas
+        };
+
+        try {
+          const response = await accountAdapter.sendTransaction(txRequest);
+          return {
+            networkId,
+            step: mintStep.id,
+            txHash: response.hash,
+            blockNumber: response.blockNumber,
+            gasUsed: response.gasUsed ? BigInt(response.gasUsed) : undefined,
+            status: response.status || 'pending',
+          };
+        } catch (error) {
+          throw new BlindMintError(
+            BlindMintErrorCode.TRANSACTION_FAILED,
+            `Mint transaction failed: ${(error as Error).message}`,
+            { 
+              step: mintStep.id,
+              quantity,
+              originalError: error as Error
+            }
+          );
+        }
+      };
+    }
+
+    steps.push(mintStep);
 
     // Build Cost structure (reuse the already computed values)
     const cost: Cost = {
@@ -476,45 +592,79 @@ export class BlindMintProduct implements IBlindMintProduct {
       cost,
       steps,
       isEligible: true,
+      // Legacy fields for backward compatibility
+      transactionData: adapter ? undefined : {
+        contractAddress: this._extensionAddress,
+        transactionData: '0x', // Would need to build this for legacy mode
+        gasEstimate: BigInt('300000'),
+        networkId,
+      },
+      gasEstimate: adapter ? undefined : platformFee,
     };
   }
 
   async purchase(params: PurchaseParams): Promise<Order> {
-    const { account, preparedPurchase } = params;
+    const { account, accountAdapter, preparedPurchase } = params;
+
+    // Support both legacy account and new accountAdapter patterns
+    let walletAddress: string;
+    let useAdapter = false;
+
+    if (accountAdapter) {
+      walletAddress = accountAdapter.address;
+      useAdapter = true;
+    } else if (account) {
+      walletAddress = account.address;
+    } else {
+      throw new BlindMintError(
+        BlindMintErrorCode.INVALID_WALLET_ADDRESS,
+        'Either account or accountAdapter must be provided',
+        { instanceId: String(this.id) }
+      );
+    }
 
     // Execute all steps sequentially
     const receipts: any[] = [];
 
     for (const step of preparedPurchase.steps) {
-      if (step.execute) {
-        try {
-          // Call step.execute with the account
-          const receipt = await step.execute(account);
-          receipts.push(receipt);
-        } catch (error) {
-          // If any step fails, throw error with context
+      try {
+        let receipt;
+        
+        if (useAdapter && accountAdapter && step.executeWithAdapter) {
+          // Use new adapter-based execution
+          receipt = await step.executeWithAdapter(accountAdapter);
+        } else if (!useAdapter && account && step.execute) {
+          // Use legacy execution
+          receipt = await step.execute(account);
+        } else {
           throw new ClientSDKError(
             ErrorCode.TRANSACTION_FAILED,
-            `Transaction failed at step ${step.id}: ${(error as Error).message}`,
-            {
-              step: step.id,
-              receipts, // Include successful receipts
-              error: error as Error,
-            },
+            `No compatible execution method available for step ${step.id}`,
+            { step: step.id, useAdapter, hasAccount: !!account, hasAdapter: !!accountAdapter }
           );
         }
+        
+        receipts.push(receipt);
+      } catch (error) {
+        // If any step fails, throw error with context
+        throw new ClientSDKError(
+          ErrorCode.TRANSACTION_FAILED,
+          `Transaction failed at step ${step.id}: ${(error as Error).message}`,
+          {
+            step: step.id,
+            receipts, // Include successful receipts
+            error: error as Error,
+          },
+        );
       }
     }
 
     return {
-      id: `blindmint_order_${Date.now()}`,
       receipts,
       status: 'completed' as const,
-      buyer: { walletAddress: account.address },
+      buyer: { walletAddress },
       total: preparedPurchase.cost,
       items: [],
-      createdAt: new Date(),
-      completedAt: new Date(),
     };
   }
 
@@ -725,6 +875,36 @@ export class BlindMintProduct implements IBlindMintProduct {
     return gasBuffer.fixed
       ? gasEstimate.add(gasBuffer.fixed)
       : gasEstimate.mul(gasBuffer.multiplier || 120).div(100);
+  }
+
+  /**
+   * Build ERC-20 approval transaction data
+   */
+  private _buildApprovalData(spender: string, amount: string): string {
+    const approvalInterface = new ethers.utils.Interface([
+      'function approve(address spender, uint256 amount)'
+    ]);
+    return approvalInterface.encodeFunctionData('approve', [spender, amount]);
+  }
+
+  /**
+   * Build mint transaction data
+   */
+  private _buildMintData(creatorContract: string, claimIndex: number, quantity: number): string {
+    // Using the actual mint function signature from the contract
+    const mintInterface = new ethers.utils.Interface([
+      'function mintReserve(address creatorContract, uint256 claimIndex, uint256 quantity)'
+    ]);
+    return mintInterface.encodeFunctionData('mintReserve', [creatorContract, claimIndex, quantity]);
+  }
+
+  /**
+   * Calculate gas limit with buffer for adapter transactions
+   */
+  private _calculateGasLimitWithBuffer(baseGas: string, gasBuffer?: GasBuffer): string {
+    const base = ethers.BigNumber.from(baseGas);
+    const buffered = this._applyGasBuffer(base, gasBuffer);
+    return buffered.toString();
   }
 }
 

@@ -1,7 +1,9 @@
 import type { Address, Cost, NetworkId, Money } from './common';
+import type { IAccountAdapter } from './account-adapter';
 
 export interface PreparePurchaseParams<T> {
-  address: Address;
+  address?: Address; // Deprecated: Use accountAdapter instead
+  accountAdapter?: IAccountAdapter;
   recipientAddress?: Address;
   networkId?: NetworkId;
   payload?: T;
@@ -31,9 +33,10 @@ export interface BlindMintPayload {
 
 export interface PreparedPurchase {
   cost: Cost;
-  transactionData: TransactionData;
+  transactionData?: TransactionData; // Optional for adapter-based flows
   steps: TransactionStep[];
-  gasEstimate: Money;
+  gasEstimate?: Money; // Optional for adapter-based flows
+  isEligible: boolean;
 }
 
 export interface TransactionData {
@@ -50,11 +53,14 @@ export interface TransactionStep {
   name: string;
   type: 'mint' | 'approve';
   execute?: (account: any) => Promise<TransactionReceipt>;
+  executeWithAdapter?: (adapter: IAccountAdapter) => Promise<TransactionReceipt>;
   description?: string;
+  cost?: { native?: Money; erc20s?: Money[] };
 }
 
 export interface PurchaseParams {
-  account: WalletAccount;
+  account?: WalletAccount; // Deprecated: Use accountAdapter instead
+  accountAdapter?: IAccountAdapter;
   preparedPurchase: PreparedPurchase;
 }
 

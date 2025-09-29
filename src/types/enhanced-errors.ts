@@ -34,6 +34,7 @@ export enum BlindMintErrorCode {
   CONTRACT_ERROR = 'CONTRACT_ERROR',
   GAS_ESTIMATION_FAILED = 'GAS_ESTIMATION_FAILED',
   WRONG_NETWORK = 'WRONG_NETWORK',
+  NETWORK_MISMATCH = 'NETWORK_MISMATCH',
   PROVIDER_UNAVAILABLE = 'PROVIDER_UNAVAILABLE',
   TRANSACTION_REPLACED = 'TRANSACTION_REPLACED',
   TRANSACTION_CANCELLED = 'TRANSACTION_CANCELLED',
@@ -81,10 +82,20 @@ export interface BlindMintErrorContext {
   mintStatus?: string;
   /** Network ID */
   networkId?: number;
+  /** Expected network ID */
+  expectedNetworkId?: number;
+  /** Actual network ID */
+  actualNetworkId?: number;
   /** Transaction hash if applicable */
   txHash?: string;
   /** Block number when error occurred */
   blockNumber?: number;
+  /** Transaction step that failed */
+  step?: string;
+  /** Original error if wrapped */
+  originalError?: Error;
+  /** Token address for payment issues */
+  tokenAddress?: string;
   /** Additional context data */
   metadata?: Record<string, unknown>;
 }
@@ -396,6 +407,13 @@ export const BLINDMINT_ERROR_CLASSIFICATIONS: Record<BlindMintErrorCode, ErrorMe
     category: ErrorCategory.USER_ERROR,
     recoverable: true,
     userActions: ['Switch to correct network'],
+    reportable: false,
+  },
+  [BlindMintErrorCode.NETWORK_MISMATCH]: {
+    severity: ErrorSeverity.MEDIUM,
+    category: ErrorCategory.USER_ERROR,
+    recoverable: true,
+    userActions: ['Switch wallet to correct network'],
     reportable: false,
   },
   [BlindMintErrorCode.PROVIDER_UNAVAILABLE]: {
