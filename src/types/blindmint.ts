@@ -16,7 +16,6 @@ import type {
   ProductInventory,
 } from './product';
 import type { BlindMintPayload } from './purchase';
-import type { ethers } from 'ethers';
 import type { Money } from '../libs/money';
 import type { Cost } from './money';
 
@@ -36,9 +35,9 @@ export interface BlindMintOnchainData {
   /** Maximum tokens per wallet (0 = unlimited) */
   walletMax: number;
   /** Mint start timestamp */
-  startDate: Date;
+  startDate?: Date;
   /** Mint end timestamp */
-  endDate: Date;
+  endDate?: Date;
   /** Audience type for access control */
   audienceType: 'None' | 'Allowlist' | 'RedemptionCode';
   /** Cost per token */
@@ -95,23 +94,6 @@ export interface BlindMintPublicData {
   thumbnail?: string;
   /** Optional attributes for filtering/display */
   attributes?: Record<string, unknown>;
-}
-
-/**
- * Gacha Configuration for BlindMint
- * Based on gachapon-widgets patterns
- */
-export interface GachaConfig {
-  /** Tier configuration with probabilities */
-  tiers: GachaTier[];
-  /** Whether to reveal metadata immediately after mint */
-  immediateReveal: boolean;
-  /** Custom reveal delay in seconds */
-  revealDelay?: number;
-  /** Whether duplicates are allowed */
-  allowDuplicates: boolean;
-  /** Floor price handling for secondary markets */
-  floorPriceHandling?: FloorPriceConfig;
 }
 
 /**
@@ -196,12 +178,9 @@ export interface BlindMintProduct extends BaseProduct<BlindMintPublicData> {
 
   // BlindMint-specific methods
   getTokenVariations(): Promise<TokenVariation[]>;
-  getGachaConfig(): Promise<GachaConfig>;
   getTierProbabilities(): Promise<GachaTier[]>;
   getClaimableTokens(walletAddress: Address): Promise<ClaimableToken[]>;
   estimateMintGas(quantity: number, walletAddress: Address): Promise<bigint>;
-  getFloorPrices(): Promise<FloorPriceData[]>;
-  getMintHistory(walletAddress?: Address): Promise<MintHistoryItem[]>;
 }
 
 // =============================================================================
@@ -209,26 +188,6 @@ export interface BlindMintProduct extends BaseProduct<BlindMintPublicData> {
 // =============================================================================
 
 export type StorageProtocol = 'ipfs' | 'arweave' | 'http' | 'data';
-
-/**
- * Internal claim data structure - not exposed in public API
- * Used internally to handle storage-specific fields
- */
-export interface InternalClaimData {
-  total: ethers.BigNumber;
-  totalMax: ethers.BigNumber;
-  walletMax: ethers.BigNumber;
-  startDate: ethers.BigNumber;
-  endDate: ethers.BigNumber;
-  storageProtocol: number;
-  merkleRoot: string;
-  tokenVariations: ethers.BigNumber;
-  startingTokenId: ethers.BigNumber;
-  location: string;
-  cost: ethers.BigNumber;
-  paymentReceiver: string;
-  erc20: string;
-}
 
 export interface FloorPriceConfig {
   enabled: boolean;
@@ -247,31 +206,6 @@ export interface ClaimableToken {
 export interface BlindMintInventory {
   totalSupply: number;
   totalPurchased: number; // Required by ProductInventory
-}
-
-export interface TierInventory {
-  tier: string;
-  totalInTier: number;
-  mintedInTier: number;
-  remainingInTier: number;
-}
-
-export interface FloorPriceData {
-  tokenId: number;
-  floorPrice: number;
-  currency: string;
-  source: string;
-  lastUpdated: Date;
-}
-
-export interface MintHistoryItem {
-  txHash: string;
-  tokenId: number;
-  minter: Address;
-  timestamp: Date;
-  tier: string;
-  gasUsed: bigint;
-  gasPrice: bigint;
 }
 
 // Import shared types for consistency

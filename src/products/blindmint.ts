@@ -4,11 +4,8 @@ import type {
   BlindMintStatus,
   BlindMintInventory,
   TokenVariation,
-  GachaConfig,
   GachaTier,
   ClaimableToken,
-  FloorPriceData,
-  MintHistoryItem,
   BlindMintTierProbability,
   BlindMintProduct as IBlindMintProduct,
 } from '../types/blindmint';
@@ -181,8 +178,8 @@ export class BlindMintProduct implements IBlindMintProduct {
     const erc20 = claimData.erc20;
 
     // Convert dates from unix seconds
-    const convertDate = (unixSeconds: number): Date => {
-      return unixSeconds === 0 ? new Date(0) : new Date(unixSeconds * 1000);
+    const convertDate = (unixSeconds: number): Date | undefined => {
+      return !unixSeconds ? undefined : new Date(unixSeconds * 1000);
     };
 
     const networkId = this.data.publicData.network;
@@ -204,12 +201,12 @@ export class BlindMintProduct implements IBlindMintProduct {
       totalSupply: claimData.totalMax || Number.MAX_SAFE_INTEGER,
       totalMinted: claimData.total || 0,
       walletMax: 0, // ABIv2 doesn't have walletMax in getClaim, need different approach
-      startDate: convertDate(claimData.startDate || 0),
-      endDate: convertDate(claimData.endDate || 0),
+      startDate: convertDate(claimData.startDate),
+      endDate: convertDate(claimData.endDate),
       audienceType: 'None', // Will be updated based on merkle root if needed
       cost: costMoney,
       paymentReceiver: claimData.paymentReceiver,
-      tokenVariations: claimData.tokenVariations || 0,
+      tokenVariations: claimData.tokenVariations,
       startingTokenId: claimData.startingTokenId ? claimData.startingTokenId.toString() : '0',
     };
   }
@@ -221,7 +218,6 @@ export class BlindMintProduct implements IBlindMintProduct {
   async getStatus(): Promise<BlindMintStatus> {
     const onchainData = await this.fetchOnchainData();
     const now = Date.now();
-    console.log('endDate', onchainData.endDate);
     if (onchainData.startDate && now < onchainData.startDate.getTime()) {
       return 'upcoming';
     }
@@ -321,7 +317,7 @@ export class BlindMintProduct implements IBlindMintProduct {
       customRpcUrls: this._httpRPCs,
     });
 
-    // Calculate costs - onchainData.cost is already a Money instance from _processClaimData
+    // Calculate costs
     const productCost = onchainData.cost.multiplyInt(quantity);
     const platformFee = this._platformFee
       ? this._platformFee.multiplyInt(quantity)
@@ -588,8 +584,8 @@ export class BlindMintProduct implements IBlindMintProduct {
   async getRules(): Promise<ProductRule> {
     const onchainData = await this.fetchOnchainData();
     return {
-      startDate: onchainData.startDate.getTime() === 0 ? undefined : onchainData.startDate,
-      endDate: onchainData.endDate.getTime() === 0 ? undefined : onchainData.endDate,
+      startDate: onchainData.startDate,
+      endDate: onchainData.endDate,
       audienceRestriction: onchainData.audienceType as AudienceRestriction,
       maxPerWallet: onchainData.walletMax || undefined,
     };
@@ -650,18 +646,6 @@ export class BlindMintProduct implements IBlindMintProduct {
     }));
   }
 
-  async getGachaConfig(): Promise<GachaConfig> {
-    const tiers = await this.getTierProbabilities();
-
-    return {
-      tiers,
-      immediateReveal: true,
-      revealDelay: 0,
-      allowDuplicates: true,
-      floorPriceHandling: undefined,
-    };
-  }
-
   async getTierProbabilities(): Promise<GachaTier[]> {
     const publicData = this.data.publicData;
     if (!publicData.tierProbabilities || publicData.tierProbabilities.length === 0) {
@@ -708,16 +692,6 @@ export class BlindMintProduct implements IBlindMintProduct {
     );
 
     return BigInt(gasEstimate.toString());
-  }
-
-  async getFloorPrices(): Promise<FloorPriceData[]> {
-    // Would integrate with price oracle
-    return [];
-  }
-
-  async getMintHistory(_walletAddress?: Address): Promise<MintHistoryItem[]> {
-    // Would query contract events
-    return [];
   }
 
   // =============================================================================
