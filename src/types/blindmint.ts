@@ -96,9 +96,6 @@ export interface BlindMintPublicData {
   attributes?: Record<string, unknown>;
 }
 
-/**
- * Individual tier configuration
- */
 export interface GachaTier {
   /** Tier identifier */
   id: string;

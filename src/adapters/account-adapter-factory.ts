@@ -1,3 +1,4 @@
+import { Signer } from 'ethers';
 import type {
   IAccountAdapter,
   FactoryError,
@@ -43,23 +44,16 @@ export class AccountAdapterFactory {
    * const adapter = AccountAdapterFactory.fromEthers5(signer);
    * ```
    */
-  static fromEthers5(provider: unknown): IAccountAdapter {
+  static fromEthers5(options: { signer: Signer }): IAccountAdapter {
     try {
-      if (!isEthers5Compatible(provider)) {
-        throw this._createFactoryError(
-          'INVALID_PROVIDER',
-          'Provider is not compatible with ethers v5',
-          { provider, attemptedType: 'ethers5' },
-        );
-      }
 
-      return createEthers5Adapter(provider);
+      return createEthers5Adapter(options.signer);
     } catch (error) {
       if (error instanceof ClientSDKError) {
         throw this._createFactoryError(
           'INITIALIZATION_FAILED',
           `Failed to create ethers v5 adapter: ${error.message}`,
-          { provider, originalError: error },
+          { provider: options.signer, originalError: error },
         );
       }
       throw error;
@@ -163,7 +157,7 @@ export class AccountAdapterFactory {
     }
 
     if (detection.isEthers5) {
-      return this.fromEthers5(provider);
+      return this.fromEthers5(provider as { signer: Signer });
     } else if (detection.isEthers6) {
       return this.fromEthers6(provider);
     } else if (detection.isViem) {
