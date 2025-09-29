@@ -1,6 +1,9 @@
 import type { BigNumber } from 'ethers';
 import type { Money } from '../libs/money';
 
+// Re-export Money class and utilities for type system
+export { Money, isMoney } from '../libs/money';
+
 /**
  * Internal Money data structure used by the Money class implementation
  * This interface is used by the Money class in libs/money.ts for backward compatibility

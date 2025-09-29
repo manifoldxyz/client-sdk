@@ -42,5 +42,35 @@ export type {
   ProviderConfig
 } from './config';
 
-// Re-export Money class for backward compatibility
+// Account adapter interfaces (CON-2740)
+export type {
+  // Core interfaces
+  IAccountAdapter,
+  IAccountAdapterFactory,
+  
+  // Transaction types
+  UniversalTransactionRequest,
+  UniversalTransactionResponse,
+  TransactionStatus,
+  
+  // Factory and configuration
+  AdapterType,
+  TypedDataPayload,
+  AdapterNetworkConfig,
+  SupportedNetwork,
+  AdapterCreationOptions,
+  
+  // Error types
+  AccountAdapterError,
+  AccountAdapterErrorCode,
+  FactoryError,
+  FactoryErrorCode,
+  
+  // Utility types
+  AccountAdapterTypeGuard,
+  ProviderDetection
+} from './account-adapter';
+
+// Re-export Money class and related types for backward compatibility
 export { Money, isMoney } from './money';
+export type { MoneyData, Cost } from './money';
