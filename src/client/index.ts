@@ -1,11 +1,17 @@
 import type { ClientConfig, ManifoldClient, WorkspaceProductsOptions } from '../types/client';
-import type { Product } from '../types/product';
+import type { Product, InstanceData, BlindMintPublicData } from '../types/product';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import { AppId } from '../types/common';
 import { BlindMintProduct } from '../products/blindmint';
-import { createMockProduct } from '../products/mock';
 import { validateInstanceId, parseManifoldUrl } from '../utils/validation';
 import { createManifoldApiClient } from '../api/manifold-api';
+
+// Type guard to check if instanceData is for BlindMint
+function isBlindMintInstanceData(
+  instanceData: InstanceData<unknown>,
+): instanceData is InstanceData<BlindMintPublicData> {
+  return (instanceData.appId as AppId) === AppId.BLIND_MINT_1155;
+}
 
 export function createClient(config?: ClientConfig): ManifoldClient {
   const httpRPCs = config?.httpRPCs ?? {};
@@ -34,13 +40,13 @@ export function createClient(config?: ClientConfig): ManifoldClient {
       }
 
       try {
+        console.log('grabbing instanceId', instanceId);
         // Fetch both instance and preview data using Studio Apps Client
         const { instanceData, previewData } = await manifoldApi.getCompleteInstanceData(instanceId);
 
-        const appId = instanceData.appId as AppId;
-
         // Create BlindMint product if it matches the app ID or name
-        if (appId === AppId.BLIND_MINT_1155) {
+        if (isBlindMintInstanceData(instanceData)) {
+          // TypeScript now knows instanceData is InstanceData<BlindMintPublicData>
           // Create BlindMintProduct with both instance and preview data
           // Following technical spec pattern
           return new BlindMintProduct(instanceData, previewData, {
@@ -48,9 +54,13 @@ export function createClient(config?: ClientConfig): ManifoldClient {
           });
         }
 
-        // For now, fallback to mock for other product types
-        return createMockProduct(instanceId);
+        // For other product types, throw an error until implemented
+        throw new ClientSDKError(
+          ErrorCode.UNSUPPORTED_PRODUCT_TYPE,
+          `Product type ${instanceData.appId} is not yet supported`,
+        );
       } catch (error) {
+        console.log('error', error);
         // Re-throw SDK errors
         if (error instanceof ClientSDKError) {
           throw error;
@@ -65,7 +75,7 @@ export function createClient(config?: ClientConfig): ManifoldClient {
     },
 
     async getProductsByWorkspace(
-      workspaceId: string,
+      _workspaceId: string,
       options?: WorkspaceProductsOptions,
     ): Promise<Product[]> {
       // Validate options
@@ -74,15 +84,10 @@ export function createClient(config?: ClientConfig): ManifoldClient {
       }
 
       // TODO: Implement with Studio Apps Client
-      // For now, return array of mock products
-      const limit = options?.limit ?? 10;
-      const products: Product[] = [];
-
-      for (let i = 0; i < limit; i++) {
-        products.push(createMockProduct(`${workspaceId}_${i}`));
-      }
-
-      return products;
+      throw new ClientSDKError(
+        ErrorCode.UNSUPPORTED_PRODUCT_TYPE,
+        'getProductsByWorkspace is not yet implemented',
+      );
     },
   };
 }

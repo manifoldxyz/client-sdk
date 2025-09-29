@@ -1,4 +1,5 @@
-export type Address = `0x${string}`;
+// No imports needed - all types defined here
+export type Address = string;
 
 export type NetworkId = number;
 
@@ -20,15 +21,3 @@ export enum AppId {
 }
 
 export type ProductStatus = 'active' | 'paused' | 'completed' | 'upcoming' | 'sold-out' | 'ended';
-
-import type { Money } from './product';
-
-// Cost type as per documentation (lines 1409-1416)
-export interface Cost {
-  total: Money;
-  subtotal: Money;
-  fees: Money;
-}
-
-// Note: Money is now defined in product.ts with full specification
-export type { Money } from './product';

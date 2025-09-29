@@ -1,7 +1,12 @@
 import * as ethers from 'ethers';
-import type { DualProvider } from './provider-factory';
 import type { NetworkId, Address } from '../types/common';
 import { getNetworkConfig } from '../config/networks';
+
+type DualProvider = {
+  current: ethers.providers.Provider;
+  primary?: ethers.providers.Provider;
+  bridge?: ethers.providers.Provider;
+};
 
 /**
  * Contract factory for BlindMint operations
@@ -17,34 +22,25 @@ import { getNetworkConfig } from '../config/networks';
  * Based on gachapon-widgets contract analysis
  */
 export const BLINDMINT_CLAIM_ABI = [
-  // Read functions from spec
+  // Read functions from ABIv2
   'function MINT_FEE() external view returns (uint256)',
-  'function getClaim(address creatorContract, uint256 claimIndex) external view returns (tuple(uint256 total, uint256 totalMax, uint256 walletMax, uint256 startDate, uint256 endDate, uint8 storageProtocol, bytes32 merkleRoot, uint256 tokenVariations, uint256 startingTokenId, string location, uint256 cost, address paymentReceiver, address erc20))',
-  'function getTotalMints(address wallet, address creatorContract, uint256 claimIndex) external view returns (uint256)',
-  'function checkMintIndices(address creatorContract, uint256 claimIndex, uint256[] calldata indices) external view returns (bool[] memory)',
+  'function getClaim(address creatorContractAddress, uint256 instanceId) external view returns (tuple(uint8 storageProtocol, uint32 total, uint32 totalMax, uint48 startDate, uint48 endDate, uint80 startingTokenId, uint8 tokenVariations, string location, address paymentReceiver, uint96 cost, address erc20))',
+  'function getUserMints(address minter, address creatorContractAddress, uint256 instanceId) external view returns (tuple(uint32 reservedCount, uint32 deliveredCount))',
 
-  // Legacy read functions (for fallback)
-  'function totalSupply() external view returns (uint256)',
-  'function totalMinted() external view returns (uint256)',
-  'function walletMax() external view returns (uint256)',
-  'function startDate() external view returns (uint256)',
-  'function endDate() external view returns (uint256)',
-  'function cost() external view returns (uint256)',
-  'function paymentReceiver() external view returns (address)',
-  'function tokenVariations() external view returns (uint256)',
-  'function startingTokenId() external view returns (uint256)',
-  'function metadataLocation() external view returns (string)',
-  'function storageProtocol() external view returns (uint8)',
+  // Additional read functions
+  'function getClaimForToken(address creatorContractAddress, uint256 tokenId) external view returns (uint256 instanceId, tuple(uint8 storageProtocol, uint32 total, uint32 totalMax, uint48 startDate, uint48 endDate, uint80 startingTokenId, uint8 tokenVariations, string location, address paymentReceiver, uint96 cost, address erc20))',
+  'function tokenURI(address creatorContractAddress, uint256 tokenId) external view returns (string)',
 
-  // Mint functions from spec
-  'function mintReserve(address creatorContract, uint256 claimIndex, uint256 mintCount, uint256[] calldata mintIndices, bytes32[][] calldata merkleProofs, address mintForAddress) external payable',
-  'function mint(address to, uint256 count) external payable',
-  'function mintBatch(address to, uint256[] calldata tokenIds) external payable',
-  'function claim(bytes32[] calldata proof, address to, uint256 count) external payable',
+  // Mint functions from ABIv2
+  'function mintReserve(address creatorContractAddress, uint256 instanceId, uint32 mintCount) external payable',
+  // Admin functions
+  'function initializeClaim(address creatorContractAddress, uint256 instanceId, tuple(uint8 storageProtocol, uint32 totalMax, uint48 startDate, uint48 endDate, uint8 tokenVariations, string location, address paymentReceiver, uint96 cost, address erc20) claimParameters) external payable',
+  'function updateClaim(address creatorContractAddress, uint256 instanceId, tuple(uint8 storageProtocol, address paymentReceiver, uint32 totalMax, uint48 startDate, uint48 endDate, uint96 cost, string location) updateClaimParameters) external',
 
   // Events
-  'event Mint(address indexed to, uint256[] tokenIds)',
-  'event Claim(address indexed to, uint256[] tokenIds, bytes32[] proof)',
+  'event SerendipityMintReserved(address indexed creatorContract, uint256 indexed instanceId, address indexed collector, uint32 mintCount)',
+  'event SerendipityClaimInitialized(address indexed creatorContract, uint256 indexed instanceId, address initializer)',
+  'event SerendipityClaimUpdated(address indexed creatorContract, uint256 indexed instanceId)',
 ] as const;
 
 /**
@@ -93,74 +89,66 @@ export type BlindMintClaimContract = ethers.Contract & {
   // Main contract methods from spec
   MINT_FEE(): Promise<ethers.BigNumber>;
   getClaim(
-    creatorContract: string,
-    claimIndex: number,
+    creatorContractAddress: string,
+    instanceId: number,
   ): Promise<{
-    total: ethers.BigNumber;
-    totalMax: ethers.BigNumber;
-    walletMax: ethers.BigNumber;
-    startDate: ethers.BigNumber;
-    endDate: ethers.BigNumber;
     storageProtocol: number;
-    merkleRoot: string;
-    tokenVariations: ethers.BigNumber;
+    total: number;
+    totalMax: number;
+    startDate: number;
+    endDate: number;
     startingTokenId: ethers.BigNumber;
+    tokenVariations: number;
     location: string;
-    cost: ethers.BigNumber;
     paymentReceiver: string;
+    cost: ethers.BigNumber;
     erc20: string;
   }>;
+  getUserMints(
+    minter: string,
+    creatorContractAddress: string,
+    instanceId: number,
+  ): Promise<{
+    reservedCount: number;
+    deliveredCount: number;
+  }>;
+
   getTotalMints(
-    wallet: string,
-    creatorContract: string,
-    claimIndex: number,
-  ): Promise<ethers.BigNumber>;
-  checkMintIndices(
-    creatorContract: string,
-    claimIndex: number,
-    indices: ethers.BigNumberish[],
-  ): Promise<boolean[]>;
+    minter: string,
+    creatorContractAddress: string,
+    instanceId: number,
+  ): Promise<number>;
 
-  // MintReserve - the main minting method
+  // MintReserve - the main minting method (ABIv2)
   mintReserve(
-    creatorContract: string,
-    claimIndex: number,
-    mintCount: ethers.BigNumberish,
-    mintIndices: ethers.BigNumberish[],
-    merkleProofs: string[][],
-    mintForAddress: string,
+    creatorContractAddress: string,
+    instanceId: number,
+    mintCount: number,
     options?: ethers.Overrides,
   ): Promise<ethers.ContractTransaction>;
 
-  // Legacy methods (for fallback)
-  totalSupply(): Promise<ethers.BigNumber>;
-  totalMinted(): Promise<ethers.BigNumber>;
-  walletMax(): Promise<ethers.BigNumber>;
-  startDate(): Promise<ethers.BigNumber>;
-  endDate(): Promise<ethers.BigNumber>;
-  cost(): Promise<ethers.BigNumber>;
-  paymentReceiver(): Promise<string>;
-  tokenVariations(): Promise<ethers.BigNumber>;
-  startingTokenId(): Promise<ethers.BigNumber>;
-  metadataLocation(): Promise<string>;
-  storageProtocol(): Promise<number>;
+  // Additional methods
+  getClaimForToken(
+    creatorContractAddress: string,
+    tokenId: number,
+  ): Promise<{
+    instanceId: ethers.BigNumber;
+    claim: {
+      storageProtocol: number;
+      total: number;
+      totalMax: number;
+      startDate: number;
+      endDate: number;
+      startingTokenId: ethers.BigNumber;
+      tokenVariations: number;
+      location: string;
+      paymentReceiver: string;
+      cost: ethers.BigNumber;
+      erc20: string;
+    };
+  }>;
 
-  mint(
-    to: string,
-    count: ethers.BigNumberish,
-    options?: ethers.Overrides,
-  ): Promise<ethers.ContractTransaction>;
-  mintBatch(
-    to: string,
-    tokenIds: ethers.BigNumberish[],
-    options?: ethers.Overrides,
-  ): Promise<ethers.ContractTransaction>;
-  claim(
-    proof: string[],
-    to: string,
-    count: ethers.BigNumberish,
-    options?: ethers.Overrides,
-  ): Promise<ethers.ContractTransaction>;
+  tokenURI(creatorContractAddress: string, tokenId: number): Promise<string>;
 };
 
 export type CreatorContract = ethers.Contract & {
@@ -241,22 +229,39 @@ export class ContractFactory {
    * Create BlindMint claim extension contract instance
    */
   createBlindMintContract(address: Address): BlindMintClaimContract {
-
     // Use primary provider for write operations if signer is available
     const providerOrSigner = this.signer || this.provider.current;
 
-    return new ethers.Contract(
+    const contract = new ethers.Contract(
       address,
       BLINDMINT_CLAIM_ABI,
       providerOrSigner,
     ) as BlindMintClaimContract;
+
+    // Add getTotalMints method implementation using getUserMints
+    contract.getTotalMints = async (
+      minter: string,
+      creatorContractAddress: string,
+      instanceId: number,
+    ): Promise<number> => {
+      try {
+        const userMints = await contract.getUserMints(minter, creatorContractAddress, instanceId);
+        // Return sum of reserved and delivered counts
+        return userMints.reservedCount + userMints.deliveredCount;
+      } catch (error) {
+        // If getUserMints fails, return 0 (no mints found)
+        console.warn('Failed to get user mints:', error);
+        return 0;
+      }
+    };
+
+    return contract;
   }
 
   /**
    * Create Creator (ERC721) contract instance
    */
   createCreatorContract(address: Address): CreatorContract {
-
     const providerOrSigner = this.signer || this.provider.current;
 
     return new ethers.Contract(address, CREATOR_CONTRACT_ABI, providerOrSigner) as CreatorContract;
@@ -266,7 +271,6 @@ export class ContractFactory {
    * Create ERC20 token contract instance
    */
   createERC20Contract(address: Address): ERC20Contract {
-
     const providerOrSigner = this.signer || this.provider.current;
 
     return new ethers.Contract(address, ERC20_ABI, providerOrSigner) as ERC20Contract;
@@ -277,10 +281,19 @@ export class ContractFactory {
    */
   getWellKnownContracts() {
     const networkConfig = getNetworkConfig(this.networkId);
-    const contracts = networkConfig.contracts;
+    const contracts = networkConfig?.contracts;
+
+    if (!contracts) {
+      return {
+        usdc: null,
+        usdt: null,
+        weth: null,
+        blindMint: null,
+        gacha: null,
+      };
+    }
 
     return {
-      // ERC20 tokens
       usdc: contracts.erc20Tokens.usdc
         ? this.createERC20Contract(contracts.erc20Tokens.usdc)
         : null,
@@ -290,8 +303,6 @@ export class ContractFactory {
       weth: contracts.erc20Tokens.weth
         ? this.createERC20Contract(contracts.erc20Tokens.weth)
         : null,
-
-      // Claim extensions
       blindMint: contracts.claimExtensions.blindMint
         ? this.createBlindMintContract(contracts.claimExtensions.blindMint)
         : null,
@@ -323,14 +334,20 @@ export class ContractFactory {
 /**
  * Estimate gas for a contract call with fallback
  */
+type EstimateGasFunction = (...fnArgs: unknown[]) => Promise<ethers.BigNumber>;
+
 export async function estimateGasWithFallback(
   contract: ethers.Contract,
   methodName: string,
-  args: any[],
+  args: ReadonlyArray<unknown>,
   fallbackGas: ethers.BigNumberish = 200000,
 ): Promise<ethers.BigNumber> {
   try {
-    return await contract.estimateGas[methodName](...args);
+    const estimateMethod = contract.estimateGas[methodName as keyof typeof contract.estimateGas];
+    if (typeof estimateMethod === 'function') {
+      return await (estimateMethod as EstimateGasFunction)(...args);
+    }
+    return ethers.BigNumber.from(fallbackGas);
   } catch (error) {
     return ethers.BigNumber.from(fallbackGas);
   }
@@ -372,15 +389,7 @@ export async function batchContractCalls<T>(
 
   for (let i = 0; i < calls.length; i += maxConcurrent) {
     const batch = calls.slice(i, i + maxConcurrent);
-    const batchResults = await Promise.all(
-      batch.map(async (call, index) => {
-        try {
-          return await call();
-        } catch (error) {
-          throw error;
-        }
-      }),
-    );
+    const batchResults = await Promise.all(batch.map((call) => call()));
 
     results.push(...batchResults);
   }
@@ -429,8 +438,13 @@ export async function validateContract(
     for (const method of expectedMethods) {
       try {
         // Try to call the method with empty parameters
-        await tempContract.callStatic[method]?.();
-        supportedMethods.push(method);
+        const staticMethod = tempContract.callStatic[method];
+        if (staticMethod) {
+          await staticMethod();
+          supportedMethods.push(method);
+        } else {
+          missingMethods.push(method);
+        }
       } catch (error) {
         // Method might not exist or might require parameters
         missingMethods.push(method);
@@ -477,58 +491,3 @@ export function parseContractEvents(
 // =============================================================================
 // DEVELOPMENT AND TESTING UTILITIES
 // =============================================================================
-
-/**
- * Create a mock contract for testing
- */
-export function createMockContract(
-  address: Address,
-  abi: readonly string[],
-  mockImplementation: Record<string, any> = {},
-): ethers.Contract {
-  // Create a mock provider that returns predefined values
-  const mockProvider = {
-    call: async (transaction: any) => {
-      const method = transaction.data?.slice(0, 10); // Function selector
-      return mockImplementation[method] || '0x';
-    },
-
-    estimateGas: async () => ethers.BigNumber.from('21000'),
-
-    getNetwork: async () => ({ chainId: 1, name: 'homestead' }),
-  } as any;
-
-  return new ethers.Contract(address, abi, mockProvider);
-}
-
-/**
- * Contract factory for testing
- */
-export function createTestContractFactory(
-  networkId: NetworkId,
-  mockContracts: Record<Address, any> = {},
-): ContractFactory {
-  const mockProvider = {
-    current: {
-      call: async (transaction: any) => {
-        const address = transaction.to;
-        const mockContract = mockContracts[address];
-
-        if (mockContract) {
-          const method = transaction.data?.slice(0, 10);
-          return mockContract[method] || '0x';
-        }
-
-        return '0x';
-      },
-
-      estimateGas: async () => ethers.BigNumber.from('21000'),
-    },
-  } as any;
-
-  return new ContractFactory({
-    provider: mockProvider,
-    networkId,
-    enableDebug: false,
-  });
-}

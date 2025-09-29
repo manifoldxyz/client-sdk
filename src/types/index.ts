@@ -5,50 +5,66 @@ export * from './purchase';
 export * from './errors';
 export * from './common';
 
-// BlindMint-specific types (selective exports to avoid conflicts)
-export type { 
-  BlindMintProduct as BlindMintProductInterface,
-  BlindMintOnchainData as BlindMintOnchainDataType,
-  BlindMintPublicData as BlindMintPublicDataType,
-  BlindMintPool as BlindMintPoolType,
-  BlindMintTierProbability as BlindMintTierProbabilityType,
+// BlindMint-specific types
+export type {
+  BlindMintProduct,
+  BlindMintOnchainData,
+  BlindMintPublicData,
+  BlindMintTierProbability,
   GachaConfig,
-  TokenVariation
+  TokenVariation,
+  MintValidation,
 } from './blindmint';
 
+// Essential contract types
 export type {
   ClaimExtensionContract,
   ERC20Contract,
   ContractCallOptions,
   TransactionResult,
-  GasConfig as BlindMintGasConfig,
-  ProviderConfig as BlindMintProviderConfig,
-  NetworkError as BlindMintNetworkError
 } from './contracts';
 
-export type {
-  InstanceDataResponse,
-  PreviewDataResponse,
-  AllocationRequest,
-  AllocationResponse as BlindMintAllocationResponse,
-  PriceCalculation,
-  ApiError as BlindMintApiError,
-  TransformationRule as BlindMintTransformationRule
-} from './data-flow';
-
-// Export MintValidation from blindmint where it's actually defined
-export type { MintValidation } from './blindmint';
-
+// Enhanced error handling
 export type {
   BlindMintError,
   BlindMintErrorCode,
-  ValidationError as BlindMintValidationError,
-  ErrorClassification,
-  RecoveryAction
+  ErrorSeverity,
+  ErrorCategory,
+  ErrorMetadata,
 } from './enhanced-errors';
 
+// Configuration
+export type { NetworkConfig, CacheConfig, ApiConfig, GasConfig, ProviderConfig } from './config';
+
+// Account adapter interfaces (CON-2740)
 export type {
-  NetworkConfig,
-  CacheConfig,
-  ApiConfig as APIConfig
-} from './config';
+  // Core interfaces
+  IAccountAdapter,
+  IAccountAdapterFactory,
+
+  // Transaction types
+  UniversalTransactionRequest,
+  UniversalTransactionResponse,
+  TransactionStatus,
+
+  // Factory and configuration
+  AdapterType,
+  TypedDataPayload,
+  AdapterNetworkConfig,
+  SupportedNetwork,
+  AdapterCreationOptions,
+
+  // Error types
+  AccountAdapterError,
+  AccountAdapterErrorCode,
+  FactoryError,
+  FactoryErrorCode,
+
+  // Utility types
+  AccountAdapterTypeGuard,
+  ProviderDetection,
+} from './account-adapter';
+
+// Re-export Money class and related types for backward compatibility
+export { Money, isMoney } from './money';
+export type { MoneyData, Cost } from './money';

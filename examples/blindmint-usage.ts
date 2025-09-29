@@ -6,7 +6,14 @@
  */
 
 import { createClient } from '../src/client';
+import { AccountAdapterFactory } from '../src/adapters/account-adapter-factory';
 import type { NetworkId } from '../src/types/common';
+import type { IAccountAdapter } from '../src/types/account-adapter';
+
+// Simulated wallet imports (in real usage, these would be actual wallet imports)
+declare const ethers: any; // ethers v5
+declare const viem: any; // viem
+declare const window: any; // browser window object
 
 // =============================================================================
 // BASIC USAGE
@@ -109,12 +116,12 @@ async function advancedConfigurationExample() {
 // =============================================================================
 
 /**
- * Example 4: Complete Minting Workflow
+ * Example 4: Complete Minting Workflow with Account Adapters
  * 
- * Demonstrates a complete minting process including validation and error handling.
+ * Demonstrates the new account adapter pattern for wallet integration.
  */
 async function completeMintin gWorkflow() {
-  console.log('=== Complete Minting Workflow ===');
+  console.log('=== Complete Minting Workflow with Account Adapters ===');
   
   const client = createClient({
     debug: true,
@@ -131,69 +138,156 @@ async function completeMintin gWorkflow() {
     }
 
     // Check product status and availability
-    console.log('Product Status:', product.data.publicData);
+    console.log('Product Status:', await product.getStatus());
     
-    // Prepare minting parameters
-    const userAddress = '0x742d35Cc6634C0532925a3b8D66320d7c2fbd768'; // Example address
-    const networkId: NetworkId = product.data.publicData.network;
+    // === NEW: Account Adapter Pattern ===
+    // Option 1: Create adapter from ethers v5
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer = provider.getSigner();
+    const ethersAdapter = AccountAdapterFactory.fromEthers5(signer);
+    
+    // Option 2: Create adapter from viem
+    // const viemClient = viem.createWalletClient({
+    //   chain: viem.chains.mainnet,
+    //   transport: viem.custom(window.ethereum)
+    // });
+    // const viemAdapter = AccountAdapterFactory.fromViem(viemClient);
+    
+    // Use the adapter (ethers example)
+    const accountAdapter = ethersAdapter;
+    console.log('Connected wallet:', accountAdapter.address);
+    console.log('Connected network:', await accountAdapter.getConnectedNetworkId());
+    
+    // Prepare minting parameters using account adapter
     const quantity = 1;
+    const networkId: NetworkId = product.data.publicData.network;
 
     console.log('Preparing to mint:', {
-      to: userAddress,
+      wallet: accountAdapter.address,
       quantity,
       networkId,
-      contract: product.data.publicData.contract,
-      mintPrice: product.data.publicData.mintPrice
+      adapterType: accountAdapter.adapterType
     });
 
-    // Execute the mint (this would interact with blockchain)
-    const mintResult = await product.mint({
-      to: userAddress,
-      quantity,
-      networkId
+    // Prepare purchase with account adapter
+    const preparedPurchase = await product.preparePurchase({
+      accountAdapter, // NEW: Use account adapter instead of address
+      payload: { quantity },
+      gasBuffer: { multiplier: 120 } // 20% gas buffer
     });
-
-    console.log('Mint prepared successfully:', mintResult);
     
-  } catch (error) {
+    console.log('Purchase prepared:', {
+      cost: preparedPurchase.cost,
+      steps: preparedPurchase.steps.map(s => ({ id: s.id, name: s.name, type: s.type })),
+      isEligible: preparedPurchase.isEligible
+    });
+
+    // Execute purchase with account adapter
+    const order = await product.purchase({
+      accountAdapter, // NEW: Use account adapter for purchase
+      preparedPurchase
+    });
+
+    console.log('Mint completed successfully:', {
+      orderId: order.id,
+      status: order.status,
+      receipts: order.receipts.map(r => ({ txHash: r.txHash, step: r.step }))
+    });
+    
+  } catch (error: any) {
     console.error('Minting workflow failed:', error);
     
-    // Handle specific error types
-    if (error.code === 'INVALID_INPUT') {
-      console.log('Fix input validation errors and try again');
-    } else if (error.code === 'NETWORK_ERROR') {
-      console.log('Check network connection and try again');
+    // Handle adapter-specific error types
+    if (error.code === 'NETWORK_MISMATCH') {
+      console.log('Wallet is connected to wrong network - switch networks');
+    } else if (error.code === 'TRANSACTION_FAILED') {
+      console.log('Transaction failed - check transaction details');
     } else if (error.code === 'INSUFFICIENT_FUNDS') {
       console.log('Ensure wallet has sufficient funds');
+    } else if (error.code === 'TRANSACTION_REJECTED') {
+      console.log('User rejected transaction');
     }
   }
 }
 
 /**
- * Example 5: Batch Minting
+ * Example 5: Batch Minting with Different Adapters
  * 
- * Shows how to handle multiple quantity minting.
+ * Shows how to handle multiple quantity minting and switching between adapters.
  */
 async function batchMintingExample() {
-  console.log('=== Batch Minting Example ===');
+  console.log('=== Batch Minting with Different Adapters ===');
   
   const client = createClient({ debug: true });
 
   try {
     const product = await client.getProduct('4150231280');
     
-    // Mint multiple tokens at once
-    const batchMintResult = await product.mint({
-      to: '0x742d35Cc6634C0532925a3b8D66320d7c2fbd768',
-      quantity: 5, // Mint 5 tokens
-      networkId: 1
-    });
+    // Example with multiple wallet types
+    const walletScenarios = [
+      {
+        name: 'Ethers v5 Wallet',
+        createAdapter: () => {
+          const provider = new ethers.providers.Web3Provider(window.ethereum);
+          const signer = provider.getSigner();
+          return AccountAdapterFactory.fromEthers5(signer);
+        }
+      },
+      {
+        name: 'Viem Wallet',
+        createAdapter: () => {
+          // const client = viem.createWalletClient({
+          //   chain: viem.chains.mainnet,
+          //   transport: viem.custom(window.ethereum)
+          // });
+          // return AccountAdapterFactory.fromViem(client);
+          return null; // Placeholder for demo
+        }
+      }
+    ];
 
-    console.log('Batch mint prepared:', {
-      quantity: 5,
-      estimatedGas: 'TBD', // Would be calculated
-      totalCost: 'TBD'     // Would be calculated
-    });
+    for (const scenario of walletScenarios) {
+      if (!scenario.createAdapter()) continue; // Skip viem for demo
+      
+      console.log(`\n--- ${scenario.name} ---`);
+      const adapter = scenario.createAdapter()!;
+      
+      // Verify network compatibility
+      const connectedNetwork = await adapter.getConnectedNetworkId();
+      const productNetwork = product.data.publicData.network;
+      
+      if (connectedNetwork !== productNetwork) {
+        console.log(`Network mismatch: wallet=${connectedNetwork}, product=${productNetwork}`);
+        
+        // Attempt to switch networks
+        try {
+          await adapter.switchNetwork(productNetwork);
+          console.log(`Successfully switched to network ${productNetwork}`);
+        } catch (switchError) {
+          console.log('Failed to switch networks:', switchError);
+          continue;
+        }
+      }
+      
+      // Prepare batch mint
+      const quantity = 3;
+      const preparedPurchase = await product.preparePurchase({
+        accountAdapter: adapter,
+        payload: { quantity },
+        gasBuffer: { multiplier: 130 } // 30% buffer for batch
+      });
+      
+      console.log('Batch mint prepared:', {
+        adapterType: adapter.adapterType,
+        wallet: adapter.address,
+        quantity,
+        totalCost: preparedPurchase.cost.total,
+        steps: preparedPurchase.steps.length
+      });
+      
+      // In real implementation, would execute the purchase
+      // const order = await product.purchase({ accountAdapter: adapter, preparedPurchase });
+    }
 
   } catch (error) {
     console.error('Batch minting failed:', error);
@@ -348,46 +442,94 @@ async function multiNetworkExample() {
 // =============================================================================
 
 /**
- * Example 9: ERC20 Token Payments
+ * Example 9: ERC20 Token Payments with Account Adapters
  * 
- * Shows how to handle BlindMints that use ERC20 tokens for payment.
+ * Shows how to handle ERC20 payments with automatic approval handling.
  */
 async function erc20PaymentExample() {
-  console.log('=== ERC20 Payment Example ===');
+  console.log('=== ERC20 Payment with Account Adapters ===');
   
   const client = createClient({ debug: true });
 
   try {
     const product = await client.getProduct('4150231280');
-    const mintPrice = product.data.publicData.mintPrice;
     
+    // Create account adapter
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer = provider.getSigner();
+    const adapter = AccountAdapterFactory.fromEthers5(signer);
+    
+    console.log('Connected wallet:', adapter.address);
+    
+    // Fetch onchain data to get current pricing
+    const onchainData = await product.fetchOnchainData();
     console.log('Payment Details:', {
-      currency: mintPrice.currency,
-      amount: mintPrice.value.toString(),
-      isERC20: mintPrice.erc20 !== '0x0000000000000000000000000000000000000000'
+      cost: onchainData.cost.formatted,
+      symbol: onchainData.cost.symbol,
+      isERC20: onchainData.cost.isERC20(),
+      tokenAddress: onchainData.cost.erc20
     });
 
-    if (mintPrice.erc20 !== '0x0000000000000000000000000000000000000000') {
-      console.log('ERC20 Token Payment Required:');
-      console.log('Token Contract:', mintPrice.erc20);
-      console.log('Amount:', mintPrice.value.toString());
-      
-      // For ERC20 payments, you would need to:
-      // 1. Check token allowance
-      // 2. Approve token spending if necessary
-      // 3. Execute the mint transaction
-      
-      console.log('Steps for ERC20 minting:');
-      console.log('1. Check token balance and allowance');
-      console.log('2. Approve token spending if needed');
-      console.log('3. Execute mint transaction');
-      
-    } else {
-      console.log('ETH Payment - Direct transaction');
+    // Check wallet balance for the payment token
+    const balance = await adapter.getBalance(
+      onchainData.cost.isERC20() ? onchainData.cost.erc20 : undefined
+    );
+    console.log('Wallet balance:', balance.formatted, balance.symbol);
+    
+    if (balance.lt(onchainData.cost)) {
+      console.log('⚠️ Insufficient balance for purchase');
+      console.log(`Need: ${onchainData.cost.formatted} ${onchainData.cost.symbol}`);
+      console.log(`Have: ${balance.formatted} ${balance.symbol}`);
+      return;
     }
 
-  } catch (error) {
-    console.error('Payment example failed:', error);
+    // Prepare purchase - SDK handles ERC20 approval automatically
+    const preparedPurchase = await product.preparePurchase({
+      accountAdapter: adapter,
+      payload: { quantity: 1 }
+    });
+    
+    console.log('\nTransaction steps:');
+    preparedPurchase.steps.forEach((step, index) => {
+      console.log(`${index + 1}. ${step.name} (${step.type})`);
+      console.log(`   Description: ${step.description}`);
+      if (step.cost) {
+        if (step.cost.native) {
+          console.log(`   Native cost: ${step.cost.native.formatted} ${step.cost.native.symbol}`);
+        }
+        if (step.cost.erc20s?.length) {
+          step.cost.erc20s.forEach(token => {
+            console.log(`   Token cost: ${token.formatted} ${token.symbol}`);
+          });
+        }
+      }
+    });
+    
+    console.log('\nTotal cost breakdown:');
+    if (preparedPurchase.cost.total.native) {
+      console.log(`Native: ${preparedPurchase.cost.total.native.formatted} ${preparedPurchase.cost.total.native.symbol}`);
+    }
+    if (preparedPurchase.cost.total.erc20s?.length) {
+      preparedPurchase.cost.total.erc20s.forEach(token => {
+        console.log(`Token: ${token.formatted} ${token.symbol}`);
+      });
+    }
+    
+    // In real implementation, would execute the purchase
+    // This automatically handles:
+    // 1. ERC20 approval if needed
+    // 2. Mint transaction
+    // const order = await product.purchase({ accountAdapter: adapter, preparedPurchase });
+    // console.log('Purchase completed:', order.id);
+
+  } catch (error: any) {
+    console.error('ERC20 payment example failed:', error);
+    
+    if (error.code === 'INSUFFICIENT_FUNDS') {
+      console.log('💡 Solution: Add more tokens to your wallet');
+    } else if (error.code === 'TRANSACTION_REJECTED') {
+      console.log('💡 User cancelled the transaction');
+    }
   }
 }
 
@@ -469,13 +611,14 @@ async function runAllExamples() {
     { name: 'Basic BlindMint', fn: basicBlindMintExample },
     { name: 'Manifold URL Parsing', fn: manifestUrlExample },
     { name: 'Advanced Configuration', fn: advancedConfigurationExample },
-    { name: 'Complete Minting Workflow', fn: completeMintin gWorkflow },
-    { name: 'Batch Minting', fn: batchMintingExample },
+    { name: 'Complete Minting Workflow (Account Adapters)', fn: completeMintin gWorkflow },
+    { name: 'Batch Minting (Multi-Adapter)', fn: batchMintingExample },
     { name: 'Error Handling', fn: errorHandlingPatterns },
     { name: 'Retry and Fallback', fn: retryAndFallbackExample },
     { name: 'Multi-Network Support', fn: multiNetworkExample },
-    { name: 'ERC20 Payments', fn: erc20PaymentExample },
-    { name: 'Performance Optimization', fn: performanceOptimizationExample }
+    { name: 'ERC20 Payments (Account Adapters)', fn: erc20PaymentExample },
+    { name: 'Performance Optimization', fn: performanceOptimizationExample },
+    { name: 'Account Adapter Factory Patterns', fn: accountAdapterFactoryExample }
   ];
 
   for (const example of examples) {
@@ -491,6 +634,82 @@ async function runAllExamples() {
   console.log('🏁 All examples completed!');
 }
 
+/**
+ * Example 11: Account Adapter Factory Patterns
+ * 
+ * Demonstrates different ways to create and use account adapters.
+ */
+async function accountAdapterFactoryExample() {
+  console.log('=== Account Adapter Factory Patterns ===');
+  
+  try {
+    // Method 1: Explicit factory methods (recommended)
+    console.log('\n--- Explicit Factory Methods ---');
+    
+    // Ethers v5
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const ethersAdapter = AccountAdapterFactory.fromEthers5(signer);
+      
+      console.log('Ethers v5 adapter created:', {
+        type: ethersAdapter.adapterType,
+        address: ethersAdapter.address
+      });
+    } catch (error) {
+      console.log('Ethers v5 not available:', error.message);
+    }
+    
+    // Viem (commented out for demo)
+    // try {
+    //   const viemClient = viem.createWalletClient({
+    //     chain: viem.chains.mainnet,
+    //     transport: viem.custom(window.ethereum)
+    //   });
+    //   const viemAdapter = AccountAdapterFactory.fromViem(viemClient);
+    //   
+    //   console.log('Viem adapter created:', {
+    //     type: viemAdapter.adapterType,
+    //     address: viemAdapter.address
+    //   });
+    // } catch (error) {
+    //   console.log('Viem not available:', error.message);
+    // }
+    
+    // Method 2: Auto-detection (legacy, less reliable)
+    console.log('\n--- Auto-Detection (Legacy) ---');
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const autoAdapter = AccountAdapterFactory.create(signer); // Auto-detect
+      
+      console.log('Auto-detected adapter:', {
+        type: autoAdapter.adapterType,
+        address: autoAdapter.address
+      });
+    } catch (error) {
+      console.log('Auto-detection failed:', error.message);
+    }
+    
+    // Method 3: Provider detection for debugging
+    console.log('\n--- Provider Detection ---');
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer = provider.getSigner();
+    const detection = AccountAdapterFactory.detectProvider(signer);
+    
+    console.log('Provider detection results:', {
+      isEthers5: detection.isEthers5,
+      isEthers6: detection.isEthers6,
+      isViem: detection.isViem,
+      confidence: detection.confidence,
+      features: detection.features
+    });
+    
+  } catch (error) {
+    console.error('Account adapter factory example failed:', error);
+  }
+}
+
 // Export for testing and documentation
 export {
   basicBlindMintExample,
@@ -503,6 +722,7 @@ export {
   multiNetworkExample,
   erc20PaymentExample,
   performanceOptimizationExample,
+  accountAdapterFactoryExample,
   runAllExamples
 };
 

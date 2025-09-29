@@ -19,46 +19,65 @@ export enum BlindMintErrorCode {
   NOT_ELIGIBLE = 'NOT_ELIGIBLE',
   INVALID_WALLET_ADDRESS = 'INVALID_WALLET_ADDRESS',
   TRANSACTION_FAILED = 'TRANSACTION_FAILED',
-  
+
   // Allowlist errors
   INVALID_MERKLE_PROOF = 'INVALID_MERKLE_PROOF',
   INVALID_REDEMPTION_CODE = 'INVALID_REDEMPTION_CODE',
   NOT_ON_ALLOWLIST = 'NOT_ON_ALLOWLIST',
-  
+
   // Payment errors
   INSUFFICIENT_ALLOWANCE = 'INSUFFICIENT_ALLOWANCE',
   INVALID_PAYMENT_TOKEN = 'INVALID_PAYMENT_TOKEN',
   PAYMENT_FAILED = 'PAYMENT_FAILED',
-  
+
   // Contract interaction errors
   CONTRACT_ERROR = 'CONTRACT_ERROR',
   GAS_ESTIMATION_FAILED = 'GAS_ESTIMATION_FAILED',
   WRONG_NETWORK = 'WRONG_NETWORK',
+  NETWORK_MISMATCH = 'NETWORK_MISMATCH',
   PROVIDER_UNAVAILABLE = 'PROVIDER_UNAVAILABLE',
   TRANSACTION_REPLACED = 'TRANSACTION_REPLACED',
   TRANSACTION_CANCELLED = 'TRANSACTION_CANCELLED',
-  
+
   // API errors
   API_ERROR = 'API_ERROR',
   RATE_LIMITED = 'RATE_LIMITED',
   API_UNAVAILABLE = 'API_UNAVAILABLE',
   INVALID_API_RESPONSE = 'INVALID_API_RESPONSE',
-  
+
   // Validation errors
   VALIDATION_FAILED = 'VALIDATION_FAILED',
   SCHEMA_VALIDATION_FAILED = 'SCHEMA_VALIDATION_FAILED',
   TYPE_MISMATCH = 'TYPE_MISMATCH',
-  
+
   // Configuration errors
   INVALID_CONFIGURATION = 'INVALID_CONFIGURATION',
   MISSING_PROVIDER = 'MISSING_PROVIDER',
   UNSUPPORTED_NETWORK = 'UNSUPPORTED_NETWORK',
 }
 
+const BLINDMINT_ERROR_CODE_SET = new Set<string>(Object.values(BlindMintErrorCode));
+
+function isBlindMintErrorCode(value: unknown): value is BlindMintErrorCode {
+  return typeof value === 'string' && BLINDMINT_ERROR_CODE_SET.has(value);
+}
+
+function resolveBlindMintCodeFromValue(value: unknown): BlindMintErrorCode | undefined {
+  return isBlindMintErrorCode(value) ? value : undefined;
+}
+
+function resolveBlindMintCode(error: BlindMintError): BlindMintErrorCode | undefined {
+  return (
+    resolveBlindMintCodeFromValue(error.blindMintCode) ?? resolveBlindMintCodeFromValue(error.code)
+  );
+}
+
 /**
  * BlindMint-specific error class with enhanced context
  */
 export class BlindMintError extends ClientSDKError {
+  public readonly blindMintCode?: BlindMintErrorCode;
+
   constructor(
     code: ErrorCode | BlindMintErrorCode,
     message: string,
@@ -66,6 +85,7 @@ export class BlindMintError extends ClientSDKError {
     details?: unknown,
   ) {
     super(code as ErrorCode, message, details);
+    this.blindMintCode = resolveBlindMintCodeFromValue(code);
     this.name = 'BlindMintError';
   }
 }
@@ -81,10 +101,20 @@ export interface BlindMintErrorContext {
   mintStatus?: string;
   /** Network ID */
   networkId?: number;
+  /** Expected network ID */
+  expectedNetworkId?: number;
+  /** Actual network ID */
+  actualNetworkId?: number;
   /** Transaction hash if applicable */
   txHash?: string;
   /** Block number when error occurred */
   blockNumber?: number;
+  /** Transaction step that failed */
+  step?: string;
+  /** Original error if wrapped */
+  originalError?: Error;
+  /** Token address for payment issues */
+  tokenAddress?: string;
   /** Additional context data */
   metadata?: Record<string, unknown>;
 }
@@ -227,10 +257,10 @@ export enum ErrorSeverity {
  * Error categories for handling strategies
  */
 export enum ErrorCategory {
-  USER_ERROR = 'user-error',          // User input or action required
-  SYSTEM_ERROR = 'system-error',      // Internal system issue
-  NETWORK_ERROR = 'network-error',    // Network connectivity issue
-  CONTRACT_ERROR = 'contract-error',  // Smart contract interaction issue
+  USER_ERROR = 'user-error', // User input or action required
+  SYSTEM_ERROR = 'system-error', // Internal system issue
+  NETWORK_ERROR = 'network-error', // Network connectivity issue
+  CONTRACT_ERROR = 'contract-error', // Smart contract interaction issue
   VALIDATION_ERROR = 'validation-error', // Data validation issue
   CONFIGURATION_ERROR = 'configuration-error', // SDK configuration issue
 }
@@ -332,7 +362,7 @@ export const BLINDMINT_ERROR_CLASSIFICATIONS: Record<BlindMintErrorCode, ErrorMe
     userActions: ['Try again', 'Check wallet connection'],
     reportable: true,
   },
-  
+
   // Allowlist errors
   [BlindMintErrorCode.INVALID_MERKLE_PROOF]: {
     severity: ErrorSeverity.MEDIUM,
@@ -355,7 +385,7 @@ export const BLINDMINT_ERROR_CLASSIFICATIONS: Record<BlindMintErrorCode, ErrorMe
     userActions: ['Check allowlist eligibility'],
     reportable: false,
   },
-  
+
   // Payment errors
   [BlindMintErrorCode.INSUFFICIENT_ALLOWANCE]: {
     severity: ErrorSeverity.MEDIUM,
@@ -376,7 +406,7 @@ export const BLINDMINT_ERROR_CLASSIFICATIONS: Record<BlindMintErrorCode, ErrorMe
     recoverable: false,
     reportable: true,
   },
-  
+
   // Contract interaction errors
   [BlindMintErrorCode.CONTRACT_ERROR]: {
     severity: ErrorSeverity.HIGH,
@@ -398,6 +428,13 @@ export const BLINDMINT_ERROR_CLASSIFICATIONS: Record<BlindMintErrorCode, ErrorMe
     userActions: ['Switch to correct network'],
     reportable: false,
   },
+  [BlindMintErrorCode.NETWORK_MISMATCH]: {
+    severity: ErrorSeverity.MEDIUM,
+    category: ErrorCategory.USER_ERROR,
+    recoverable: true,
+    userActions: ['Switch wallet to correct network'],
+    reportable: false,
+  },
   [BlindMintErrorCode.PROVIDER_UNAVAILABLE]: {
     severity: ErrorSeverity.HIGH,
     category: ErrorCategory.SYSTEM_ERROR,
@@ -417,7 +454,7 @@ export const BLINDMINT_ERROR_CLASSIFICATIONS: Record<BlindMintErrorCode, ErrorMe
     recoverable: true,
     reportable: false,
   },
-  
+
   // API errors
   [BlindMintErrorCode.API_ERROR]: {
     severity: ErrorSeverity.MEDIUM,
@@ -447,7 +484,7 @@ export const BLINDMINT_ERROR_CLASSIFICATIONS: Record<BlindMintErrorCode, ErrorMe
     recoverable: false,
     reportable: true,
   },
-  
+
   // Validation errors
   [BlindMintErrorCode.VALIDATION_FAILED]: {
     severity: ErrorSeverity.MEDIUM,
@@ -468,7 +505,7 @@ export const BLINDMINT_ERROR_CLASSIFICATIONS: Record<BlindMintErrorCode, ErrorMe
     recoverable: false,
     reportable: true,
   },
-  
+
   // Configuration errors
   [BlindMintErrorCode.INVALID_CONFIGURATION]: {
     severity: ErrorSeverity.HIGH,
@@ -502,7 +539,10 @@ export const BLINDMINT_ERROR_CLASSIFICATIONS: Record<BlindMintErrorCode, ErrorMe
  */
 export function isRecoverableError(error: Error): boolean {
   if (error instanceof BlindMintError) {
-    const errorCode = error.code as BlindMintErrorCode;
+    const errorCode = resolveBlindMintCode(error);
+    if (!errorCode) {
+      return false;
+    }
     return BLINDMINT_ERROR_CLASSIFICATIONS[errorCode]?.recoverable ?? false;
   }
   return false;
@@ -513,14 +553,17 @@ export function isRecoverableError(error: Error): boolean {
  */
 export function getUserFriendlyMessage(error: Error): string {
   if (error instanceof BlindMintError) {
-    const errorCode = error.code as BlindMintErrorCode;
+    const errorCode = resolveBlindMintCode(error);
+    if (!errorCode) {
+      return error.message;
+    }
     const classification = BLINDMINT_ERROR_CLASSIFICATIONS[errorCode];
-    
+
     if (classification?.userActions?.length) {
       return `${error.message}. Try: ${classification.userActions.join(', ')}.`;
     }
   }
-  
+
   return error.message;
 }
 
@@ -529,11 +572,14 @@ export function getUserFriendlyMessage(error: Error): string {
  */
 export function getSuggestedActions(error: Error): string[] {
   if (error instanceof BlindMintError) {
-    const errorCode = error.code as BlindMintErrorCode;
+    const errorCode = resolveBlindMintCode(error);
+    if (!errorCode) {
+      return [];
+    }
     const classification = BLINDMINT_ERROR_CLASSIFICATIONS[errorCode];
     return classification?.userActions ?? [];
   }
-  
+
   return [];
 }
 
@@ -542,9 +588,12 @@ export function getSuggestedActions(error: Error): string[] {
  */
 export function shouldReportError(error: Error): boolean {
   if (error instanceof BlindMintError) {
-    const errorCode = error.code as BlindMintErrorCode;
+    const errorCode = resolveBlindMintCode(error);
+    if (!errorCode) {
+      return true;
+    }
     return BLINDMINT_ERROR_CLASSIFICATIONS[errorCode]?.reportable ?? true;
   }
-  
+
   return true; // Report unknown errors by default
 }

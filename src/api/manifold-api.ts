@@ -28,7 +28,7 @@ export class ManifoldApiClient {
     const [instanceData, previewDatas] = (await Promise.all([
       this.studioClient.public.getInstance({ instanceId: Number(instanceId) }),
       this.studioClient.public.getPreviews({
-        instanceIds: [instanceId],
+        instanceIds: [parseInt(instanceId)],
       }),
     ])) as [PublicInstance<T>, { instancePreviews: InstancePreview[] }];
     const previewData = previewDatas.instancePreviews[0];
@@ -50,9 +50,29 @@ export class ManifoldApiClient {
   }
 }
 
+// Global client instance for testing
+let globalClient: ManifoldApiClient | null = null;
+
 /**
  * Factory function to create Manifold API client
  */
 export function createManifoldApiClient(): ManifoldApiClient {
   return new ManifoldApiClient();
+}
+
+/**
+ * Get or create global API client instance
+ */
+export function getManifoldApiClient(): ManifoldApiClient {
+  if (!globalClient) {
+    globalClient = createManifoldApiClient();
+  }
+  return globalClient;
+}
+
+/**
+ * Reset global API client instance (for testing)
+ */
+export function resetManifoldApiClient(): void {
+  globalClient = null;
 }

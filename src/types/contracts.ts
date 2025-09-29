@@ -27,21 +27,29 @@ export interface ClaimExtensionContract {
   getClaimState(): Promise<ClaimState>;
 
   // Write operations
-  mint(quantity: number, paymentAmount: BigNumber, walletAddress: Address): Promise<TransactionResponse>;
+  mint(
+    quantity: number,
+    paymentAmount: BigNumber,
+    walletAddress: Address,
+  ): Promise<TransactionResponse>;
   mintWithProofs(
     quantity: number,
     paymentAmount: BigNumber,
     walletAddress: Address,
-    merkleProofs: string[]
+    merkleProofs: string[],
   ): Promise<TransactionResponse>;
 
   // Gas estimation
-  estimateGasMint(walletAddress: Address, quantity: number, paymentAmount: BigNumber): Promise<BigNumber>;
+  estimateGasMint(
+    walletAddress: Address,
+    quantity: number,
+    paymentAmount: BigNumber,
+  ): Promise<BigNumber>;
   estimateGasMintWithProofs(
     walletAddress: Address,
     quantity: number,
     paymentAmount: BigNumber,
-    merkleProofs: string[]
+    merkleProofs: string[],
   ): Promise<BigNumber>;
 
   // Utility methods
@@ -156,7 +164,7 @@ export interface NetworkProviderConfig {
 /**
  * Enhanced transaction response with SDK-specific metadata
  */
-export interface TransactionResponse extends ContractTransaction {
+export interface TransactionResponse extends Omit<ContractTransaction, 'type'> {
   /** SDK-generated transaction ID for tracking */
   sdkTxId: string;
   /** Estimated gas used */
@@ -193,7 +201,7 @@ export interface TransactionResult {
   executionTime: number;
 }
 
-export type TransactionType = 
+export type TransactionType =
   | 'approve'
   | 'mint'
   | 'mintWithProofs'
@@ -274,12 +282,7 @@ export interface ClaimState {
   };
 }
 
-export type ClaimStatus = 
-  | 'not-started'
-  | 'active'
-  | 'ended'
-  | 'sold-out'
-  | 'paused';
+export type ClaimStatus = 'not-started' | 'active' | 'ended' | 'sold-out' | 'paused';
 
 export type ClaimType = 'erc721' | 'erc1155';
 
@@ -327,7 +330,7 @@ export interface NetworkError extends Error {
   recoverable: boolean;
 }
 
-export type NetworkErrorType = 
+export type NetworkErrorType =
   | 'wrong-network'
   | 'network-unavailable'
   | 'rpc-error'
@@ -376,7 +379,7 @@ export interface ContractValidationWarning {
   severity: 'low' | 'medium' | 'high';
 }
 
-export type ContractValidationErrorCode = 
+export type ContractValidationErrorCode =
   | 'insufficient-balance'
   | 'insufficient-allowance'
   | 'invalid-quantity'
@@ -400,7 +403,7 @@ export interface ManifoldBridgeProvider {
   readonly networkId: NetworkId;
   /** RPC endpoint URL */
   readonly rpcUrl: string;
-  
+
   /** Get contract instance through bridge */
   getContract(address: Address, abi: unknown[]): BridgeContract;
   /** Execute read-only contract call */
@@ -413,15 +416,12 @@ export interface ManifoldBridgeProvider {
   getBlockNumber(): Promise<number>;
 }
 
-export interface BridgeContract {
+export type BridgeContract = {
   /** Contract address */
   readonly address: Address;
   /** Contract ABI */
   readonly interface: unknown;
-  
-  /** Call read-only method */
-  [methodName: string]: (...args: unknown[]) => Promise<unknown>;
-}
+} & Record<string, (...args: unknown[]) => Promise<unknown>>;
 
 export interface CallRequest {
   to: Address;
@@ -447,30 +447,7 @@ export const STORAGE_PROTOCOLS = {
   0: 'none',
   1: 'ipfs',
   2: 'arweave',
-  3: 'http'
+  3: 'http',
 } as const;
 
-/** Default gas configurations by network */
-export const DEFAULT_GAS_CONFIGS: Record<NetworkId, GasConfig> = {
-  1: { // Ethereum Mainnet
-    baseMintGas: 200000,
-    bufferPercentage: 0.25,
-    maxGasLimit: BigNumber.from('500000'),
-    minGasLimit: BigNumber.from('21000'),
-    estimationTimeout: 1500
-  },
-  137: { // Polygon
-    baseMintGas: 150000,
-    bufferPercentage: 0.25,
-    maxGasLimit: BigNumber.from('400000'),
-    minGasLimit: BigNumber.from('21000'),
-    estimationTimeout: 1500
-  },
-  10: { // Optimism
-    baseMintGas: 120000,
-    bufferPercentage: 0.20,
-    maxGasLimit: BigNumber.from('300000'),
-    minGasLimit: BigNumber.from('21000'),
-    estimationTimeout: 1500
-  }
-};
+// Note: Gas configurations moved to config.ts for centralized management

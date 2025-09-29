@@ -1,10 +1,9 @@
-import type { Address, Cost, ProductStatus } from './common';
-import type { Money } from './product';
+import type { PublicInstance } from '@manifoldxyz/studio-apps-client';
+import type { Address, ProductStatus, AppType } from './common';
 import type {
+  BaseProduct,
   Asset,
   Media,
-  Contract,
-  Workspace,
   AllocationParams,
   AllocationResponse,
   PreparePurchaseParams,
@@ -14,8 +13,12 @@ import type {
   ProductMetadata,
   ProductRule,
   ProductProvenance,
+  ProductInventory,
 } from './product';
+import type { BlindMintPayload } from './purchase';
 import type { ethers } from 'ethers';
+import type { Money } from '../libs/money';
+import type { Cost } from './money';
 
 // =============================================================================
 // CORE BLINDMINT INTERFACES
@@ -50,21 +53,40 @@ export interface BlindMintOnchainData {
 
 /**
  * BlindMint Public Data - off-chain configuration
- * Extended from existing BlindMintPublicData
+ * This is the main public data structure for BlindMint products
  */
 export interface BlindMintPublicData {
-  /** Display title for the mint */
-  title: string;
+  /** Display name for the mint */
+  name: string;
   /** Description of the mint */
   description?: string;
   /** Network ID where the contract is deployed */
   network: number;
   /** Contract details */
-  contract: Contract;
+  contract: {
+    id: number;
+    name: string;
+    symbol: string;
+    contractAddress: string;
+    networkId: number;
+    spec: string;
+  };
   /** Claim extension contract address */
-  extensionAddress: Address;
+  extensionAddress1155: {
+    value: Address;
+    version: number;
+  };
+  /** Price configuration */
+  price?: {
+    value: string;
+    decimals: number;
+    currency: string;
+    erc20: string;
+    symbol: string;
+    name: string;
+  };
   /** Tier probability configuration */
-  tierProbabilities: BlindMintTierProbability;
+  tierProbabilities: BlindMintTierProbability[];
   /** Pool of available tokens */
   pool: BlindMintPool[];
   /** Preview media for the collection */
@@ -138,8 +160,8 @@ export interface BlindMintTierProbability {
  * Pool item configuration (legacy support)
  */
 export interface BlindMintPool {
-  /** Pool index */
-  index: number;
+  /** Series index */
+  seriesIndex: number;
   /** Token metadata */
   metadata: Asset;
 }
@@ -149,44 +171,25 @@ export interface BlindMintPool {
 // =============================================================================
 
 /**
- * Enhanced BlindMint Product interface with specialized methods
+ * BlindMint Product interface - extends BaseProduct
+ * This is the main product interface for BlindMint products
  */
-export interface BlindMintProduct {
+export interface BlindMintProduct extends BaseProduct<BlindMintPublicData> {
   /** Product type identifier */
-  type: 'blind-mint';
-  /** Unique product ID */
-  id: string;
+  type: AppType.BLIND_MINT;
   /** Instance data with BlindMint-specific public data */
-  data: {
-    id: string;
-    creator: Workspace;
-    publicData: BlindMintPublicData;
-    appId: number;
-    appName: string;
-  };
-  /** Preview data for UI display */
-  previewData: {
-    title?: string;
-    description?: string;
-    contract?: Contract;
-    thumbnail?: string;
-    payoutAddress?: string;
-    network?: number;
-    startDate?: Date;
-    endDate?: Date;
-    price?: Money;
-  };
+  data: PublicInstance<BlindMintPublicData> & { publicData: BlindMintPublicData };
   /** Cached on-chain data */
   onchainData?: BlindMintOnchainData;
 
-  // Core product methods
+  // Core product methods (matching Product interface)
   getAllocations(params: AllocationParams): Promise<AllocationResponse>;
-  preparePurchase(params: PreparePurchaseParams): Promise<PreparedPurchase>;
+  preparePurchase(params: PreparePurchaseParams<BlindMintPayload>): Promise<PreparedPurchase>;
   purchase(params: PurchaseParams): Promise<Order>;
   getStatus(): Promise<ProductStatus>;
   getPreviewMedia(): Promise<Media | undefined>;
   getMetadata(): Promise<ProductMetadata>;
-  getInventory(): Promise<BlindMintInventory>;
+  getInventory(): Promise<ProductInventory>;
   getRules(): Promise<ProductRule>;
   getProvenance(): Promise<ProductProvenance>;
   fetchOnchainData(): Promise<BlindMintOnchainData>;
@@ -197,7 +200,6 @@ export interface BlindMintProduct {
   getTierProbabilities(): Promise<GachaTier[]>;
   getClaimableTokens(walletAddress: Address): Promise<ClaimableToken[]>;
   estimateMintGas(quantity: number, walletAddress: Address): Promise<bigint>;
-  validateMint(params: MintValidationParams): Promise<MintValidation>;
   getFloorPrices(): Promise<FloorPriceData[]>;
   getMintHistory(walletAddress?: Address): Promise<MintHistoryItem[]>;
 }
@@ -245,11 +247,6 @@ export interface ClaimableToken {
 export interface BlindMintInventory {
   totalSupply: number;
   totalPurchased: number; // Required by ProductInventory
-  totalMinted: number;
-  remainingSupply: number;
-  tierBreakdown: TierInventory[];
-  walletMinted: number;
-  walletRemaining: number;
 }
 
 export interface TierInventory {

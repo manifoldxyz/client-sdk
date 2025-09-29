@@ -1,13 +1,7 @@
 // Products export index
 
 // BlindMint product implementation
-export {
-  BlindMintProduct,
-  isBlindMintProduct
-} from './blindmint';
-
-// Mock implementations for testing
-export { createMockProduct } from './mock';
+export { BlindMintProduct, isBlindMintProduct } from './blindmint';
 
 // Re-export product types
 export type {
