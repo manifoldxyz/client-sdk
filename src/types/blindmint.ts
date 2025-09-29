@@ -15,6 +15,7 @@ import type {
   ProductProvenance,
   ProductInventory,
 } from './product';
+import type { BlindMintPayload } from './purchase';
 import type { ethers } from 'ethers';
 import type { Money } from '../libs/money';
 import type { Cost } from './money';
@@ -183,7 +184,7 @@ export interface BlindMintProduct extends BaseProduct<BlindMintPublicData> {
 
   // Core product methods (matching Product interface)
   getAllocations(params: AllocationParams): Promise<AllocationResponse>;
-  preparePurchase(params: PreparePurchaseParams<any>): Promise<PreparedPurchase>;
+  preparePurchase(params: PreparePurchaseParams<BlindMintPayload>): Promise<PreparedPurchase>;
   purchase(params: PurchaseParams): Promise<Order>;
   getStatus(): Promise<ProductStatus>;
   getPreviewMedia(): Promise<Media | undefined>;

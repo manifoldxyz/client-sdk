@@ -7,7 +7,10 @@ import type { InstanceData } from '../src/types/product';
 import { BlindMintError, BlindMintErrorCode } from '../src/types/enhanced-errors';
 
 // Mock implementations for testing
-const createMockAdapter = (networkId: number = 1, address: string = '0x742d35Cc6634C0532925a3b8D66320d7c2fbd768'): IAccountAdapter => ({
+const createMockAdapter = (
+  networkId: number = 1,
+  address: string = '0x742d35Cc6634C0532925a3b8D66320d7c2fbd768',
+): IAccountAdapter => ({
   address,
   adapterType: 'ethers5',
   async sendTransaction(request) {
@@ -19,7 +22,7 @@ const createMockAdapter = (networkId: number = 1, address: string = '0x742d35Cc6
     };
   },
   async getBalance(tokenAddress) {
-    const mockMoney = await import('../src/libs/money').then(m => m.Money);
+    const mockMoney = await import('../src/libs/money').then((m) => m.Money);
     return mockMoney.create({
       value: '1000000000000000000', // 1 ETH
       networkId,
@@ -213,7 +216,7 @@ describe('Account Adapter Integration', () => {
   describe('preparePurchase with Account Adapters', () => {
     it('should prepare purchase using account adapter', async () => {
       const adapter = createMockAdapter(1);
-      
+
       const result = await blindMintProduct.preparePurchase({
         accountAdapter: adapter,
         payload: { quantity: 1 },
@@ -228,14 +231,14 @@ describe('Account Adapter Integration', () => {
 
     it('should detect network mismatch and throw error', async () => {
       const adapter = createMockAdapter(137); // Polygon, but product is on Ethereum
-      
+
       await expect(
         blindMintProduct.preparePurchase({
           accountAdapter: adapter,
           payload: { quantity: 1 },
-        })
+        }),
       ).rejects.toThrow(BlindMintError);
-      
+
       try {
         await blindMintProduct.preparePurchase({
           accountAdapter: adapter,
@@ -266,14 +269,14 @@ describe('Account Adapter Integration', () => {
       await expect(
         blindMintProduct.preparePurchase({
           payload: { quantity: 1 },
-        })
+        }),
       ).rejects.toThrow(BlindMintError);
     });
 
     it('should check balance using adapter', async () => {
       const adapter = createMockAdapter(1);
       const getBalanceSpy = vi.spyOn(adapter, 'getBalance');
-      
+
       await blindMintProduct.preparePurchase({
         accountAdapter: adapter,
         payload: { quantity: 1 },
@@ -287,7 +290,7 @@ describe('Account Adapter Integration', () => {
     it('should execute purchase using account adapter', async () => {
       const adapter = createMockAdapter(1);
       const sendTransactionSpy = vi.spyOn(adapter, 'sendTransaction');
-      
+
       const preparedPurchase = await blindMintProduct.preparePurchase({
         accountAdapter: adapter,
         payload: { quantity: 1 },
@@ -309,7 +312,7 @@ describe('Account Adapter Integration', () => {
       const legacyAccount = {
         address: '0x742d35Cc6634C0532925a3b8D66320d7c2fbd768',
       };
-      
+
       const preparedPurchase = await blindMintProduct.preparePurchase({
         address: legacyAccount.address,
         payload: { quantity: 1 },
@@ -339,7 +342,7 @@ describe('Account Adapter Integration', () => {
 
     it('should throw error when no compatible execution method available', async () => {
       const adapter = createMockAdapter(1);
-      
+
       const preparedPurchase = await blindMintProduct.preparePurchase({
         accountAdapter: adapter,
         payload: { quantity: 1 },
@@ -352,7 +355,7 @@ describe('Account Adapter Integration', () => {
         blindMintProduct.purchase({
           accountAdapter: adapter,
           preparedPurchase,
-        })
+        }),
       ).rejects.toThrow('No compatible execution method available');
     });
   });
@@ -360,8 +363,9 @@ describe('Account Adapter Integration', () => {
   describe('ERC20 Token Support with Adapters', () => {
     beforeEach(() => {
       // Mock ERC20 token payment scenario
-      vi.mocked(mockInstanceData.publicData.mintPrice).erc20 = '0xA0b86a33E6441d7B2c15e9A9d98b56e3F42E9b9B';
-      
+      vi.mocked(mockInstanceData.publicData.mintPrice).erc20 =
+        '0xA0b86a33E6441d7B2c15e9A9d98b56e3F42E9b9B';
+
       // Update contract mock to return ERC20 data
       const contractMock = vi.fn(() => ({
         MINT_FEE: vi.fn().mockResolvedValue({
@@ -414,7 +418,7 @@ describe('Account Adapter Integration', () => {
 
     it('should create approval step for ERC20 payments', async () => {
       const adapter = createMockAdapter(1);
-      
+
       const result = await blindMintProduct.preparePurchase({
         accountAdapter: adapter,
         payload: { quantity: 1 },
@@ -430,7 +434,7 @@ describe('Account Adapter Integration', () => {
     it('should check ERC20 token balance using adapter', async () => {
       const adapter = createMockAdapter(1);
       const getBalanceSpy = vi.spyOn(adapter, 'getBalance');
-      
+
       await blindMintProduct.preparePurchase({
         accountAdapter: adapter,
         payload: { quantity: 1 },
@@ -443,7 +447,7 @@ describe('Account Adapter Integration', () => {
   describe('Gas Estimation and Buffers', () => {
     it('should apply gas buffer correctly', async () => {
       const adapter = createMockAdapter(1);
-      
+
       const result = await blindMintProduct.preparePurchase({
         accountAdapter: adapter,
         payload: { quantity: 1 },
@@ -451,7 +455,7 @@ describe('Account Adapter Integration', () => {
       });
 
       expect(result.steps[0].executeWithAdapter).toBeDefined();
-      
+
       // Execute the step to verify gas buffer is applied
       const receipt = await result.steps[0].executeWithAdapter!(adapter);
       expect(receipt.txHash).toBe('0x123abc');
@@ -459,7 +463,7 @@ describe('Account Adapter Integration', () => {
 
     it('should use fixed gas buffer when provided', async () => {
       const adapter = createMockAdapter(1);
-      
+
       const result = await blindMintProduct.preparePurchase({
         accountAdapter: adapter,
         payload: { quantity: 1 },
@@ -474,7 +478,7 @@ describe('Account Adapter Integration', () => {
     it('should handle adapter transaction failures gracefully', async () => {
       const adapter = createMockAdapter(1);
       vi.spyOn(adapter, 'sendTransaction').mockRejectedValue(new Error('Transaction failed'));
-      
+
       const preparedPurchase = await blindMintProduct.preparePurchase({
         accountAdapter: adapter,
         payload: { quantity: 1 },
@@ -484,22 +488,22 @@ describe('Account Adapter Integration', () => {
         blindMintProduct.purchase({
           accountAdapter: adapter,
           preparedPurchase,
-        })
+        }),
       ).rejects.toThrow('Transaction failed at step mint');
     });
 
     it('should handle network switching in adapter', async () => {
       const adapter = createMockAdapter(137); // Wrong network initially
       const switchNetworkSpy = vi.spyOn(adapter, 'switchNetwork');
-      
+
       // This should throw network mismatch error
       await expect(
         blindMintProduct.preparePurchase({
           accountAdapter: adapter,
           payload: { quantity: 1 },
-        })
+        }),
       ).rejects.toThrow(BlindMintError);
-      
+
       // switchNetwork should not be called automatically in preparePurchase
       expect(switchNetworkSpy).not.toHaveBeenCalled();
     });

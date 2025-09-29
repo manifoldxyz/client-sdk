@@ -16,7 +16,7 @@ describe('createClient', () => {
     appName: 'BlindMint',
     creator: {
       name: 'Test Creator',
-      address: '0x1234567890123456789012345678901234567890'
+      address: '0x1234567890123456789012345678901234567890',
     },
     publicData: {
       title: 'Test BlindMint',
@@ -27,16 +27,16 @@ describe('createClient', () => {
       mintPrice: {
         currency: 'ETH',
         value: BigInt('100000000000000000'), // 0.1 ETH in wei
-        erc20: '0x0000000000000000000000000000000000000000'
+        erc20: '0x0000000000000000000000000000000000000000',
       },
-      pool: []
-    }
+      pool: [],
+    },
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
     resetManifoldApiClient();
-    
+
     // Set up default successful API mock
     const mockFetch = vi.mocked(fetch);
     mockFetch.mockResolvedValue({

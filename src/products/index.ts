@@ -1,10 +1,7 @@
 // Products export index
 
 // BlindMint product implementation
-export {
-  BlindMintProduct,
-  isBlindMintProduct
-} from './blindmint';
+export { BlindMintProduct, isBlindMintProduct } from './blindmint';
 
 // Re-export product types
 export type {

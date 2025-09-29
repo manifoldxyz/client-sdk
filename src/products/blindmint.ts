@@ -12,10 +12,7 @@ import type {
   BlindMintTierProbability,
   BlindMintProduct as IBlindMintProduct,
 } from '../types/blindmint';
-import type {
-  IAccountAdapter,
-  UniversalTransactionRequest,
-} from '../types/account-adapter';
+import type { IAccountAdapter, UniversalTransactionRequest } from '../types/account-adapter';
 import type {
   Product,
   AllocationParams,
@@ -28,6 +25,7 @@ import type {
   ProductProvenance,
   Media,
   InstanceData,
+  AudienceRestriction,
 } from '../types/product';
 import type {
   BlindMintPayload,
@@ -49,6 +47,7 @@ import type { InstancePreview } from '@manifoldxyz/studio-apps-client';
 import { estimateGas, checkERC20Balance, checkERC20Allowance } from '../utils/gas-estimation';
 import { Money } from '../libs/money';
 import type { Cost } from '../types/money';
+import type { TransactionReceipt } from '../types/purchase';
 
 /**
  * BlindMintProduct implementation following technical spec CON-2729
@@ -222,7 +221,7 @@ export class BlindMintProduct implements IBlindMintProduct {
   async getStatus(): Promise<BlindMintStatus> {
     const onchainData = await this.fetchOnchainData();
     const now = Date.now();
-    console.log('endDate', onchainData.endDate)
+    console.log('endDate', onchainData.endDate);
     if (onchainData.startDate && now < onchainData.startDate.getTime()) {
       return 'upcoming';
     }
@@ -277,9 +276,13 @@ export class BlindMintProduct implements IBlindMintProduct {
     const walletAddress = address;
 
     if (!validateAddress(walletAddress)) {
-      throw new BlindMintError(BlindMintErrorCode.INVALID_WALLET_ADDRESS, 'Invalid wallet address', {
-        walletAddress,
-      });
+      throw new BlindMintError(
+        BlindMintErrorCode.INVALID_WALLET_ADDRESS,
+        'Invalid wallet address',
+        {
+          walletAddress,
+        },
+      );
     }
 
     // Check status first
@@ -347,7 +350,7 @@ export class BlindMintProduct implements IBlindMintProduct {
       if (totalCost.isERC20()) {
         // Check ERC20 balance using provider
         const balance = await checkERC20Balance(tokenAddress, walletAddress, provider);
-        
+
         if (balance.lt(totalCost.raw)) {
           throw new ClientSDKError(
             ErrorCode.INSUFFICIENT_FUNDS,
@@ -371,7 +374,7 @@ export class BlindMintProduct implements IBlindMintProduct {
             description: `Approve ${totalCost.formatted} ${totalCost.symbol}`,
             execute: async (accountAdapter: IAccountAdapter) => {
               const gasBuffer = params.gasBuffer || {};
-              
+
               // Build universal transaction request
               const txRequest: UniversalTransactionRequest = {
                 to: tokenAddress,
@@ -393,22 +396,22 @@ export class BlindMintProduct implements IBlindMintProduct {
                 throw new BlindMintError(
                   BlindMintErrorCode.TRANSACTION_FAILED,
                   `Approval transaction failed: ${(error as Error).message}`,
-                  { 
+                  {
                     step: approvalStep.id,
                     tokenAddress,
-                    originalError: error as Error
-                  }
+                    originalError: error as Error,
+                  },
                 );
               }
             },
           };
-          
+
           steps.push(approvalStep);
         }
       } else {
         // Check native balance using provider
         const nativeBalance = await provider.getBalance(walletAddress);
-        
+
         if (nativeBalance.lt(totalCost.raw)) {
           throw new ClientSDKError(
             ErrorCode.INSUFFICIENT_FUNDS,
@@ -446,16 +449,16 @@ export class BlindMintProduct implements IBlindMintProduct {
           throw new BlindMintError(
             BlindMintErrorCode.NETWORK_MISMATCH,
             `Wallet connected to network ${adapterNetworkId}, but product requires network ${networkId}`,
-            { 
-              expectedNetworkId: networkId, 
+            {
+              expectedNetworkId: networkId,
               actualNetworkId: adapterNetworkId,
-              instanceId: String(this.id)
-            }
+              instanceId: String(this.id),
+            },
           );
         }
 
         const gasBuffer = params.gasBuffer || {};
-        
+
         // Build universal transaction request
         const txRequest: UniversalTransactionRequest = {
           to: this._extensionAddress,
@@ -478,11 +481,11 @@ export class BlindMintProduct implements IBlindMintProduct {
           throw new BlindMintError(
             BlindMintErrorCode.TRANSACTION_FAILED,
             `Mint transaction failed: ${(error as Error).message}`,
-            { 
+            {
               step: mintStep.id,
               quantity,
-              originalError: error as Error
-            }
+              originalError: error as Error,
+            },
           );
         }
       },
@@ -493,7 +496,7 @@ export class BlindMintProduct implements IBlindMintProduct {
     // Build Cost structure (reuse the already computed values)
     const cost: Cost = {
       total: {
-        native: nativeCost || await Money.zero({ networkId, provider }),
+        native: nativeCost || (await Money.zero({ networkId, provider })),
         erc20s: erc20Costs,
       },
       breakdown: {
@@ -514,7 +517,7 @@ export class BlindMintProduct implements IBlindMintProduct {
     const walletAddress = accountAdapter.address;
 
     // Execute all steps sequentially
-    const receipts: any[] = [];
+    const receipts: TransactionReceipt[] = [];
 
     for (const step of preparedPurchase.steps) {
       try {
@@ -587,7 +590,7 @@ export class BlindMintProduct implements IBlindMintProduct {
     return {
       startDate: onchainData.startDate.getTime() === 0 ? undefined : onchainData.startDate,
       endDate: onchainData.endDate.getTime() === 0 ? undefined : onchainData.endDate,
-      audienceRestriction: onchainData.audienceType as any,
+      audienceRestriction: onchainData.audienceType as AudienceRestriction,
       maxPerWallet: onchainData.walletMax || undefined,
     };
   }
@@ -757,7 +760,7 @@ export class BlindMintProduct implements IBlindMintProduct {
    */
   private _buildApprovalData(spender: string, amount: string): string {
     const approvalInterface = new ethers.utils.Interface([
-      'function approve(address spender, uint256 amount)'
+      'function approve(address spender, uint256 amount)',
     ]);
     return approvalInterface.encodeFunctionData('approve', [spender, amount]);
   }
@@ -768,7 +771,7 @@ export class BlindMintProduct implements IBlindMintProduct {
   private _buildMintData(creatorContract: string, claimIndex: number, quantity: number): string {
     // Using the actual mint function signature from the contract
     const mintInterface = new ethers.utils.Interface([
-      'function mintReserve(address creatorContract, uint256 claimIndex, uint256 quantity)'
+      'function mintReserve(address creatorContract, uint256 claimIndex, uint256 quantity)',
     ]);
     return mintInterface.encodeFunctionData('mintReserve', [creatorContract, claimIndex, quantity]);
   }

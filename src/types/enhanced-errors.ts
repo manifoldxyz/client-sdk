@@ -19,17 +19,17 @@ export enum BlindMintErrorCode {
   NOT_ELIGIBLE = 'NOT_ELIGIBLE',
   INVALID_WALLET_ADDRESS = 'INVALID_WALLET_ADDRESS',
   TRANSACTION_FAILED = 'TRANSACTION_FAILED',
-  
+
   // Allowlist errors
   INVALID_MERKLE_PROOF = 'INVALID_MERKLE_PROOF',
   INVALID_REDEMPTION_CODE = 'INVALID_REDEMPTION_CODE',
   NOT_ON_ALLOWLIST = 'NOT_ON_ALLOWLIST',
-  
+
   // Payment errors
   INSUFFICIENT_ALLOWANCE = 'INSUFFICIENT_ALLOWANCE',
   INVALID_PAYMENT_TOKEN = 'INVALID_PAYMENT_TOKEN',
   PAYMENT_FAILED = 'PAYMENT_FAILED',
-  
+
   // Contract interaction errors
   CONTRACT_ERROR = 'CONTRACT_ERROR',
   GAS_ESTIMATION_FAILED = 'GAS_ESTIMATION_FAILED',
@@ -38,18 +38,18 @@ export enum BlindMintErrorCode {
   PROVIDER_UNAVAILABLE = 'PROVIDER_UNAVAILABLE',
   TRANSACTION_REPLACED = 'TRANSACTION_REPLACED',
   TRANSACTION_CANCELLED = 'TRANSACTION_CANCELLED',
-  
+
   // API errors
   API_ERROR = 'API_ERROR',
   RATE_LIMITED = 'RATE_LIMITED',
   API_UNAVAILABLE = 'API_UNAVAILABLE',
   INVALID_API_RESPONSE = 'INVALID_API_RESPONSE',
-  
+
   // Validation errors
   VALIDATION_FAILED = 'VALIDATION_FAILED',
   SCHEMA_VALIDATION_FAILED = 'SCHEMA_VALIDATION_FAILED',
   TYPE_MISMATCH = 'TYPE_MISMATCH',
-  
+
   // Configuration errors
   INVALID_CONFIGURATION = 'INVALID_CONFIGURATION',
   MISSING_PROVIDER = 'MISSING_PROVIDER',
@@ -68,8 +68,7 @@ function resolveBlindMintCodeFromValue(value: unknown): BlindMintErrorCode | und
 
 function resolveBlindMintCode(error: BlindMintError): BlindMintErrorCode | undefined {
   return (
-    resolveBlindMintCodeFromValue(error.blindMintCode) ??
-    resolveBlindMintCodeFromValue(error.code)
+    resolveBlindMintCodeFromValue(error.blindMintCode) ?? resolveBlindMintCodeFromValue(error.code)
   );
 }
 
@@ -258,10 +257,10 @@ export enum ErrorSeverity {
  * Error categories for handling strategies
  */
 export enum ErrorCategory {
-  USER_ERROR = 'user-error',          // User input or action required
-  SYSTEM_ERROR = 'system-error',      // Internal system issue
-  NETWORK_ERROR = 'network-error',    // Network connectivity issue
-  CONTRACT_ERROR = 'contract-error',  // Smart contract interaction issue
+  USER_ERROR = 'user-error', // User input or action required
+  SYSTEM_ERROR = 'system-error', // Internal system issue
+  NETWORK_ERROR = 'network-error', // Network connectivity issue
+  CONTRACT_ERROR = 'contract-error', // Smart contract interaction issue
   VALIDATION_ERROR = 'validation-error', // Data validation issue
   CONFIGURATION_ERROR = 'configuration-error', // SDK configuration issue
 }
@@ -363,7 +362,7 @@ export const BLINDMINT_ERROR_CLASSIFICATIONS: Record<BlindMintErrorCode, ErrorMe
     userActions: ['Try again', 'Check wallet connection'],
     reportable: true,
   },
-  
+
   // Allowlist errors
   [BlindMintErrorCode.INVALID_MERKLE_PROOF]: {
     severity: ErrorSeverity.MEDIUM,
@@ -386,7 +385,7 @@ export const BLINDMINT_ERROR_CLASSIFICATIONS: Record<BlindMintErrorCode, ErrorMe
     userActions: ['Check allowlist eligibility'],
     reportable: false,
   },
-  
+
   // Payment errors
   [BlindMintErrorCode.INSUFFICIENT_ALLOWANCE]: {
     severity: ErrorSeverity.MEDIUM,
@@ -407,7 +406,7 @@ export const BLINDMINT_ERROR_CLASSIFICATIONS: Record<BlindMintErrorCode, ErrorMe
     recoverable: false,
     reportable: true,
   },
-  
+
   // Contract interaction errors
   [BlindMintErrorCode.CONTRACT_ERROR]: {
     severity: ErrorSeverity.HIGH,
@@ -455,7 +454,7 @@ export const BLINDMINT_ERROR_CLASSIFICATIONS: Record<BlindMintErrorCode, ErrorMe
     recoverable: true,
     reportable: false,
   },
-  
+
   // API errors
   [BlindMintErrorCode.API_ERROR]: {
     severity: ErrorSeverity.MEDIUM,
@@ -485,7 +484,7 @@ export const BLINDMINT_ERROR_CLASSIFICATIONS: Record<BlindMintErrorCode, ErrorMe
     recoverable: false,
     reportable: true,
   },
-  
+
   // Validation errors
   [BlindMintErrorCode.VALIDATION_FAILED]: {
     severity: ErrorSeverity.MEDIUM,
@@ -506,7 +505,7 @@ export const BLINDMINT_ERROR_CLASSIFICATIONS: Record<BlindMintErrorCode, ErrorMe
     recoverable: false,
     reportable: true,
   },
-  
+
   // Configuration errors
   [BlindMintErrorCode.INVALID_CONFIGURATION]: {
     severity: ErrorSeverity.HIGH,
@@ -564,7 +563,7 @@ export function getUserFriendlyMessage(error: Error): string {
       return `${error.message}. Try: ${classification.userActions.join(', ')}.`;
     }
   }
-  
+
   return error.message;
 }
 
@@ -595,6 +594,6 @@ export function shouldReportError(error: Error): boolean {
     }
     return BLINDMINT_ERROR_CLASSIFICATIONS[errorCode]?.reportable ?? true;
   }
-  
+
   return true; // Report unknown errors by default
 }

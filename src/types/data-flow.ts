@@ -39,5 +39,5 @@ export interface AllocationResponse {
 }
 
 // Note: Complex pricing, metadata, state sync, and pagination types removed.
-// These were over-engineered for the current SDK needs. 
+// These were over-engineered for the current SDK needs.
 // If needed in the future, implement simpler, focused versions.

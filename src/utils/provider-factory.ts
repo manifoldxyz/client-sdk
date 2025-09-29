@@ -58,7 +58,7 @@ function createPrimaryProvider(
 
     return null;
   } catch (error) {
-    console.log('errrr', error)
+    console.log('errrr', error);
     return null;
   }
 }

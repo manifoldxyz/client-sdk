@@ -21,11 +21,7 @@ export interface ProviderConfig {
   };
 }
 
-export type WalletType = 
-  | 'metamask'
-  | 'walletconnect'
-  | 'coinbase'
-  | 'injected';
+export type WalletType = 'metamask' | 'walletconnect' | 'coinbase' | 'injected';
 
 // =============================================================================
 // NETWORK CONFIGURATION
@@ -110,7 +106,7 @@ export interface CacheConfig {
 }
 
 // =============================================================================
-// DEFAULT CONFIGURATIONS  
+// DEFAULT CONFIGURATIONS
 // =============================================================================
 
 /**

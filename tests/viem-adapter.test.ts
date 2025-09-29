@@ -100,7 +100,7 @@ describe('ViemAdapter', () => {
         protected override _initializeViem(): void {
           throw new ClientSDKError(
             'INVALID_INPUT' as any,
-            'Viem is not installed. Please install viem as a peer dependency: npm install viem'
+            'Viem is not installed. Please install viem as a peer dependency: npm install viem',
           );
         }
       }
@@ -152,7 +152,7 @@ describe('ViemAdapter', () => {
   describe('sendTransaction', () => {
     it('should send transaction successfully', async () => {
       const adapter = new ViemAdapter(mockWalletClient);
-      
+
       const request: UniversalTransactionRequest = {
         to: '0x1234567890123456789012345678901234567890',
         value: '1000000000000000000',
@@ -172,7 +172,7 @@ describe('ViemAdapter', () => {
 
     it('should handle EIP-1559 transactions', async () => {
       const adapter = new ViemAdapter(mockWalletClient);
-      
+
       const request: UniversalTransactionRequest = {
         to: '0x1234567890123456789012345678901234567890',
         value: '1000000000000000000',
@@ -188,13 +188,13 @@ describe('ViemAdapter', () => {
           maxFeePerGas: BigInt('30000000000'),
           maxPriorityFeePerGas: BigInt('2000000000'),
           type: 'eip1559',
-        })
+        }),
       );
     });
 
     it('should handle legacy transactions', async () => {
       const adapter = new ViemAdapter(mockWalletClient);
-      
+
       const request: UniversalTransactionRequest = {
         to: '0x1234567890123456789012345678901234567890',
         value: '1000000000000000000',
@@ -208,7 +208,7 @@ describe('ViemAdapter', () => {
         expect.objectContaining({
           gasPrice: BigInt('20000000000'),
           type: 'legacy',
-        })
+        }),
       );
     });
 
@@ -218,7 +218,7 @@ describe('ViemAdapter', () => {
         account: null,
       };
       const adapter = new ViemAdapter(clientWithoutAccount);
-      
+
       const request: UniversalTransactionRequest = {
         to: '0x1234567890123456789012345678901234567890',
         value: '1000000000000000000',
@@ -229,13 +229,13 @@ describe('ViemAdapter', () => {
       expect(mockWalletClient.sendTransaction).toHaveBeenCalledWith(
         expect.objectContaining({
           account: '0x742d35cc6488ad532a3b33a8b3c9f9b8eb8c5b3a',
-        })
+        }),
       );
     });
 
     it('should throw error when using public client without wallet', async () => {
       const adapter = new ViemAdapter(mockPublicClient);
-      
+
       const request: UniversalTransactionRequest = {
         to: '0x1234567890123456789012345678901234567890',
         value: '1000000000000000000',
@@ -252,9 +252,9 @@ describe('ViemAdapter', () => {
   describe('getBalance', () => {
     it('should get native token balance', async () => {
       const adapter = new ViemAdapter(mockWalletClient);
-      
+
       const balance = await adapter.getBalance();
-      
+
       expect(mockPublicClient.getBalance).toHaveBeenCalledWith({
         address: '0x742d35cc6488ad532a3b33a8b3c9f9b8eb8c5b3a',
       });
@@ -263,9 +263,9 @@ describe('ViemAdapter', () => {
 
     it('should get native token balance with zero address', async () => {
       const adapter = new ViemAdapter(mockWalletClient);
-      
+
       const balance = await adapter.getBalance('0x0000000000000000000000000000000000000000');
-      
+
       expect(mockPublicClient.getBalance).toHaveBeenCalledWith({
         address: '0x742d35cc6488ad532a3b33a8b3c9f9b8eb8c5b3a',
       });
@@ -275,23 +275,25 @@ describe('ViemAdapter', () => {
     it('should get ERC-20 token balance', async () => {
       const { checkERC20BalanceViem } = await import('../src/utils/gas-estimation');
       const adapter = new ViemAdapter(mockWalletClient);
-      
+
       const tokenAddress = '0xA0b86a33E6441d7B2c15e9A9d98b56e3F42E9b9B';
       const balance = await adapter.getBalance(tokenAddress);
-      
+
       expect(checkERC20BalanceViem).toHaveBeenCalledWith(
         tokenAddress,
         '0x742d35cc6488ad532a3b33a8b3c9f9b8eb8c5b3a',
-        mockPublicClient
+        mockPublicClient,
       );
       expect(balance.networkId).toBe(1);
     });
 
     it('should work with public client only', async () => {
       const adapter = new ViemAdapter(mockPublicClient);
-      
+
       // Should throw because no wallet client to get address
-      await expect(adapter.getBalance()).rejects.toThrow('Cannot get address from read-only client');
+      await expect(adapter.getBalance()).rejects.toThrow(
+        'Cannot get address from read-only client',
+      );
     });
   });
 
@@ -302,9 +304,9 @@ describe('ViemAdapter', () => {
   describe('getConnectedNetworkId', () => {
     it('should return current network ID', async () => {
       const adapter = new ViemAdapter(mockWalletClient);
-      
+
       const networkId = await adapter.getConnectedNetworkId();
-      
+
       expect(networkId).toBe(1);
       expect(mockPublicClient.getChainId).toHaveBeenCalled();
     });
@@ -313,15 +315,15 @@ describe('ViemAdapter', () => {
   describe('switchNetwork', () => {
     it('should switch network', async () => {
       const adapter = new ViemAdapter(mockWalletClient);
-      
+
       await adapter.switchNetwork(137);
-      
+
       expect(mockWalletClient.switchChain).toHaveBeenCalledWith({ id: 137 });
     });
 
     it('should throw error for public client without wallet', async () => {
       const adapter = new ViemAdapter(mockPublicClient);
-      
+
       await expect(adapter.switchNetwork(137)).rejects.toThrow('No wallet client available');
     });
   });
@@ -333,9 +335,9 @@ describe('ViemAdapter', () => {
   describe('signMessage', () => {
     it('should sign message', async () => {
       const adapter = new ViemAdapter(mockWalletClient);
-      
+
       const signature = await adapter.signMessage('Hello, Web3!');
-      
+
       expect(signature).toBe('0xmockedsignature');
       expect(mockWalletClient.signMessage).toHaveBeenCalledWith({
         account: '0x742d35cc6488ad532a3b33a8b3c9f9b8eb8c5b3a',
@@ -345,7 +347,7 @@ describe('ViemAdapter', () => {
 
     it('should throw error when using public client without wallet', async () => {
       const adapter = new ViemAdapter(mockPublicClient);
-      
+
       await expect(adapter.signMessage('Hello')).rejects.toThrow('No wallet client available');
     });
   });
@@ -358,9 +360,9 @@ describe('ViemAdapter', () => {
     it('should wrap user rejection errors', async () => {
       const rejectionError = { name: 'UserRejectedRequestError', message: 'User rejected request' };
       mockWalletClient.sendTransaction.mockRejectedValue(rejectionError);
-      
+
       const adapter = new ViemAdapter(mockWalletClient);
-      
+
       try {
         await adapter.sendTransaction({ to: '0x1234567890123456789012345678901234567890' });
       } catch (error: any) {
@@ -372,9 +374,9 @@ describe('ViemAdapter', () => {
     it('should wrap insufficient funds errors', async () => {
       const fundsError = { name: 'InsufficientFundsError', message: 'Insufficient funds' };
       mockWalletClient.sendTransaction.mockRejectedValue(fundsError);
-      
+
       const adapter = new ViemAdapter(mockWalletClient);
-      
+
       try {
         await adapter.sendTransaction({ to: '0x1234567890123456789012345678901234567890' });
       } catch (error: any) {
@@ -386,9 +388,9 @@ describe('ViemAdapter', () => {
     it('should wrap chain mismatch errors', async () => {
       const chainError = { name: 'ChainMismatchError', message: 'Chain mismatch' };
       mockWalletClient.sendTransaction.mockRejectedValue(chainError);
-      
+
       const adapter = new ViemAdapter(mockWalletClient);
-      
+
       try {
         await adapter.sendTransaction({ to: '0x1234567890123456789012345678901234567890' });
       } catch (error: any) {
@@ -400,9 +402,9 @@ describe('ViemAdapter', () => {
     it('should wrap transaction execution errors', async () => {
       const executionError = { name: 'TransactionExecutionError', message: 'Transaction failed' };
       mockWalletClient.sendTransaction.mockRejectedValue(executionError);
-      
+
       const adapter = new ViemAdapter(mockWalletClient);
-      
+
       try {
         await adapter.sendTransaction({ to: '0x1234567890123456789012345678901234567890' });
       } catch (error: any) {
@@ -487,7 +489,7 @@ describe('isViemCompatible', () => {
       getBalance: vi.fn(),
       _isProvider: true,
     };
-    
+
     expect(isViemCompatible(ethersLikeProvider)).toBe(false);
   });
 
@@ -496,7 +498,7 @@ describe('isViemCompatible', () => {
       ...localMockWalletClient,
       mode: 'anvil',
     };
-    
+
     expect(isViemCompatible(testClient)).toBe(false);
   });
 });

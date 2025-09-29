@@ -1,5 +1,4 @@
-import { BigNumber } from 'ethers';
-import type { ContractTransaction, ContractReceipt } from 'ethers';
+import type { BigNumber, ContractTransaction, ContractReceipt } from 'ethers';
 import type { Address, NetworkId } from './common';
 
 // =============================================================================
@@ -28,21 +27,29 @@ export interface ClaimExtensionContract {
   getClaimState(): Promise<ClaimState>;
 
   // Write operations
-  mint(quantity: number, paymentAmount: BigNumber, walletAddress: Address): Promise<TransactionResponse>;
+  mint(
+    quantity: number,
+    paymentAmount: BigNumber,
+    walletAddress: Address,
+  ): Promise<TransactionResponse>;
   mintWithProofs(
     quantity: number,
     paymentAmount: BigNumber,
     walletAddress: Address,
-    merkleProofs: string[]
+    merkleProofs: string[],
   ): Promise<TransactionResponse>;
 
   // Gas estimation
-  estimateGasMint(walletAddress: Address, quantity: number, paymentAmount: BigNumber): Promise<BigNumber>;
+  estimateGasMint(
+    walletAddress: Address,
+    quantity: number,
+    paymentAmount: BigNumber,
+  ): Promise<BigNumber>;
   estimateGasMintWithProofs(
     walletAddress: Address,
     quantity: number,
     paymentAmount: BigNumber,
-    merkleProofs: string[]
+    merkleProofs: string[],
   ): Promise<BigNumber>;
 
   // Utility methods
@@ -194,7 +201,7 @@ export interface TransactionResult {
   executionTime: number;
 }
 
-export type TransactionType = 
+export type TransactionType =
   | 'approve'
   | 'mint'
   | 'mintWithProofs'
@@ -275,12 +282,7 @@ export interface ClaimState {
   };
 }
 
-export type ClaimStatus = 
-  | 'not-started'
-  | 'active'
-  | 'ended'
-  | 'sold-out'
-  | 'paused';
+export type ClaimStatus = 'not-started' | 'active' | 'ended' | 'sold-out' | 'paused';
 
 export type ClaimType = 'erc721' | 'erc1155';
 
@@ -328,7 +330,7 @@ export interface NetworkError extends Error {
   recoverable: boolean;
 }
 
-export type NetworkErrorType = 
+export type NetworkErrorType =
   | 'wrong-network'
   | 'network-unavailable'
   | 'rpc-error'
@@ -377,7 +379,7 @@ export interface ContractValidationWarning {
   severity: 'low' | 'medium' | 'high';
 }
 
-export type ContractValidationErrorCode = 
+export type ContractValidationErrorCode =
   | 'insufficient-balance'
   | 'insufficient-allowance'
   | 'invalid-quantity'
@@ -401,7 +403,7 @@ export interface ManifoldBridgeProvider {
   readonly networkId: NetworkId;
   /** RPC endpoint URL */
   readonly rpcUrl: string;
-  
+
   /** Get contract instance through bridge */
   getContract(address: Address, abi: unknown[]): BridgeContract;
   /** Execute read-only contract call */
@@ -445,7 +447,7 @@ export const STORAGE_PROTOCOLS = {
   0: 'none',
   1: 'ipfs',
   2: 'arweave',
-  3: 'http'
+  3: 'http',
 } as const;
 
 // Note: Gas configurations moved to config.ts for centralized management

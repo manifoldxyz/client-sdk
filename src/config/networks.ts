@@ -5,7 +5,8 @@ import type { NetworkId } from '../types/common';
  * Simple network configurations
  */
 export const NETWORK_CONFIGS: Record<NetworkId, NetworkConfig> = {
-  1: { // Ethereum Mainnet
+  1: {
+    // Ethereum Mainnet
     networkId: 1,
     chainId: 1,
     name: 'Ethereum',
@@ -13,7 +14,8 @@ export const NETWORK_CONFIGS: Record<NetworkId, NetworkConfig> = {
     rpcUrl: 'https://eth.llamarpc.com',
     explorerUrl: 'https://etherscan.io',
   },
-  137: { // Polygon
+  137: {
+    // Polygon
     networkId: 137,
     chainId: 137,
     name: 'Polygon',
@@ -21,7 +23,8 @@ export const NETWORK_CONFIGS: Record<NetworkId, NetworkConfig> = {
     rpcUrl: 'https://polygon.llamarpc.com',
     explorerUrl: 'https://polygonscan.com',
   },
-  10: { // Optimism
+  10: {
+    // Optimism
     networkId: 10,
     chainId: 10,
     name: 'Optimism',
@@ -29,7 +32,8 @@ export const NETWORK_CONFIGS: Record<NetworkId, NetworkConfig> = {
     rpcUrl: 'https://optimism.llamarpc.com',
     explorerUrl: 'https://optimistic.etherscan.io',
   },
-  42161: { // Arbitrum
+  42161: {
+    // Arbitrum
     networkId: 42161,
     chainId: 42161,
     name: 'Arbitrum One',
@@ -37,7 +41,8 @@ export const NETWORK_CONFIGS: Record<NetworkId, NetworkConfig> = {
     rpcUrl: 'https://arbitrum.llamarpc.com',
     explorerUrl: 'https://arbiscan.io',
   },
-  8453: { // Base
+  8453: {
+    // Base
     networkId: 8453,
     chainId: 8453,
     name: 'Base',
@@ -58,7 +63,7 @@ export function getNetworkConfig(networkId: NetworkId): NetworkConfig | undefine
  * Get supported network IDs
  */
 export function getSupportedNetworks(): NetworkId[] {
-  return Object.keys(NETWORK_CONFIGS).map(id => parseInt(id));
+  return Object.keys(NETWORK_CONFIGS).map((id) => parseInt(id));
 }
 
 /**

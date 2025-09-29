@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import type { PublicClient } from 'viem';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 
 export interface GasEstimationParams {
@@ -87,7 +88,7 @@ export async function checkERC20Balance(
 export async function checkERC20BalanceViem(
   tokenAddress: string,
   ownerAddress: string,
-  publicClient: any, // viem PublicClient
+  publicClient: Pick<PublicClient, 'readContract'>,
 ): Promise<bigint> {
   const erc20Abi = [
     {
@@ -100,10 +101,10 @@ export async function checkERC20BalanceViem(
   ] as const;
 
   const balance = await publicClient.readContract({
-    address: tokenAddress,
+    address: tokenAddress as `0x${string}`,
     abi: erc20Abi,
     functionName: 'balanceOf',
-    args: [ownerAddress],
+    args: [ownerAddress as `0x${string}`],
   });
 
   return balance;

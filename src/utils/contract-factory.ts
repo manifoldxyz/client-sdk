@@ -245,11 +245,7 @@ export class ContractFactory {
       instanceId: number,
     ): Promise<number> => {
       try {
-        const userMints = await contract.getUserMints(
-          minter,
-          creatorContractAddress,
-          instanceId,
-        );
+        const userMints = await contract.getUserMints(minter, creatorContractAddress, instanceId);
         // Return sum of reserved and delivered counts
         return userMints.reservedCount + userMints.deliveredCount;
       } catch (error) {
@@ -338,16 +334,18 @@ export class ContractFactory {
 /**
  * Estimate gas for a contract call with fallback
  */
+type EstimateGasFunction = (...fnArgs: unknown[]) => Promise<ethers.BigNumber>;
+
 export async function estimateGasWithFallback(
   contract: ethers.Contract,
   methodName: string,
-  args: any[],
+  args: ReadonlyArray<unknown>,
   fallbackGas: ethers.BigNumberish = 200000,
 ): Promise<ethers.BigNumber> {
   try {
-    const estimateMethod = contract.estimateGas[methodName];
-    if (estimateMethod) {
-      return await estimateMethod(...args);
+    const estimateMethod = contract.estimateGas[methodName as keyof typeof contract.estimateGas];
+    if (typeof estimateMethod === 'function') {
+      return await (estimateMethod as EstimateGasFunction)(...args);
     }
     return ethers.BigNumber.from(fallbackGas);
   } catch (error) {
@@ -391,15 +389,7 @@ export async function batchContractCalls<T>(
 
   for (let i = 0; i < calls.length; i += maxConcurrent) {
     const batch = calls.slice(i, i + maxConcurrent);
-    const batchResults = await Promise.all(
-      batch.map(async (call) => {
-        try {
-          return await call();
-        } catch (error) {
-          throw error;
-        }
-      }),
-    );
+    const batchResults = await Promise.all(batch.map((call) => call()));
 
     results.push(...batchResults);
   }

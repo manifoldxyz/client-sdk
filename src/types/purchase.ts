@@ -46,8 +46,6 @@ export interface TransactionData {
   networkId: number;
 }
 
-
-
 export interface TransactionStep {
   id: string;
   name: string;
@@ -61,7 +59,6 @@ export interface PurchaseParams {
   accountAdapter: IAccountAdapter;
   preparedPurchase: PreparedPurchase;
 }
-
 
 export interface Order {
   receipts: TransactionReceipt[];

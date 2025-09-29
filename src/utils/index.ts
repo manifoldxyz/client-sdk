@@ -10,17 +10,13 @@ export {
   validateInstanceId,
   parseManifoldUrl,
   validateAddress,
-  validateNetworkId
+  validateNetworkId,
 } from './validation';
 
 // Provider utilities
-export {
-  createProvider
-} from './provider-factory';
+export { createProvider } from './provider-factory';
 
-export type {
-  ProviderFactoryOptions
-} from './provider-factory';
+export type { ProviderFactoryOptions } from './provider-factory';
 
 // Contract utilities
 export {
@@ -32,14 +28,14 @@ export {
   parseContractEvents,
   BLINDMINT_CLAIM_ABI,
   CREATOR_CONTRACT_ABI,
-  ERC20_ABI
+  ERC20_ABI,
 } from './contract-factory';
 
 export type {
   ContractFactoryOptions,
   BlindMintClaimContract,
   CreatorContract,
-  ERC20Contract
+  ERC20Contract,
 } from './contract-factory';
 
 // Gas estimation utilities
@@ -48,12 +44,10 @@ export {
   applyGasBuffer,
   checkERC20Balance,
   checkERC20Allowance,
-  createERC20ApprovalTx
+  createERC20ApprovalTx,
 } from './gas-estimation';
 
-export type {
-  GasEstimationParams
-} from './gas-estimation';
+export type { GasEstimationParams } from './gas-estimation';
 
 // =============================================================================
 // ADDITIONAL UTILITY FUNCTIONS
@@ -67,7 +61,7 @@ import * as ethers from 'ethers';
 export function formatBigNumber(
   value: ethers.BigNumber,
   decimals: number = 18,
-  precision: number = 4
+  precision: number = 4,
 ): string {
   return parseFloat(ethers.utils.formatUnits(value, decimals)).toFixed(precision);
 }
@@ -75,10 +69,7 @@ export function formatBigNumber(
 /**
  * Parse human-readable string to BigNumber
  */
-export function parseBigNumber(
-  value: string,
-  decimals: number = 18
-): ethers.BigNumber {
+export function parseBigNumber(value: string, decimals: number = 18): ethers.BigNumber {
   return ethers.utils.parseUnits(value, decimals);
 }
 
@@ -88,12 +79,12 @@ export function parseBigNumber(
 export function formatAddress(
   address: string,
   startLength: number = 6,
-  endLength: number = 4
+  endLength: number = 4,
 ): string {
   if (!address || address.length < startLength + endLength) {
     return address;
   }
-  
+
   return `${address.slice(0, startLength)}...${address.slice(-endLength)}`;
 }
 
@@ -130,7 +121,7 @@ export function randomBytes(length: number): string {
  * Delay execution for specified milliseconds
  */
 export function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -140,23 +131,23 @@ export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   maxRetries: number = 3,
   baseDelay: number = 1000,
-  backoffMultiplier: number = 2
+  backoffMultiplier: number = 2,
 ): Promise<T> {
   let lastError: Error;
-  
+
   for (let i = 0; i < maxRetries; i++) {
     try {
       return await fn();
     } catch (error) {
       lastError = error as Error;
-      
+
       if (i < maxRetries - 1) {
         const delayMs = baseDelay * Math.pow(backoffMultiplier, i);
         await delay(delayMs);
       }
     }
   }
-  
+
   throw lastError!;
 }
 
@@ -166,13 +157,11 @@ export async function retryWithBackoff<T>(
 export function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
-  errorMessage: string = 'Operation timed out'
+  errorMessage: string = 'Operation timed out',
 ): Promise<T> {
   return Promise.race([
     promise,
-    new Promise<never>((_, reject) => 
-      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
-    )
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(errorMessage)), timeoutMs)),
   ]);
 }
 
@@ -181,11 +170,11 @@ export function withTimeout<T>(
  */
 export function chunkArray<T>(array: T[], chunkSize: number): T[][] {
   const chunks: T[][] = [];
-  
+
   for (let i = 0; i < array.length; i += chunkSize) {
     chunks.push(array.slice(i, i + chunkSize));
   }
-  
+
   return chunks;
 }
 
@@ -194,7 +183,7 @@ export function chunkArray<T>(array: T[], chunkSize: number): T[][] {
  */
 export function uniqueBy<T, K>(array: T[], keyFn: (item: T) => K): T[] {
   const seen = new Set<K>();
-  return array.filter(item => {
+  return array.filter((item) => {
     const key = keyFn(item);
     if (seen.has(key)) {
       return false;
@@ -211,23 +200,25 @@ export function deepClone<T>(obj: T): T {
   if (obj === null || typeof obj !== 'object') {
     return obj;
   }
-  
+
   if (obj instanceof Date) {
     return new Date(obj.getTime()) as unknown as T;
   }
-  
+
   if (Array.isArray(obj)) {
-    return obj.map(item => deepClone(item)) as unknown as T;
+    // deep cloning arrays requires a cast because TypeScript cannot infer tuple shapes through recursion
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return obj.map((item) => deepClone(item)) as unknown as T;
   }
-  
-  const cloned = {} as T;
+
+  const cloned = {} as Record<PropertyKey, unknown>;
   for (const key in obj) {
-    if (obj.hasOwnProperty(key)) {
-      cloned[key] = deepClone(obj[key]);
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      cloned[key] = deepClone((obj as Record<PropertyKey, unknown>)[key]);
     }
   }
-  
-  return cloned;
+
+  return cloned as T;
 }
 
 /**
@@ -237,29 +228,26 @@ export function isEmpty(value: unknown): boolean {
   if (value === null || value === undefined) {
     return true;
   }
-  
+
   if (typeof value === 'string') {
     return value.trim().length === 0;
   }
-  
+
   if (Array.isArray(value)) {
     return value.length === 0;
   }
-  
+
   if (typeof value === 'object') {
     return Object.keys(value).length === 0;
   }
-  
+
   return false;
 }
 
 /**
  * Safe JSON parse with error handling
  */
-export function safeJsonParse<T>(
-  json: string,
-  defaultValue: T
-): T {
+export function safeJsonParse<T>(json: string, defaultValue: T): T {
   try {
     return JSON.parse(json) as T;
   } catch {
@@ -272,30 +260,30 @@ export function safeJsonParse<T>(
  */
 export function simpleHash(str: string): string {
   let hash = 0;
-  
+
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash; // Convert to 32-bit integer
   }
-  
+
   return Math.abs(hash).toString(36);
 }
 
 /**
  * Create a debounced version of a function
  */
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
-  wait: number
+  wait: number,
 ): (...args: Parameters<T>) => void {
   let timeout: NodeJS.Timeout | null = null;
-  
+
   return (...args: Parameters<T>) => {
     if (timeout) {
       clearTimeout(timeout);
     }
-    
+
     timeout = setTimeout(() => {
       func(...args);
     }, wait);
@@ -305,12 +293,12 @@ export function debounce<T extends (...args: any[]) => any>(
 /**
  * Create a throttled version of a function
  */
-export function throttle<T extends (...args: any[]) => any>(
+export function throttle<T extends (...args: unknown[]) => unknown>(
   func: T,
-  limit: number
+  limit: number,
 ): (...args: Parameters<T>) => void {
   let inThrottle: boolean = false;
-  
+
   return (...args: Parameters<T>) => {
     if (!inThrottle) {
       func(...args);
@@ -339,5 +327,5 @@ export default {
   safeJsonParse,
   simpleHash,
   debounce,
-  throttle
+  throttle,
 };

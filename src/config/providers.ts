@@ -3,9 +3,11 @@ import type { ProviderConfig } from '../types/config';
 /**
  * Simple provider configuration
  */
-export function createProviderConfig(options: {
-  environment?: 'development' | 'production' | 'test';
-} = {}): ProviderConfig {
+export function createProviderConfig(
+  options: {
+    environment?: 'development' | 'production' | 'test';
+  } = {},
+): ProviderConfig {
   const { environment = 'production' } = options;
 
   return {

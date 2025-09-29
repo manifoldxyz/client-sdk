@@ -15,13 +15,14 @@ import { ethers } from 'ethers';
 // VIEM TYPE IMPORTS
 // =============================================================================
 
+import type * as Viem from 'viem';
+import type { WalletClient as ViemWalletClient, PublicClient as ViemPublicClient } from 'viem';
+
 /**
  * Import viem types conditionally to support optional peer dependency
  * Using type-only imports to avoid runtime errors when viem is not installed
  */
-type ViemModule = typeof import('viem');
-type ViemWalletClient = import('viem').WalletClient;
-type ViemPublicClient = import('viem').PublicClient;
+type ViemModule = typeof Viem;
 type ViemAddress = `0x${string}`;
 type ViemHash = `0x${string}`;
 type ViemClient = ViemWalletClient | ViemPublicClient;

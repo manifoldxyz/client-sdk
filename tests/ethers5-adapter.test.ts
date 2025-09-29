@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ethers } from 'ethers';
-import { Ethers5Adapter, createEthers5Adapter, isEthers5Compatible } from '../src/adapters/ethers5-adapter';
+import {
+  Ethers5Adapter,
+  createEthers5Adapter,
+  isEthers5Compatible,
+} from '../src/adapters/ethers5-adapter';
 import { AccountAdapterFactory } from '../src/adapters/account-adapter-factory';
 import type { UniversalTransactionRequest } from '../src/types/account-adapter';
 import { ClientSDKError } from '../src/types/errors';
@@ -78,7 +82,9 @@ describe('Ethers5Adapter', () => {
       };
 
       expect(() => new Ethers5Adapter(signerWithoutProvider)).toThrow(ClientSDKError);
-      expect(() => new Ethers5Adapter(signerWithoutProvider)).toThrow('must have a connected provider');
+      expect(() => new Ethers5Adapter(signerWithoutProvider)).toThrow(
+        'must have a connected provider',
+      );
     });
 
     it('should throw error for invalid input', () => {
@@ -112,7 +118,7 @@ describe('Ethers5Adapter', () => {
   describe('sendTransaction', () => {
     it('should send transaction successfully', async () => {
       const adapter = new Ethers5Adapter(mockSigner);
-      
+
       const request: UniversalTransactionRequest = {
         to: '0x1234567890123456789012345678901234567890',
         value: '1000000000000000000',
@@ -129,7 +135,7 @@ describe('Ethers5Adapter', () => {
 
     it('should handle EIP-1559 transactions', async () => {
       const adapter = new Ethers5Adapter(mockSigner);
-      
+
       const request: UniversalTransactionRequest = {
         to: '0x1234567890123456789012345678901234567890',
         value: '1000000000000000000',
@@ -145,13 +151,13 @@ describe('Ethers5Adapter', () => {
           maxFeePerGas: ethers.BigNumber.from('30000000000'),
           maxPriorityFeePerGas: ethers.BigNumber.from('2000000000'),
           type: 2,
-        })
+        }),
       );
     });
 
     it('should handle legacy transactions', async () => {
       const adapter = new Ethers5Adapter(mockSigner);
-      
+
       const request: UniversalTransactionRequest = {
         to: '0x1234567890123456789012345678901234567890',
         value: '1000000000000000000',
@@ -165,13 +171,13 @@ describe('Ethers5Adapter', () => {
         expect.objectContaining({
           gasPrice: ethers.BigNumber.from('20000000000'),
           type: 0,
-        })
+        }),
       );
     });
 
     it('should throw error when using provider without signer', async () => {
       const adapter = new Ethers5Adapter(mockProvider);
-      
+
       const request: UniversalTransactionRequest = {
         to: '0x1234567890123456789012345678901234567890',
         value: '1000000000000000000',
@@ -188,33 +194,37 @@ describe('Ethers5Adapter', () => {
   describe('getBalance', () => {
     it('should get native token balance', async () => {
       const adapter = new Ethers5Adapter(mockSigner);
-      
+
       const balance = await adapter.getBalance();
-      
-      expect(mockProvider.getBalance).toHaveBeenCalledWith('0x742d35cc6488ad532a3b33a8b3c9f9b8eb8c5b3a');
+
+      expect(mockProvider.getBalance).toHaveBeenCalledWith(
+        '0x742d35cc6488ad532a3b33a8b3c9f9b8eb8c5b3a',
+      );
       expect(balance.networkId).toBe(1);
     });
 
     it('should get native token balance with zero address', async () => {
       const adapter = new Ethers5Adapter(mockSigner);
-      
+
       const balance = await adapter.getBalance(ethers.constants.AddressZero);
-      
-      expect(mockProvider.getBalance).toHaveBeenCalledWith('0x742d35cc6488ad532a3b33a8b3c9f9b8eb8c5b3a');
+
+      expect(mockProvider.getBalance).toHaveBeenCalledWith(
+        '0x742d35cc6488ad532a3b33a8b3c9f9b8eb8c5b3a',
+      );
       expect(balance.networkId).toBe(1);
     });
 
     it('should get ERC-20 token balance', async () => {
       const { checkERC20Balance } = await import('../src/utils/gas-estimation');
       const adapter = new Ethers5Adapter(mockSigner);
-      
+
       const tokenAddress = '0xA0b86a33E6441d7B2c15e9A9d98b56e3F42E9b9B';
       const balance = await adapter.getBalance(tokenAddress);
-      
+
       expect(checkERC20Balance).toHaveBeenCalledWith(
         tokenAddress,
         '0x742d35cc6488ad532a3b33a8b3c9f9b8eb8c5b3a',
-        mockProvider
+        mockProvider,
       );
       expect(balance.networkId).toBe(1);
     });
@@ -227,9 +237,9 @@ describe('Ethers5Adapter', () => {
   describe('getConnectedNetworkId', () => {
     it('should return current network ID', async () => {
       const adapter = new Ethers5Adapter(mockProvider);
-      
+
       const networkId = await adapter.getConnectedNetworkId();
-      
+
       expect(networkId).toBe(1);
       expect(mockProvider.getNetwork).toHaveBeenCalled();
     });
@@ -242,9 +252,9 @@ describe('Ethers5Adapter', () => {
         request: vi.fn().mockResolvedValue(undefined),
       };
       const adapter = new Ethers5Adapter(web3Provider);
-      
+
       await adapter.switchNetwork(137);
-      
+
       expect(web3Provider.request).toHaveBeenCalledWith({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: '0x89' }], // 137 in hex
@@ -253,7 +263,7 @@ describe('Ethers5Adapter', () => {
 
     it('should throw error for providers without request method', async () => {
       const adapter = new Ethers5Adapter(mockProvider);
-      
+
       await expect(adapter.switchNetwork(137)).rejects.toThrow('Network switching not supported');
     });
   });
@@ -265,16 +275,16 @@ describe('Ethers5Adapter', () => {
   describe('signMessage', () => {
     it('should sign message', async () => {
       const adapter = new Ethers5Adapter(mockSigner);
-      
+
       const signature = await adapter.signMessage('Hello, Web3!');
-      
+
       expect(signature).toBe('0xmockedsignature');
       expect(mockSigner.signMessage).toHaveBeenCalledWith('Hello, Web3!');
     });
 
     it('should throw error when using provider without signer', async () => {
       const adapter = new Ethers5Adapter(mockProvider);
-      
+
       await expect(adapter.signMessage('Hello')).rejects.toThrow('No signer available');
     });
   });
@@ -287,9 +297,9 @@ describe('Ethers5Adapter', () => {
     it('should wrap user rejection errors', async () => {
       const rejectionError = { code: 4001, message: 'User denied transaction signature' };
       mockSigner.sendTransaction.mockRejectedValue(rejectionError);
-      
+
       const adapter = new Ethers5Adapter(mockSigner);
-      
+
       try {
         await adapter.sendTransaction({ to: '0x1234567890123456789012345678901234567890' });
       } catch (error: any) {
@@ -301,9 +311,9 @@ describe('Ethers5Adapter', () => {
     it('should wrap insufficient funds errors', async () => {
       const fundsError = { message: 'insufficient funds for gas' };
       mockSigner.sendTransaction.mockRejectedValue(fundsError);
-      
+
       const adapter = new Ethers5Adapter(mockSigner);
-      
+
       try {
         await adapter.sendTransaction({ to: '0x1234567890123456789012345678901234567890' });
       } catch (error: any) {
@@ -379,7 +389,7 @@ describe('isEthers5Compatible', () => {
       getBalance: vi.fn(),
       request: { constructor: { name: 'v6Provider' } },
     };
-    
+
     const result = isEthers5Compatible(v6LikeProvider);
     expect(result).toBe(false);
   });

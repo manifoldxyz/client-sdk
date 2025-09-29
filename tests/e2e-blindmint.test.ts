@@ -1,7 +1,7 @@
 // @ts-nocheck
 /**
  * End-to-End BlindMint Workflow Tests
- * 
+ *
  * Comprehensive testing of complete BlindMint workflows from client creation
  * to product interaction and purchase flow simulation.
  */
@@ -89,7 +89,7 @@ describe('End-to-End BlindMint Workflows', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     resetManifoldApiClient();
-    
+
     // Setup successful API responses
     const mockFetch = vi.mocked(fetch);
     mockFetch.mockResolvedValue({
@@ -107,15 +107,15 @@ describe('End-to-End BlindMint Workflows', () => {
         previewId: 'e2e-preview-1',
         url: 'https://example.com/preview1.png',
         title: 'Preview 1',
-        description: 'First preview image'
+        description: 'First preview image',
       },
       {
         instanceId: testInstanceId,
-        previewId: 'e2e-preview-2', 
+        previewId: 'e2e-preview-2',
         url: 'https://example.com/preview2.mp4',
         title: 'Preview 2',
-        description: 'Preview animation'
-      }
+        description: 'Preview animation',
+      },
     ]);
   });
 
@@ -127,7 +127,7 @@ describe('End-to-End BlindMint Workflows', () => {
     it('should successfully create client and fetch BlindMint product', async () => {
       const client = createClient({
         debug: true,
-        environment: 'test'
+        environment: 'test',
       });
 
       const product = await client.getProduct(testInstanceId);
@@ -153,7 +153,7 @@ describe('End-to-End BlindMint Workflows', () => {
     it('should handle complete minting workflow preparation', async () => {
       const client = createClient({
         debug: true,
-        environment: 'test'
+        environment: 'test',
       });
 
       const product = await client.getProduct(testInstanceId);
@@ -174,11 +174,11 @@ describe('End-to-End BlindMint Workflows', () => {
 
       const client = createClient({
         debug: true,
-        environment: 'test'
+        environment: 'test',
       });
 
       const product = await client.getProduct(testInstanceId);
-      
+
       // Should fallback to mock product
       expect(product).toBeDefined();
       expect(product.id).toBe(testInstanceId);
@@ -188,7 +188,7 @@ describe('End-to-End BlindMint Workflows', () => {
     it('should handle invalid instance IDs appropriately', async () => {
       const client = createClient({
         debug: true,
-        environment: 'test'
+        environment: 'test',
       });
 
       await expect(client.getProduct('invalid-id')).rejects.toThrow();
@@ -199,23 +199,23 @@ describe('End-to-End BlindMint Workflows', () => {
     it('should handle network switching scenarios', async () => {
       const client = createClient({
         debug: true,
-        environment: 'test'
+        environment: 'test',
       });
 
       // Test with different network configurations
       const testCases = [
         { networkId: 1, name: 'Ethereum' },
-        { networkId: 137, name: 'Polygon' }, 
-        { networkId: 8453, name: 'Base' }
+        { networkId: 137, name: 'Polygon' },
+        { networkId: 8453, name: 'Base' },
       ];
 
       for (const testCase of testCases) {
-          const networkSpecificData = {
-            ...testInstanceData,
-            publicData: {
-              ...testInstanceData.publicData,
-              network: testCase.networkId
-            }
+        const networkSpecificData = {
+          ...testInstanceData,
+          publicData: {
+            ...testInstanceData.publicData,
+            network: testCase.networkId,
+          },
         };
 
         const mockFetch = vi.mocked(fetch);
@@ -241,7 +241,7 @@ describe('End-to-End BlindMint Workflows', () => {
             ...testInstanceData.publicData.price!,
             value: '1000000000000000000',
           },
-        }
+        },
       };
 
       const mockFetch = vi.mocked(fetch);
@@ -253,7 +253,7 @@ describe('End-to-End BlindMint Workflows', () => {
 
       const client = createClient({
         debug: true,
-        environment: 'test'
+        environment: 'test',
       });
 
       const product = await client.getProduct(testInstanceId);
@@ -274,7 +274,7 @@ describe('End-to-End BlindMint Workflows', () => {
             decimals: 6,
             erc20: '0xA0b86a33E6417aF4E73D4F3C9c77A9b7D1B9A4C2',
           },
-        }
+        },
       };
 
       const mockFetch = vi.mocked(fetch);
@@ -286,24 +286,26 @@ describe('End-to-End BlindMint Workflows', () => {
 
       const client = createClient({
         debug: true,
-        environment: 'test'
+        environment: 'test',
       });
 
       const product = await client.getProduct(testInstanceId);
-      
+
       expect(product.data.publicData.price?.currency).toBe('USDC');
-      expect(product.data.publicData.price?.erc20).not.toBe('0x0000000000000000000000000000000000000000');
+      expect(product.data.publicData.price?.erc20).not.toBe(
+        '0x0000000000000000000000000000000000000000',
+      );
       expect(product.data.publicData.price?.value).toBe('100000000');
     });
 
     it('should handle batch minting scenarios', async () => {
       const client = createClient({
         debug: true,
-        environment: 'test'
+        environment: 'test',
       });
 
       const product = await client.getProduct(testInstanceId);
-      
+
       // Test multiple quantity minting setup by ensuring preparePurchase is callable
       const batchQuantities = [1, 5, 10];
 
@@ -318,11 +320,11 @@ describe('End-to-End BlindMint Workflows', () => {
     it('should efficiently cache and reuse instance data', async () => {
       const client = createClient({
         debug: true,
-        environment: 'test'
+        environment: 'test',
       });
 
       const mockFetch = vi.mocked(fetch);
-      
+
       // First call should hit the API
       await client.getProduct(testInstanceId);
       expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -339,20 +341,20 @@ describe('End-to-End BlindMint Workflows', () => {
     it('should handle concurrent requests efficiently', async () => {
       const client = createClient({
         debug: true,
-        environment: 'test'
+        environment: 'test',
       });
 
       // Make multiple concurrent requests
       const promises = [
         client.getProduct(testInstanceId),
         client.getProduct(testInstanceId),
-        client.getProduct(testInstanceId)
+        client.getProduct(testInstanceId),
       ];
 
       const results = await Promise.all(promises);
 
       // All should resolve successfully
-      results.forEach(product => {
+      results.forEach((product) => {
         expect(product).toBeDefined();
         expect(product.id).toBe(testInstanceId);
         expect(product.type).toBe('blind-mint');
@@ -367,7 +369,7 @@ describe('End-to-End BlindMint Workflows', () => {
     it('should validate all critical addresses', async () => {
       const client = createClient({
         debug: true,
-        environment: 'test'
+        environment: 'test',
       });
 
       const product = await client.getProduct(testInstanceId);
@@ -378,8 +380,8 @@ describe('End-to-End BlindMint Workflows', () => {
 
       // Validate contract address format
       expect(product.data.publicData.contract.contractAddress).toMatch(/^0x[a-fA-F0-9]{40}$/);
-      
-      // Validate creator address format  
+
+      // Validate creator address format
       expect(product.data.creator.address).toMatch(/^0x[a-fA-F0-9]{40}$/);
 
       // Validate ERC20 address format
@@ -389,7 +391,7 @@ describe('End-to-End BlindMint Workflows', () => {
     it('should handle malicious input safely', async () => {
       const client = createClient({
         debug: true,
-        environment: 'test'
+        environment: 'test',
       });
 
       const maliciousInputs = [
@@ -398,7 +400,7 @@ describe('End-to-End BlindMint Workflows', () => {
         'javascript:alert(1)',
         '0x' + 'f'.repeat(100), // Too long address
         null,
-        undefined
+        undefined,
       ];
 
       for (const maliciousInput of maliciousInputs) {
@@ -409,11 +411,13 @@ describe('End-to-End BlindMint Workflows', () => {
     it('should not leak sensitive information in errors', async () => {
       const mockFetch = vi.mocked(fetch);
       mockFetch.mockClear();
-      mockFetch.mockRejectedValue(new Error('Internal server error with sensitive data: API_KEY_12345'));
+      mockFetch.mockRejectedValue(
+        new Error('Internal server error with sensitive data: API_KEY_12345'),
+      );
 
       const client = createClient({
         debug: false, // Production mode
-        environment: 'production'
+        environment: 'production',
       });
 
       try {

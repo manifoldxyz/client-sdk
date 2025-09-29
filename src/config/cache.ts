@@ -3,9 +3,11 @@ import type { CacheConfig } from '../types/config';
 /**
  * Simple cache configuration
  */
-export function createCacheConfig(options: {
-  environment?: 'development' | 'production' | 'test';
-} = {}): CacheConfig {
+export function createCacheConfig(
+  options: {
+    environment?: 'development' | 'production' | 'test';
+  } = {},
+): CacheConfig {
   const { environment = 'production' } = options;
 
   return {

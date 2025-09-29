@@ -1,8 +1,15 @@
 // @ts-nocheck
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createManifoldApiClient, getManifoldApiClient, resetManifoldApiClient } from '../src/api/manifold-api';
+import {
+  createManifoldApiClient,
+  getManifoldApiClient,
+  resetManifoldApiClient,
+} from '../src/api/manifold-api';
 import { StudioAppsClient } from '../src/stubs/studio-apps-client';
-import { createManifoldProvider, ManifoldBridgeProvider } from '../src/stubs/manifold-provider-client';
+import {
+  createManifoldProvider,
+  ManifoldBridgeProvider,
+} from '../src/stubs/manifold-provider-client';
 import { createClient } from '../src/client';
 import { createApiConfig, TEST_API_CONFIG } from '../src/config/api';
 import { ClientSDKError, ErrorCode } from '../src/types/errors';
@@ -30,14 +37,14 @@ vi.mock('@manifoldxyz/manifold-provider-client', () => ({
 
 describe('API Integration Tests', () => {
   const mockInstanceId = 123456789; // Use numeric format as expected by validateInstanceId
-  
+
   // Setup clean environment for each test
   beforeEach(async () => {
     // Clear all mocks
     vi.clearAllMocks();
     // Reset any singleton instances
     resetManifoldApiClient();
-    
+
     // Setup default Studio Apps mock response
     const { getAllPreviews } = await import('@manifoldxyz/studio-app-sdk');
     const mockGetAllPreviews = vi.mocked(getAllPreviews);
@@ -45,8 +52,8 @@ describe('API Integration Tests', () => {
       {
         instanceId: String(mockInstanceId), // Convert to string for preview API
         previewId: '123456789-preview',
-        url: 'https://example.com/preview.png'
-      }
+        url: 'https://example.com/preview.png',
+      },
     ]);
   });
 
@@ -101,7 +108,7 @@ describe('API Integration Tests', () => {
   describe('Manifold API Client', () => {
     it('should create API client with proper configuration', () => {
       const client = createManifoldApiClient();
-      
+
       expect(client).toBeDefined();
       expect(typeof client.getCompleteInstanceData).toBe('function');
     });
@@ -115,19 +122,19 @@ describe('API Integration Tests', () => {
       } as Response);
 
       const client = createManifoldApiClient();
-      
+
       const result = await client.getCompleteInstanceData(mockInstanceId);
-      
+
       expect(result.instanceData).toBeDefined();
       expect(mockFetch).toHaveBeenCalledWith(
         `https://apps.api.manifoldxyz.dev/public/instance/data?id=${String(mockInstanceId)}`,
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
-            'Accept': 'application/json',
+            Accept: 'application/json',
             'Content-Type': 'application/json',
           }),
-        })
+        }),
       );
     });
 
@@ -141,20 +148,20 @@ describe('API Integration Tests', () => {
       } as Response);
 
       const client = createManifoldApiClient();
-      
+
       // Single call that should throw the correct error
       await expect(client.getCompleteInstanceData(mockInstanceId)).rejects.toThrow(
-        'API resource not found'
+        'API resource not found',
       );
     }, 10000); // Increase timeout to 10 seconds
 
     it('should retry failed requests with exponential backoff', async () => {
       const mockFetch = vi.mocked(fetch);
-      
+
       // First two attempts fail with network error
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
-      
+
       // Third attempt succeeds
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -163,9 +170,9 @@ describe('API Integration Tests', () => {
       } as Response);
 
       const client = createManifoldApiClient();
-      
+
       const result = await client.getCompleteInstanceData(mockInstanceId);
-      
+
       expect(result.instanceData).toBeDefined();
       expect(mockFetch).toHaveBeenCalledTimes(3);
     });
@@ -179,9 +186,9 @@ describe('API Integration Tests', () => {
       } as Response);
 
       const client = createManifoldApiClient();
-      
+
       await expect(client.getCompleteInstanceData(mockInstanceId)).rejects.toThrow(
-        'Invalid instance data: missing or invalid id'
+        'Invalid instance data: missing or invalid id',
       );
     });
 
@@ -189,7 +196,7 @@ describe('API Integration Tests', () => {
       const config = createApiConfig({ environment: 'test' });
       const client1 = getManifoldApiClient(config, true);
       const client2 = getManifoldApiClient(config, true);
-      
+
       expect(client1).toBe(client2);
     });
   });
@@ -200,7 +207,7 @@ describe('API Integration Tests', () => {
         debug: true,
         timeout: 5000,
       });
-      
+
       expect(client).toBeDefined();
       expect(typeof client.getPreviewData).toBe('function');
     });
@@ -208,7 +215,7 @@ describe('API Integration Tests', () => {
     it('should fetch and filter preview data by instanceId', async () => {
       const { getAllPreviews } = await import('@manifoldxyz/studio-app-sdk');
       const mockGetAllPreviews = vi.mocked(getAllPreviews);
-      
+
       // Mock getAllPreviews to return an array with our test data
       mockGetAllPreviews.mockResolvedValueOnce([
         { id: 'other-instance', title: 'Other Instance' },
@@ -218,51 +225,51 @@ describe('API Integration Tests', () => {
 
       const client = new StudioAppsClient({ debug: true });
       const result = await client.getPreviewData(String(mockInstanceId));
-      
-      expect(result).toEqual(expect.objectContaining({
-        title: mockPreviewData.title,
-        description: mockPreviewData.description,
-        images: mockPreviewData.images,
-        animations: mockPreviewData.animations,
-      }));
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          title: mockPreviewData.title,
+          description: mockPreviewData.description,
+          images: mockPreviewData.images,
+          animations: mockPreviewData.animations,
+        }),
+      );
       expect(mockGetAllPreviews).toHaveBeenCalledOnce();
     });
 
     it('should return null when no preview data found', async () => {
       const { getAllPreviews } = await import('@manifoldxyz/studio-app-sdk');
       const mockGetAllPreviews = vi.mocked(getAllPreviews);
-      
-      mockGetAllPreviews.mockResolvedValueOnce([
-        { id: 'other-instance', title: 'Other Instance' },
-      ]);
+
+      mockGetAllPreviews.mockResolvedValueOnce([{ id: 'other-instance', title: 'Other Instance' }]);
 
       const client = new StudioAppsClient({ debug: true });
       const result = await client.getPreviewData(String(mockInstanceId));
-      
+
       expect(result).toBeNull();
     });
 
     it('should handle invalid responses from getAllPreviews', async () => {
       const { getAllPreviews } = await import('@manifoldxyz/studio-app-sdk');
       const mockGetAllPreviews = vi.mocked(getAllPreviews);
-      
+
       mockGetAllPreviews.mockResolvedValueOnce('not an array' as any);
 
       const client = new StudioAppsClient({ debug: true });
-      
+
       await expect(client.getPreviewData(mockInstanceId)).rejects.toThrow(
-        'Invalid response from getAllPreviews: expected array'
+        'Invalid response from getAllPreviews: expected array',
       );
     });
 
     it('should validate instance ID input', async () => {
       const client = new StudioAppsClient({ debug: true });
-      
+
       await expect(client.getPreviewData('')).rejects.toThrow(
-        'Instance ID is required and must be a non-empty string'
+        'Instance ID is required and must be a non-empty string',
       );
       await expect(client.getPreviewData(null as any)).rejects.toThrow(
-        'Instance ID is required and must be a non-empty string'
+        'Instance ID is required and must be a non-empty string',
       );
     });
   });
@@ -271,7 +278,7 @@ describe('API Integration Tests', () => {
     it('should create Manifold provider with proper network configuration', () => {
       const networkId: NetworkId = 1;
       const provider = createManifoldProvider(networkId, { debug: true });
-      
+
       expect(provider).toBeDefined();
       expect(provider.isReady()).toBe(true);
       expect(typeof provider.request).toBe('function');
@@ -281,7 +288,7 @@ describe('API Integration Tests', () => {
       const networkId: NetworkId = 1;
       const provider = createManifoldProvider(networkId, { debug: true });
       const bridgeProvider = provider.getBridgeProvider();
-      
+
       expect(bridgeProvider).toBeDefined();
       expect(ManifoldBridgeProvider).toHaveBeenCalledWith(networkId);
     });
@@ -290,13 +297,13 @@ describe('API Integration Tests', () => {
       const networkId: NetworkId = 1;
       const provider = createManifoldProvider(networkId, { debug: true });
       const bridgeProvider = provider.getBridgeProvider();
-      
+
       const mockResult = { blockNumber: '0x123456' };
       const mockRequest = vi.fn().mockResolvedValueOnce(mockResult);
       bridgeProvider.request = mockRequest;
-      
+
       const result = await provider.request('eth_blockNumber', []);
-      
+
       expect(result).toEqual(mockResult);
       expect(mockRequest).toHaveBeenCalledWith({
         method: 'eth_blockNumber',
@@ -307,12 +314,12 @@ describe('API Integration Tests', () => {
     it('should validate RPC method and params', async () => {
       const networkId: NetworkId = 1;
       const provider = createManifoldProvider(networkId, { debug: true });
-      
+
       await expect(provider.request('', [])).rejects.toThrow(
-        'RPC method is required and must be a string'
+        'RPC method is required and must be a string',
       );
       await expect(provider.request('eth_blockNumber', 'not-array' as any)).rejects.toThrow(
-        'RPC params must be an array'
+        'RPC params must be an array',
       );
     });
 
@@ -320,12 +327,12 @@ describe('API Integration Tests', () => {
       const networkId: NetworkId = 1;
       const provider = createManifoldProvider(networkId, { debug: true });
       const bridgeProvider = provider.getBridgeProvider();
-      
+
       const mockRequest = vi.fn().mockRejectedValue(new Error('RPC error'));
       bridgeProvider.request = mockRequest;
-      
+
       await expect(provider.request('eth_blockNumber', [])).rejects.toThrow(
-        'RPC request failed for method eth_blockNumber'
+        'RPC request failed for method eth_blockNumber',
       );
     });
   });
@@ -343,27 +350,25 @@ describe('API Integration Tests', () => {
       // Mock the Studio Apps SDK
       const { getAllPreviews } = await import('@manifoldxyz/studio-app-sdk');
       const mockGetAllPreviews = vi.mocked(getAllPreviews);
-      mockGetAllPreviews.mockResolvedValueOnce([
-        { id: mockInstanceId, ...mockPreviewData },
-      ]);
+      mockGetAllPreviews.mockResolvedValueOnce([{ id: mockInstanceId, ...mockPreviewData }]);
 
       const client = createClient({
         debug: true,
         environment: 'test',
         includeOnchainData: false,
       });
-      
+
       const product = await client.getProduct(String(mockInstanceId));
-      
+
       expect(product).toBeDefined();
       expect(product.type).toBe('blind-mint');
       expect(product.id).toBe(mockInstanceId);
       expect(product.data.appName).toBe('BlindMint');
-      
+
       // Verify API was called
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining(`id=${String(mockInstanceId)}`),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
@@ -377,9 +382,9 @@ describe('API Integration Tests', () => {
         debug: true,
         environment: 'test',
       });
-      
+
       const product = await client.getProduct(String(mockInstanceId));
-      
+
       expect(product).toBeDefined();
       expect(product.type).toBe('edition'); // Mock product returns 'edition' type
       expect(product.id).toBe(mockInstanceId);
@@ -393,20 +398,18 @@ describe('API Integration Tests', () => {
         debug: false,
         environment: 'production',
       });
-      
+
       await expect(client.getProduct(mockInstanceId)).rejects.toThrow(
-        'Failed to fetch product data'
+        'Failed to fetch product data',
       );
     }, 15000); // Increase timeout for end-to-end test
 
     it('should handle invalid instance ID format', async () => {
       const client = createClient({ debug: true });
-      
-      await expect(client.getProduct('')).rejects.toThrow(
-        'Invalid instance ID format'
-      );
+
+      await expect(client.getProduct('')).rejects.toThrow('Invalid instance ID format');
       await expect(client.getProduct('invalid-format!')).rejects.toThrow(
-        'Invalid instance ID format'
+        'Invalid instance ID format',
       );
     });
 
@@ -420,14 +423,14 @@ describe('API Integration Tests', () => {
 
       const client = createClient({ debug: true, environment: 'test' });
       const manifestUrl = `https://manifold.xyz/@test-creator/id/${mockInstanceId}`;
-      
+
       const product = await client.getProduct(manifestUrl);
-      
+
       expect(product).toBeDefined();
       expect(product.id).toBe(mockInstanceId);
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining(`id=${String(mockInstanceId)}`),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
   });
@@ -453,12 +456,10 @@ describe('API Integration Tests', () => {
       const config = createApiConfig({ environment: 'test' });
       config.requests!.timeout = 100; // 100ms timeout
       config.requests!.maxRetries = 0; // No retries to speed up test
-      
+
       const client = createManifoldApiClient(config, true);
-      
-      await expect(client.getCompleteInstanceData(mockInstanceId)).rejects.toThrow(
-        ClientSDKError
-      );
+
+      await expect(client.getCompleteInstanceData(mockInstanceId)).rejects.toThrow(ClientSDKError);
     }, 10000);
 
     it('should handle rate limiting with proper error code', async () => {
@@ -470,8 +471,8 @@ describe('API Integration Tests', () => {
       } as Response);
 
       const client = createManifoldApiClient();
-      
-      const error = await client.getCompleteInstanceData(mockInstanceId).catch(e => e);
+
+      const error = await client.getCompleteInstanceData(mockInstanceId).catch((e) => e);
       expect(error).toBeInstanceOf(ClientSDKError);
       expect(error.code).toBe(ErrorCode.RATE_LIMITED);
     });
@@ -487,10 +488,8 @@ describe('API Integration Tests', () => {
       const config = createApiConfig({ environment: 'test' });
       config.requests!.maxRetries = 0; // No retries to speed up test
       const client = createManifoldApiClient(config, true);
-      
-      await expect(client.getCompleteInstanceData(mockInstanceId)).rejects.toThrow(
-        ClientSDKError
-      );
+
+      await expect(client.getCompleteInstanceData(mockInstanceId)).rejects.toThrow(ClientSDKError);
     }, 10000);
   });
 });

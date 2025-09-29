@@ -1,7 +1,14 @@
 import type { InstancePreview, PublicInstance } from '@manifoldxyz/studio-apps-client';
 import type { Address, AppId, AppType, ProductStatus } from './common';
 import type { Money } from '../libs/money';
-import type { PreparedPurchase, PurchaseParams, PreparePurchaseParams, Order } from './purchase';
+import type {
+  PreparedPurchase,
+  PurchaseParams,
+  PreparePurchaseParams,
+  Order,
+  EditionPayload,
+  BurnRedeemPayload,
+} from './purchase';
 import type { BlindMintProduct } from './blindmint';
 
 // Base Product type as per documentation (lines 1231-1238)
@@ -82,7 +89,7 @@ export interface EditionProduct extends BaseProduct<EditionPublicData> {
 
   // Methods
   getAllocations(params: AllocationParams): Promise<AllocationResponse>;
-  preparePurchase(params: PreparePurchaseParams<any>): Promise<PreparedPurchase>;
+  preparePurchase(params: PreparePurchaseParams<EditionPayload>): Promise<PreparedPurchase>;
   purchase(params: PurchaseParams): Promise<Order>;
   getStatus(): Promise<ProductStatus>;
   getPreviewMedia(): Promise<Media | undefined>;
@@ -101,7 +108,7 @@ export interface BurnRedeemProduct extends BaseProduct<BurnRedeemPublicData> {
 
   // Methods
   getAllocations(params: AllocationParams): Promise<AllocationResponse>;
-  preparePurchase(params: PreparePurchaseParams<any>): Promise<PreparedPurchase>;
+  preparePurchase(params: PreparePurchaseParams<BurnRedeemPayload>): Promise<PreparedPurchase>;
   purchase(params: PurchaseParams): Promise<Order>;
   getStatus(): Promise<ProductStatus>;
   getPreviewMedia(): Promise<Media | undefined>;
@@ -213,7 +220,7 @@ export type Product = EditionProduct | BurnRedeemProduct | BlindMintProduct;
 export type { BlindMintPublicData, BlindMintOnchainData, BlindMintProduct } from './blindmint';
 
 // PreviewData type (from InstancePreview)
-export type PreviewData = import('@manifoldxyz/studio-apps-client').InstancePreview;
+export type PreviewData = InstancePreview;
 
 // Re-export purchase-related types
 export type {
