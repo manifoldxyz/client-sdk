@@ -3,7 +3,6 @@ import type { Product, InstanceData, BlindMintPublicData } from '../types/produc
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import { AppId } from '../types/common';
 import { BlindMintProduct } from '../products/blindmint';
-import { createMockProduct } from '../products/mock';
 import { validateInstanceId, parseManifoldUrl } from '../utils/validation';
 import { createManifoldApiClient } from '../api/manifold-api';
 
@@ -41,7 +40,7 @@ export function createClient(config?: ClientConfig): ManifoldClient {
       }
 
       try {
-        console.log('grabbing instanceId', instanceId)
+        console.log('grabbing instanceId', instanceId);
         // Fetch both instance and preview data using Studio Apps Client
         const { instanceData, previewData } = await manifoldApi.getCompleteInstanceData(instanceId);
 
@@ -55,10 +54,13 @@ export function createClient(config?: ClientConfig): ManifoldClient {
           });
         }
 
-        // For now, fallback to mock for other product types
-        return createMockProduct(instanceId);
+        // For other product types, throw an error until implemented
+        throw new ClientSDKError(
+          ErrorCode.UNSUPPORTED_PRODUCT_TYPE,
+          `Product type ${instanceData.appId} is not yet supported`,
+        );
       } catch (error) {
-        console.log('error', error)
+        console.log('error', error);
         // Re-throw SDK errors
         if (error instanceof ClientSDKError) {
           throw error;
@@ -73,7 +75,7 @@ export function createClient(config?: ClientConfig): ManifoldClient {
     },
 
     async getProductsByWorkspace(
-      workspaceId: string,
+      _workspaceId: string,
       options?: WorkspaceProductsOptions,
     ): Promise<Product[]> {
       // Validate options
@@ -82,15 +84,10 @@ export function createClient(config?: ClientConfig): ManifoldClient {
       }
 
       // TODO: Implement with Studio Apps Client
-      // For now, return array of mock products
-      const limit = options?.limit ?? 10;
-      const products: Product[] = [];
-
-      for (let i = 0; i < limit; i++) {
-        products.push(createMockProduct(`${workspaceId}_${i}`));
-      }
-
-      return products;
+      throw new ClientSDKError(
+        ErrorCode.UNSUPPORTED_PRODUCT_TYPE,
+        'getProductsByWorkspace is not yet implemented',
+      );
     },
   };
 }

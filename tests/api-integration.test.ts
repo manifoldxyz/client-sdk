@@ -28,7 +28,7 @@ vi.mock('@manifoldxyz/manifold-provider-client', () => ({
 }));
 
 describe('API Integration Tests', () => {
-  const mockInstanceId = '123456789'; // Use numeric format as expected by validateInstanceId
+  const mockInstanceId = 123456789; // Use numeric format as expected by validateInstanceId
   
   // Setup clean environment for each test
   beforeEach(async () => {
@@ -42,7 +42,7 @@ describe('API Integration Tests', () => {
     const mockGetAllPreviews = vi.mocked(getAllPreviews);
     mockGetAllPreviews.mockResolvedValue([
       {
-        instanceId: mockInstanceId,
+        instanceId: String(mockInstanceId), // Convert to string for preview API
         previewId: '123456789-preview',
         url: 'https://example.com/preview.png'
       }
@@ -69,7 +69,7 @@ describe('API Integration Tests', () => {
       network: 1,
       thumbnail: 'https://example.com/thumbnail.jpg',
       mintPrice: {
-        value: 100000000000000000n, // 0.1 ETH in wei
+        value: '100000000000000000', // Use string instead of bigint to avoid serialization issues
         currency: 'ETH',
         erc20: '0x0000000000000000000000000000000000000000',
       },
@@ -119,7 +119,7 @@ describe('API Integration Tests', () => {
       
       expect(result.instanceData).toBeDefined();
       expect(mockFetch).toHaveBeenCalledWith(
-        `https://apps.api.manifoldxyz.dev/public/instance/data?id=${mockInstanceId}`,
+        `https://apps.api.manifoldxyz.dev/public/instance/data?id=${String(mockInstanceId)}`,
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
@@ -216,7 +216,7 @@ describe('API Integration Tests', () => {
       ]);
 
       const client = new StudioAppsClient({ debug: true });
-      const result = await client.getPreviewData(mockInstanceId);
+      const result = await client.getPreviewData(String(mockInstanceId));
       
       expect(result).toEqual(expect.objectContaining({
         title: mockPreviewData.title,
@@ -236,7 +236,7 @@ describe('API Integration Tests', () => {
       ]);
 
       const client = new StudioAppsClient({ debug: true });
-      const result = await client.getPreviewData(mockInstanceId);
+      const result = await client.getPreviewData(String(mockInstanceId));
       
       expect(result).toBeNull();
     });
@@ -352,7 +352,7 @@ describe('API Integration Tests', () => {
         includeOnchainData: false,
       });
       
-      const product = await client.getProduct(mockInstanceId);
+      const product = await client.getProduct(String(mockInstanceId));
       
       expect(product).toBeDefined();
       expect(product.type).toBe('blind-mint');
@@ -361,7 +361,7 @@ describe('API Integration Tests', () => {
       
       // Verify API was called
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining(`id=${mockInstanceId}`),
+        expect.stringContaining(`id=${String(mockInstanceId)}`),
         expect.any(Object)
       );
     });
@@ -377,7 +377,7 @@ describe('API Integration Tests', () => {
         environment: 'test',
       });
       
-      const product = await client.getProduct(mockInstanceId);
+      const product = await client.getProduct(String(mockInstanceId));
       
       expect(product).toBeDefined();
       expect(product.type).toBe('edition'); // Mock product returns 'edition' type
@@ -425,7 +425,7 @@ describe('API Integration Tests', () => {
       expect(product).toBeDefined();
       expect(product.id).toBe(mockInstanceId);
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining(`id=${mockInstanceId}`),
+        expect.stringContaining(`id=${String(mockInstanceId)}`),
         expect.any(Object)
       );
     });

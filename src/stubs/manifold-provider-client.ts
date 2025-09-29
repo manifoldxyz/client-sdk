@@ -12,6 +12,7 @@ export interface ManifoldProviderConfig {
   baseUrl?: string;
   timeout?: number;
   retries?: number;
+  debug?: boolean;
 }
 
 /**

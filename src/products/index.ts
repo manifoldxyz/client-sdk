@@ -6,9 +6,6 @@ export {
   isBlindMintProduct
 } from './blindmint';
 
-// Mock implementations for testing
-export { createMockProduct } from './mock';
-
 // Re-export product types
 export type {
   BlindMintProduct as BlindMintProductType,

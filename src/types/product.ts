@@ -1,5 +1,5 @@
 import type { InstancePreview, PublicInstance } from '@manifoldxyz/studio-apps-client';
-import type { Address, AppId, AppType, ProductStatus } from './common';
+import type { Address, AppId, AppType, ProductStatus, Money } from './common';
 import type { PreparedPurchase, PurchaseParams, PreparePurchaseParams, Order } from './purchase';
 import type { BlindMintProduct } from './blindmint';
 
@@ -122,7 +122,7 @@ export interface EditionOnchainData {
   startDate: Date;
   endDate: Date;
   audienceType: AudienceType;
-  cost: import('../libs/money').Money;
+  cost: Money;
   paymentReceiver: string;
 }
 
@@ -133,7 +133,7 @@ export interface BurnRedeemOnchainData {
   startDate: Date;
   endDate: Date;
   audienceType: AudienceType;
-  cost: import('../libs/money').Money;
+  cost: Money;
   paymentReceiver: string;
   burnSet: BurnSetData;
 }
@@ -158,30 +158,21 @@ export interface ProductRule {
   maxPerWallet?: number;
 }
 
-export interface Workspace {
-  id: string;
-  slug: string;
-  address: string;
-  name?: string;
-}
-
 export interface ProductProvenance {
-  creator: Workspace;
+  creator: Creator;
   contract?: Contract;
   token?: Token;
   networkId?: number;
 }
 
 export interface Token {
+  networkId: number;
   contract: Contract;
   tokenId: string;
   explorer: Explorer;
 }
 
-// Re-export Money class from libs/money.ts
-export { Money } from '../libs/money';
-// Export MoneyData type for interfaces that need the data structure
-export type { MoneyData } from './money';
+// Money type is now exported from common.ts to avoid circular dependencies
 
 // Parameter types
 export interface AllocationParams {

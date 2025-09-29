@@ -1189,17 +1189,17 @@ export function MultiAppPurchaseButton({
   | attributes  | object                                                                                                              | ❌       | Extra attributes (key/value) |
   | media       | [Media](https://www.notion.so/Manifold-Client-SDK-Complete-Developer-Guide-2676b055ee58800abc38ccd30cdfca70?pvs=21) | ❌       | Preview animation URL        |
 - ProductProvenance
-  | Field     | Type                                                                                                                    | Required | Description                                 |
-  | --------- | ----------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------- |
-  | creator   | [Workspace](https://www.notion.so/Manifold-Client-SDK-Complete-Developer-Guide-2676b055ee58800abc38ccd30cdfca70?pvs=21) | ✅       | Media url of the product                    |
-  | contract  | [Contract](https://www.notion.so/Manifold-Client-SDK-Complete-Developer-Guide-2676b055ee58800abc38ccd30cdfca70?pvs=21)  | ❌       | Link to the contract related to the product |
-  | token     | [Token](https://www.notion.so/Manifold-Client-SDK-Complete-Developer-Guide-2676b055ee58800abc38ccd30cdfca70?pvs=21)     | ❌       | Link to the token related to the product    |
-  | networkId | number                                                                                                                  | ❌       | Network ID of the product (if applicable)   |
+  | Field     | Type                                                                                                                   | Required | Description                                 |
+  | --------- | ---------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------- |
+  | creator   | [Creator](https://www.notion.so/Manifold-Client-SDK-Complete-Developer-Guide-2676b055ee58800abc38ccd30cdfca70?pvs=21)  | ✅       | Media url of the product                    |
+  | contract  | [Contract](https://www.notion.so/Manifold-Client-SDK-Complete-Developer-Guide-2676b055ee58800abc38ccd30cdfca70?pvs=21) | ❌       | Link to the contract related to the product |
+  | token     | [Token](https://www.notion.so/Manifold-Client-SDK-Complete-Developer-Guide-2676b055ee58800abc38ccd30cdfca70?pvs=21)    | ❌       | Link to the token related to the product    |
+  | networkId | number                                                                                                                 | ❌       | Network ID of the product (if applicable)   |
 - Inventory
-  | Field          | Type   | Required | Description                                     |
-  | -------------- | ------ | -------- | ----------------------------------------------- |
-  | totalSupply    | number | ✅       | Total product supply (-1 means infinite supply) |
-  | totalPurchased | number | ✅       | Total product purchased                         |
+  | Field          | Type   | Required | Description                                    |
+  | -------------- | ------ | -------- | ---------------------------------------------- |
+  | totalSupply    | number | ✅       | Total product supply (0 means infinite supply) |
+  | totalPurchased | number | ✅       | Total product purchased                        |
 - ProductRule
   | Field                   | Type   | Required | Description                                     |
   | ----------------------- | ------ | -------- | ----------------------------------------------- | ------ | ------------------ |
@@ -1212,7 +1212,7 @@ export function MultiAppPurchaseButton({
   | ------------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------- | --------------------------- |
   | items         | [TokenItemRequirement](https://www.notion.so/Manifold-Client-SDK-Complete-Developer-Guide-2676b055ee58800abc38ccd30cdfca70?pvs=21)[] | ✅       | List of eligible token sets |
   | requiredCount | number                                                                                                                               | ✅       | Number of tokens required   |
-- Workspace
+- Creator
   | Field   | Type   | Required | Description                                  |
   | ------- | ------ | -------- | -------------------------------------------- |
   | id      | string | ✅       | identifier of the workspace                  |
@@ -1299,6 +1299,7 @@ export function MultiAppPurchaseButton({
   | **cost**            | [Cost](https://www.notion.so/Manifold-Client-SDK-Complete-Developer-Guide-2676b055ee58800abc38ccd30cdfca70?pvs=21)              | ✅       | Purchase cost                                                          |
   | **transactionData** | [TransactionData](https://www.notion.so/Manifold-Client-SDK-Complete-Developer-Guide-2676b055ee58800abc38ccd30cdfca70?pvs=21)   | ✅       | Transaction to execute                                                 |
   | steps               | [TransactionStep](https://www.notion.so/Manifold-Client-SDK-Complete-Developer-Guide-2676b055ee58800abc38ccd30cdfca70?pvs=21)[] | ✅       | Manual steps that need to be executed in order (For manual executions) |
+  | gasEstimate         | [Money](https://www.notion.so/Manifold-Client-SDK-Complete-Developer-Guide-2676b055ee58800abc38ccd30cdfca70?pvs=21)ed           |          |                                                                        |
 - TransactionData
   | Field           | Type   | Required | Description            |
   | --------------- | ------ | -------- | ---------------------- |

@@ -4,9 +4,7 @@
  */
 
 // Re-export existing utilities
-export {
-  logger
-} from './logger';
+// Note: logger utility not yet implemented
 
 export {
   validateInstanceId,
@@ -17,12 +15,11 @@ export {
 
 // Provider utilities
 export {
-  createDualProvider
+  createProvider
 } from './provider-factory';
 
 export type {
-  ProviderFactoryOptions,
-  DualProvider
+  ProviderFactoryOptions
 } from './provider-factory';
 
 // Contract utilities
@@ -33,8 +30,6 @@ export {
   batchContractCalls,
   validateContract,
   parseContractEvents,
-  createMockContract,
-  createTestContractFactory,
   BLINDMINT_CLAIM_ABI,
   CREATOR_CONTRACT_ABI,
   ERC20_ABI

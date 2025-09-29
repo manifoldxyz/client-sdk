@@ -1,5 +1,4 @@
-import type { Address, Cost, NetworkId } from './common';
-import type { Money } from './product';
+import type { Address, Cost, NetworkId, Money } from './common';
 
 export interface PreparePurchaseParams<T> {
   address: Address;
@@ -16,11 +15,14 @@ export interface GasBuffer {
 
 export interface EditionPayload {
   quantity: number;
-  code?: string;
+  redemptionCode?: string;
 }
 
 export interface BurnRedeemPayload {
-  burnTokenIds: string[];
+  tokens?: Array<{
+    contract: { networkId: number; address: string; spec: 'erc721' | 'erc1155' };
+    tokenId: string;
+  }>;
 }
 
 export interface BlindMintPayload {
@@ -28,37 +30,25 @@ export interface BlindMintPayload {
 }
 
 export interface PreparedPurchase {
-  cost: EnhancedCost;
+  cost: Cost;
+  transactionData: TransactionData;
   steps: TransactionStep[];
-  isEligible: boolean;
-  reason?: string;
+  gasEstimate: Money;
 }
 
-export interface EnhancedCost {
-  // Total tokens the user needs to have
-  total: {
-    native?: Money; // Native tokens needed (if any)
-    erc20s: Money[]; // Array of ERC20 tokens needed (can be multiple different tokens)
-  };
-
-  // Breakdown by purpose (for transparency)
-  breakdown: {
-    product: Money; // Product cost (could be native or ERC20)
-    platformFee: Money; // Platform fee (could be native or ERC20)
-  };
+export interface TransactionData {
+  contractAddress: string;
+  transactionData: string;
+  gasEstimate: bigint;
+  networkId: number;
 }
+
+
 
 export interface TransactionStep {
   id: string;
   name: string;
-  type: 'mint' | 'approval' | 'burn' | 'transfer';
-
-  // What tokens are consumed by this step
-  cost?: {
-    native?: Money; // Native tokens consumed
-    erc20s?: Money[]; // Array of ERC20 tokens consumed
-  };
-
+  type: 'mint' | 'approve';
   execute?: (account: any) => Promise<TransactionReceipt>;
   description?: string;
 }
@@ -74,21 +64,30 @@ export interface WalletAccount {
 }
 
 export interface Order {
-  id?: string;
-  status: OrderStatus;
   receipts: TransactionReceipt[];
-  createdAt?: Date;
-  completedAt?: Date;
-  buyer?: { walletAddress: string };
-  total?: any;
-  items?: any[];
+  status: OrderStatus;
+  buyer: { walletAddress: string };
+  total: Cost;
+  items?: OrderItem[];
 }
 
-export type OrderStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'confirmed';
+export interface OrderItem {
+  status: OrderStatus;
+  total: Cost;
+  token?: {
+    contract: { networkId: number; address: string; spec: 'erc721' | 'erc1155' };
+    tokenId: string;
+    explorer: { etherscanUrl: string; manifoldUrl?: string; openseaUrl?: string };
+  };
+}
+
+export type OrderStatus = 'pending' | 'confirmed' | 'cancelled' | 'failed' | 'completed';
 
 export interface TransactionReceipt {
+  networkId: number;
+  step: string;
   txHash: string;
-  blockNumber: number;
-  gasUsed: bigint;
-  status: 'success' | 'failed';
+  blockNumber?: number;
+  gasUsed?: bigint;
+  status?: string;
 }

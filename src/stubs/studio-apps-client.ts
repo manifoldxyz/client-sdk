@@ -12,6 +12,7 @@ export interface StudioAppsConfig {
   apiKey?: string;
   baseUrl?: string;
   timeout?: number;
+  debug?: boolean;
 }
 
 /**

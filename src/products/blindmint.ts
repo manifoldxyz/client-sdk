@@ -7,10 +7,6 @@ import type {
   GachaConfig,
   GachaTier,
   ClaimableToken,
-  MintValidationParams,
-  MintValidation,
-  ValidationError,
-  ValidationWarning,
   FloorPriceData,
   MintHistoryItem,
   BlindMintTierProbability,
@@ -33,7 +29,6 @@ import type {
   BlindMintPayload,
   PreparedPurchase,
   TransactionStep,
-  EnhancedCost,
   TransactionReceipt,
   GasBuffer,
 } from '../types/purchase';
@@ -49,8 +44,7 @@ import { ClientSDKError, ErrorCode } from '../types/errors';
 import { BlindMintError, BlindMintErrorCode } from '../types/enhanced-errors';
 import type { InstancePreview } from '@manifoldxyz/studio-apps-client';
 import { estimateGas, checkERC20Balance, checkERC20Allowance } from '../utils/gas-estimation';
-import { Money } from '../libs/money';
-import { getNativeCurrencySymbol } from '../api/coinbase';
+import { Money, Cost } from '../libs/money';
 
 /**
  * BlindMintProduct implementation following technical spec CON-2729
@@ -98,7 +92,7 @@ export class BlindMintProduct implements IBlindMintProduct {
 
     this.id = instanceData.id;
 
-    this._creatorContract = publicData.contract.contractAddress as Address;
+    this._creatorContract = publicData.contract.contractAddress;
     this._extensionAddress = publicData.extensionAddress1155.value;
   }
 
@@ -184,8 +178,8 @@ export class BlindMintProduct implements IBlindMintProduct {
     const erc20 = claimData.erc20;
 
     // Convert dates from unix seconds
-    const convertDate = (unixSeconds: number) => {
-      return unixSeconds === 0 ? 0 : new Date(unixSeconds * 1000);
+    const convertDate = (unixSeconds: number): Date => {
+      return unixSeconds === 0 ? new Date(0) : new Date(unixSeconds * 1000);
     };
 
     const networkId = this.data.publicData.network;
@@ -211,7 +205,7 @@ export class BlindMintProduct implements IBlindMintProduct {
       endDate: convertDate(claimData.endDate || 0),
       audienceType: 'None', // Will be updated based on merkle root if needed
       cost: costMoney,
-      paymentReceiver: claimData.paymentReceiver as Address,
+      paymentReceiver: claimData.paymentReceiver,
       tokenVariations: claimData.tokenVariations || 0,
       startingTokenId: claimData.startingTokenId ? claimData.startingTokenId.toString() : '0',
     };
@@ -466,8 +460,8 @@ export class BlindMintProduct implements IBlindMintProduct {
       },
     });
 
-    // Build EnhancedCost structure (reuse the already computed values)
-    const cost: EnhancedCost = {
+    // Build Cost structure (reuse the already computed values)
+    const cost: Cost = {
       total: {
         ...(nativeCost && { native: nativeCost }),
         erc20s: erc20Costs,
@@ -686,64 +680,6 @@ export class BlindMintProduct implements IBlindMintProduct {
     );
 
     return BigInt(gasEstimate.toString());
-  }
-
-  async validateMint(params: MintValidationParams): Promise<MintValidation> {
-    const { walletAddress, quantity } = params;
-    const errors: ValidationError[] = [];
-    const warnings: ValidationWarning[] = [];
-
-    // Validate address
-    if (!validateAddress(walletAddress)) {
-      errors.push({
-        code: 'INVALID_ADDRESS',
-        message: 'Invalid wallet address',
-        field: 'walletAddress',
-      });
-    }
-
-    // Check allocations
-    const allocations = await this.getAllocations({ recipientAddress: walletAddress });
-    if (!allocations.isEligible) {
-      errors.push({
-        code: 'NOT_ELIGIBLE',
-        message: allocations.reason || 'Not eligible to mint',
-      });
-    }
-
-    if (quantity > allocations.quantity) {
-      errors.push({
-        code: 'EXCEEDS_LIMIT',
-        message: `Quantity ${quantity} exceeds available ${allocations.quantity}`,
-        field: 'quantity',
-      });
-    }
-
-    // Estimate costs
-    const onchainData = await this.fetchOnchainData();
-    const estimatedGas = await this.estimateMintGas(quantity, walletAddress);
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      warnings,
-      estimatedGas,
-      estimatedCost: {
-        total: onchainData.cost,
-        subtotal: onchainData.cost,
-        fees: this._platformFee
-          ? this._platformFee.multiplyInt(quantity)
-          : Money.fromData({
-              value: ethers.BigNumber.from(0),
-              decimals: 18,
-              erc20: ethers.constants.AddressZero,
-              symbol: getNativeCurrencySymbol(this.data.publicData.network),
-              networkId: this.data.publicData.network,
-              formattedUSD: undefined,
-              formatted: '0.0', // fromData requires formatted field
-            }),
-      },
-    };
   }
 
   async getFloorPrices(): Promise<FloorPriceData[]> {

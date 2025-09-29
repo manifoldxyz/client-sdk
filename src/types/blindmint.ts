@@ -1,10 +1,9 @@
 import type { PublicInstance } from '@manifoldxyz/studio-apps-client';
-import type { Address, Cost, ProductStatus, AppType } from './common';
+import type { Address, ProductStatus, AppType } from './common';
 import type {
   BaseProduct,
   Asset,
   Media,
-  Contract,
   AllocationParams,
   AllocationResponse,
   PreparePurchaseParams,
@@ -16,8 +15,9 @@ import type {
   ProductProvenance,
   ProductInventory,
 } from './product';
-import type { Money } from '../libs/money';
 import type { ethers } from 'ethers';
+import type { Money } from '../libs/money';
+import type { Cost } from './money';
 
 // =============================================================================
 // CORE BLINDMINT INTERFACES
@@ -199,7 +199,6 @@ export interface BlindMintProduct extends BaseProduct<BlindMintPublicData> {
   getTierProbabilities(): Promise<GachaTier[]>;
   getClaimableTokens(walletAddress: Address): Promise<ClaimableToken[]>;
   estimateMintGas(quantity: number, walletAddress: Address): Promise<bigint>;
-  validateMint(params: MintValidationParams): Promise<MintValidation>;
   getFloorPrices(): Promise<FloorPriceData[]>;
   getMintHistory(walletAddress?: Address): Promise<MintHistoryItem[]>;
 }

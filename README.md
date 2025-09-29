@@ -275,6 +275,3 @@ MIT © Manifold
 - [Documentation](https://docs.manifold.xyz/)
 - [GitHub](https://github.com/manifoldxyz/client-sdk)
 
----
-
-> This is version 1 of the SDK with mock implementations. Real API integrations will be added in subsequent releases.

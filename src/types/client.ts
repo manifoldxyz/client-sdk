@@ -3,6 +3,8 @@ import type { Product } from './product';
 
 export interface ClientConfig {
   httpRPCs?: HttpRPCs;
+  debug?: boolean;
+  environment?: string;
 }
 
 export interface ManifoldClient {

@@ -1,4 +1,5 @@
-import type { BigNumber, ContractTransaction, ContractReceipt } from 'ethers';
+import { BigNumber } from 'ethers';
+import type { ContractTransaction, ContractReceipt } from 'ethers';
 import type { Address, NetworkId } from './common';
 
 // =============================================================================
@@ -450,27 +451,4 @@ export const STORAGE_PROTOCOLS = {
   3: 'http'
 } as const;
 
-/** Default gas configurations by network */
-export const DEFAULT_GAS_CONFIGS: Record<NetworkId, GasConfig> = {
-  1: { // Ethereum Mainnet
-    baseMintGas: 200000,
-    bufferPercentage: 0.25,
-    maxGasLimit: BigNumber.from('500000'),
-    minGasLimit: BigNumber.from('21000'),
-    estimationTimeout: 1500
-  },
-  137: { // Polygon
-    baseMintGas: 150000,
-    bufferPercentage: 0.25,
-    maxGasLimit: BigNumber.from('400000'),
-    minGasLimit: BigNumber.from('21000'),
-    estimationTimeout: 1500
-  },
-  10: { // Optimism
-    baseMintGas: 120000,
-    bufferPercentage: 0.20,
-    maxGasLimit: BigNumber.from('300000'),
-    minGasLimit: BigNumber.from('21000'),
-    estimationTimeout: 1500
-  }
-};
+// Note: Gas configurations moved to config.ts for centralized management
