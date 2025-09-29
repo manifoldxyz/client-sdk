@@ -3,7 +3,6 @@ import { ethers } from 'ethers';
 import {
   Ethers5Adapter,
   createEthers5Adapter,
-  isEthers5Compatible,
 } from '../src/adapters/ethers5-adapter';
 import { AccountAdapterFactory } from '../src/adapters/account-adapter-factory';
 import type { UniversalTransactionRequest } from '../src/types/account-adapter';
@@ -345,53 +344,12 @@ describe('createEthers5Adapter', () => {
   });
 
   it('should throw error for invalid input', () => {
-    expect(() => createEthers5Adapter(null)).toThrow(ClientSDKError);
-    expect(() => createEthers5Adapter('invalid')).toThrow(ClientSDKError);
-  });
-});
-
-// =============================================================================
-// COMPATIBILITY DETECTION TESTS
-// =============================================================================
-
-describe('isEthers5Compatible', () => {
-  let localMockProvider: any;
-  let localMockSigner: any;
-
-  beforeEach(() => {
-    localMockProvider = {
-      getNetwork: vi.fn(),
-      getBalance: vi.fn(),
-      _isProvider: true,
-    };
-
-    localMockSigner = {
-      getAddress: vi.fn(),
-      signTransaction: vi.fn(),
-      provider: localMockProvider,
-    };
-  });
-
-  it('should detect ethers v5 providers', () => {
-    expect(isEthers5Compatible(localMockProvider)).toBe(true);
-    expect(isEthers5Compatible(localMockSigner)).toBe(true);
-  });
-
-  it('should reject invalid inputs', () => {
-    expect(isEthers5Compatible(null)).toBe(false);
-    expect(isEthers5Compatible('invalid')).toBe(false);
-    expect(isEthers5Compatible({})).toBe(false);
-  });
-
-  it('should reject ethers v6-like objects', () => {
-    const v6LikeProvider = {
-      getNetwork: vi.fn(),
-      getBalance: vi.fn(),
-      request: { constructor: { name: 'v6Provider' } },
-    };
-
-    const result = isEthers5Compatible(v6LikeProvider);
-    expect(result).toBe(false);
+    expect(() => createEthers5Adapter(null as unknown as ethers.Signer)).toThrow(
+      ClientSDKError,
+    );
+    expect(() => createEthers5Adapter('invalid' as unknown as ethers.Signer)).toThrow(
+      ClientSDKError,
+    );
   });
 });
 

@@ -11,7 +11,6 @@ export type {
   BlindMintStatus,
   BlindMintInventory,
   TokenVariation,
-  GachaConfig,
   GachaTier,
   ClaimableToken,
   MintValidationParams,
