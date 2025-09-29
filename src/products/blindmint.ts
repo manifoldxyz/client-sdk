@@ -33,7 +33,6 @@ import type {
   BlindMintPayload,
   PreparedPurchase,
   TransactionStep,
-  TransactionReceipt,
   GasBuffer,
 } from '../types/purchase';
 import type { Address } from '../types/common';
@@ -272,41 +271,10 @@ export class BlindMintProduct implements IBlindMintProduct {
   async preparePurchase(
     params: PreparePurchaseParams<BlindMintPayload>,
   ): Promise<PreparedPurchase> {
-    const { address, accountAdapter, payload } = params;
+    const { address, payload } = params;
     const quantity = payload?.quantity || 1;
     const networkId = this.data.publicData.network;
-
-    // Support both legacy address and new accountAdapter patterns
-    let walletAddress: string;
-    let adapter: IAccountAdapter | undefined;
-
-    if (accountAdapter) {
-      walletAddress = accountAdapter.address;
-      adapter = accountAdapter;
-      
-      // Verify adapter is connected to correct network
-      const adapterNetworkId = await adapter.getConnectedNetworkId();
-      if (adapterNetworkId !== networkId) {
-        throw new BlindMintError(
-          BlindMintErrorCode.NETWORK_MISMATCH,
-          `Wallet connected to network ${adapterNetworkId}, but product requires network ${networkId}`,
-          { 
-            expectedNetworkId: networkId, 
-            actualNetworkId: adapterNetworkId,
-            instanceId: String(this.id)
-          }
-        );
-      }
-    } else if (address) {
-      walletAddress = address;
-      // Legacy mode - no adapter available
-    } else {
-      throw new BlindMintError(
-        BlindMintErrorCode.INVALID_WALLET_ADDRESS,
-        'Either address or accountAdapter must be provided',
-        { instanceId: String(this.id) }
-      );
-    }
+    const walletAddress = address;
 
     if (!validateAddress(walletAddress)) {
       throw new BlindMintError(BlindMintErrorCode.INVALID_WALLET_ADDRESS, 'Invalid wallet address', {
@@ -377,14 +345,8 @@ export class BlindMintProduct implements IBlindMintProduct {
     // Check balances and create approvals for each token type
     for (const [tokenAddress, totalCost] of Array.from(costsByToken)) {
       if (totalCost.isERC20()) {
-        // Check ERC20 balance using adapter if available, fallback to provider
-        let balance: ethers.BigNumber;
-        if (adapter) {
-          const adapterBalance = await adapter.getBalance(tokenAddress);
-          balance = ethers.BigNumber.from(adapterBalance.raw.toString());
-        } else {
-          balance = await checkERC20Balance(tokenAddress, walletAddress, provider);
-        }
+        // Check ERC20 balance using provider
+        const balance = await checkERC20Balance(tokenAddress, walletAddress, provider);
         
         if (balance.lt(totalCost.raw)) {
           throw new ClientSDKError(
@@ -407,35 +369,7 @@ export class BlindMintProduct implements IBlindMintProduct {
             name: `Approve ${totalCost.symbol} Spending`,
             type: 'approve',
             description: `Approve ${totalCost.formatted} ${totalCost.symbol}`,
-            // Legacy execute for backward compatibility
-            execute: async (account: ethers.Signer) => {
-              const gasBuffer = params.gasBuffer || {};
-              const erc20Contract = new ethers.Contract(
-                tokenAddress,
-                ['function approve(address,uint256)'],
-                account,
-              );
-              const gasEstimate = await erc20Contract.estimateGas.approve!(
-                this._extensionAddress,
-                totalCost.raw,
-              );
-              const gasLimit = this._applyGasBuffer(gasEstimate, gasBuffer);
-              const tx = (await erc20Contract.approve(this._extensionAddress, totalCost.raw, {
-                gasLimit,
-              })) as ethers.ContractTransaction;
-              const receipt = await tx.wait();
-              return {
-                txHash: receipt.transactionHash,
-                blockNumber: receipt.blockNumber,
-                gasUsed: BigInt(receipt.gasUsed.toString()),
-                status: receipt.status === 1 ? 'success' : 'failed',
-              } as TransactionReceipt;
-            },
-          };
-
-          // Add adapter-compatible execute method
-          if (adapter) {
-            approvalStep.executeWithAdapter = async (accountAdapter: IAccountAdapter) => {
+            execute: async (accountAdapter: IAccountAdapter) => {
               const gasBuffer = params.gasBuffer || {};
               
               // Build universal transaction request
@@ -466,20 +400,14 @@ export class BlindMintProduct implements IBlindMintProduct {
                   }
                 );
               }
-            };
-          }
+            },
+          };
           
           steps.push(approvalStep);
         }
       } else {
-        // Check native balance using adapter if available, fallback to provider
-        let nativeBalance: ethers.BigNumber;
-        if (adapter) {
-          const adapterBalance = await adapter.getBalance();
-          nativeBalance = ethers.BigNumber.from(adapterBalance.raw.toString());
-        } else {
-          nativeBalance = await provider.getBalance(walletAddress);
-        }
+        // Check native balance using provider
+        const nativeBalance = await provider.getBalance(walletAddress);
         
         if (nativeBalance.lt(totalCost.raw)) {
           throw new ClientSDKError(
@@ -511,36 +439,21 @@ export class BlindMintProduct implements IBlindMintProduct {
       type: 'mint',
       description: `Mint ${quantity} random NFT(s)`,
       cost: mintCost,
-      // Legacy execute for backward compatibility
-      execute: async (account: ethers.Signer) => {
-        const gasBuffer = params.gasBuffer || {};
-        const contract = this._getClaimContract();
-        const gasEstimate = await contract.connect(account).estimateGas.mintReserve!(
-          this._creatorContract,
-          this.id,
-          quantity,
-          { value: nativePaymentValue },
-        );
-        const gasLimit = this._applyGasBuffer(gasEstimate, gasBuffer);
-        const tx = (await contract
-          .connect(account)
-          .mintReserve(this._creatorContract, this.id, quantity, {
-            value: nativePaymentValue,
-            gasLimit,
-          })) as ethers.ContractTransaction;
-        const receipt = await tx.wait();
-        return {
-          txHash: receipt.transactionHash,
-          blockNumber: receipt.blockNumber,
-          gasUsed: BigInt(receipt.gasUsed.toString()),
-          status: receipt.status === 1 ? 'success' : 'failed',
-        } as TransactionReceipt;
-      },
-    };
+      execute: async (accountAdapter: IAccountAdapter) => {
+        // Validate network at execution time
+        const adapterNetworkId = await accountAdapter.getConnectedNetworkId();
+        if (adapterNetworkId !== networkId) {
+          throw new BlindMintError(
+            BlindMintErrorCode.NETWORK_MISMATCH,
+            `Wallet connected to network ${adapterNetworkId}, but product requires network ${networkId}`,
+            { 
+              expectedNetworkId: networkId, 
+              actualNetworkId: adapterNetworkId,
+              instanceId: String(this.id)
+            }
+          );
+        }
 
-    // Add adapter-compatible execute method
-    if (adapter) {
-      mintStep.executeWithAdapter = async (accountAdapter: IAccountAdapter) => {
         const gasBuffer = params.gasBuffer || {};
         
         // Build universal transaction request
@@ -572,15 +485,15 @@ export class BlindMintProduct implements IBlindMintProduct {
             }
           );
         }
-      };
-    }
+      },
+    };
 
     steps.push(mintStep);
 
     // Build Cost structure (reuse the already computed values)
     const cost: Cost = {
       total: {
-        ...(nativeCost && { native: nativeCost }),
+        native: nativeCost || await Money.zero({ networkId, provider }),
         erc20s: erc20Costs,
       },
       breakdown: {
@@ -593,58 +506,19 @@ export class BlindMintProduct implements IBlindMintProduct {
       cost,
       steps,
       isEligible: true,
-      // Legacy fields for backward compatibility
-      transactionData: adapter ? undefined : {
-        contractAddress: this._extensionAddress,
-        transactionData: '0x', // Would need to build this for legacy mode
-        gasEstimate: BigInt('300000'),
-        networkId,
-      },
-      gasEstimate: adapter ? undefined : platformFee,
     };
   }
 
   async purchase(params: PurchaseParams): Promise<Order> {
-    const { account, accountAdapter, preparedPurchase } = params;
-
-    // Support both legacy account and new accountAdapter patterns
-    let walletAddress: string;
-    let useAdapter = false;
-
-    if (accountAdapter) {
-      walletAddress = accountAdapter.address;
-      useAdapter = true;
-    } else if (account) {
-      walletAddress = account.address;
-    } else {
-      throw new BlindMintError(
-        BlindMintErrorCode.INVALID_WALLET_ADDRESS,
-        'Either account or accountAdapter must be provided',
-        { instanceId: String(this.id) }
-      );
-    }
+    const { accountAdapter, preparedPurchase } = params;
+    const walletAddress = accountAdapter.address;
 
     // Execute all steps sequentially
     const receipts: any[] = [];
 
     for (const step of preparedPurchase.steps) {
       try {
-        let receipt;
-        
-        if (useAdapter && accountAdapter && step.executeWithAdapter) {
-          // Use new adapter-based execution
-          receipt = await step.executeWithAdapter(accountAdapter);
-        } else if (!useAdapter && account && step.execute) {
-          // Use legacy execution
-          receipt = await step.execute(account);
-        } else {
-          throw new ClientSDKError(
-            ErrorCode.TRANSACTION_FAILED,
-            `No compatible execution method available for step ${step.id}`,
-            { step: step.id, useAdapter, hasAccount: !!account, hasAdapter: !!accountAdapter }
-          );
-        }
-        
+        const receipt = await step.execute(accountAdapter);
         receipts.push(receipt);
       } catch (error) {
         // If any step fails, throw error with context

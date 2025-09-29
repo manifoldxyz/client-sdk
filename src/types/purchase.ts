@@ -2,8 +2,7 @@ import type { Address, Cost, NetworkId, Money } from './common';
 import type { IAccountAdapter } from './account-adapter';
 
 export interface PreparePurchaseParams<T> {
-  address?: Address; // Deprecated: Use accountAdapter instead
-  accountAdapter?: IAccountAdapter;
+  address: Address;
   recipientAddress?: Address;
   networkId?: NetworkId;
   payload?: T;
@@ -52,22 +51,16 @@ export interface TransactionStep {
   id: string;
   name: string;
   type: 'mint' | 'approve';
-  execute?: (account: any) => Promise<TransactionReceipt>;
-  executeWithAdapter?: (adapter: IAccountAdapter) => Promise<TransactionReceipt>;
+  execute: (adapter: IAccountAdapter) => Promise<TransactionReceipt>;
   description?: string;
   cost?: { native?: Money; erc20s?: Money[] };
 }
 
 export interface PurchaseParams {
-  account?: WalletAccount; // Deprecated: Use accountAdapter instead
-  accountAdapter?: IAccountAdapter;
+  accountAdapter: IAccountAdapter;
   preparedPurchase: PreparedPurchase;
 }
 
-export interface WalletAccount {
-  address: Address;
-  // Add other account properties as needed
-}
 
 export interface Order {
   receipts: TransactionReceipt[];
