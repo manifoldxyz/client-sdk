@@ -82,6 +82,34 @@ export async function checkERC20Balance(
 }
 
 /**
+ * Check ERC20 token balance using viem client
+ */
+export async function checkERC20BalanceViem(
+  tokenAddress: string,
+  ownerAddress: string,
+  publicClient: any, // viem PublicClient
+): Promise<bigint> {
+  const erc20Abi = [
+    {
+      name: 'balanceOf',
+      type: 'function',
+      stateMutability: 'view',
+      inputs: [{ name: 'owner', type: 'address' }],
+      outputs: [{ name: '', type: 'uint256' }],
+    },
+  ] as const;
+
+  const balance = await publicClient.readContract({
+    address: tokenAddress,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: [ownerAddress],
+  });
+
+  return balance;
+}
+
+/**
  * Check ERC20 token allowance
  */
 export async function checkERC20Allowance(

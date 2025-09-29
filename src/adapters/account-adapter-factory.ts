@@ -6,6 +6,7 @@ import type {
 } from '../types/account-adapter';
 import { ClientSDKError } from '../types/errors';
 import { createEthers5Adapter, isEthers5Compatible } from './ethers5-adapter';
+import { createViemAdapter, isViemCompatible } from './viem-adapter';
 
 // =============================================================================
 // ACCOUNT ADAPTER FACTORY IMPLEMENTATION
@@ -109,11 +110,26 @@ export class AccountAdapterFactory {
    * ```
    */
   static fromViem(client: unknown): IAccountAdapter {
-    throw this._createFactoryError(
-      'UNSUPPORTED_PROVIDER',
-      'Viem adapter not yet implemented',
-      { provider: client, attemptedType: 'viem' }
-    );
+    try {
+      if (!isViemCompatible(client)) {
+        throw this._createFactoryError(
+          'INVALID_PROVIDER',
+          'Client is not compatible with viem',
+          { provider: client, attemptedType: 'viem' }
+        );
+      }
+
+      return createViemAdapter(client);
+    } catch (error) {
+      if (error instanceof ClientSDKError) {
+        throw this._createFactoryError(
+          'INITIALIZATION_FAILED',
+          `Failed to create viem adapter: ${error.message}`,
+          { provider: client, originalError: error }
+        );
+      }
+      throw error;
+    }
   }
 
   /**
@@ -255,6 +271,28 @@ export class AccountAdapterFactory {
     if (obj.chain && typeof obj.chain === 'object' && obj.chain.id) {
       features.push('viemChain');
       viemScore += 0.3;
+    }
+
+    // Check for viem WalletClient specific methods
+    if (typeof obj.sendTransaction === 'function' && 
+        typeof obj.signMessage === 'function' && 
+        (obj.account || typeof obj.getAddresses === 'function')) {
+      features.push('viemWalletClient');
+      viemScore += 0.4;
+    }
+
+    // Check for viem PublicClient specific methods
+    if (typeof obj.readContract === 'function' && 
+        typeof obj.getChainId === 'function' && 
+        !obj.sendTransaction) {
+      features.push('viemPublicClient');
+      viemScore += 0.4;
+    }
+
+    // Reduce ethers scores if viem patterns detected
+    if (viemScore > 0.3) {
+      ethers5Score *= 0.5;
+      ethers6Score *= 0.5;
     }
 
     // Determine best match
