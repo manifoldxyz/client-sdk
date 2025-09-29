@@ -113,6 +113,12 @@ export type BlindMintClaimContract = ethers.Contract & {
     deliveredCount: number;
   }>;
 
+  getTotalMints(
+    minter: string,
+    creatorContractAddress: string,
+    instanceId: number,
+  ): Promise<number>;
+
   // MintReserve - the main minting method (ABIv2)
   mintReserve(
     creatorContractAddress: string,
@@ -279,10 +285,19 @@ export class ContractFactory {
    */
   getWellKnownContracts() {
     const networkConfig = getNetworkConfig(this.networkId);
-    const contracts = networkConfig.contracts;
+    const contracts = networkConfig?.contracts;
+
+    if (!contracts) {
+      return {
+        usdc: null,
+        usdt: null,
+        weth: null,
+        blindMint: null,
+        gacha: null,
+      };
+    }
 
     return {
-      // ERC20 tokens
       usdc: contracts.erc20Tokens.usdc
         ? this.createERC20Contract(contracts.erc20Tokens.usdc)
         : null,
@@ -292,8 +307,6 @@ export class ContractFactory {
       weth: contracts.erc20Tokens.weth
         ? this.createERC20Contract(contracts.erc20Tokens.weth)
         : null,
-
-      // Claim extensions
       blindMint: contracts.claimExtensions.blindMint
         ? this.createBlindMintContract(contracts.claimExtensions.blindMint)
         : null,

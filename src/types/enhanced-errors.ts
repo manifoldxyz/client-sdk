@@ -56,10 +56,29 @@ export enum BlindMintErrorCode {
   UNSUPPORTED_NETWORK = 'UNSUPPORTED_NETWORK',
 }
 
+const BLINDMINT_ERROR_CODE_SET = new Set<string>(Object.values(BlindMintErrorCode));
+
+function isBlindMintErrorCode(value: unknown): value is BlindMintErrorCode {
+  return typeof value === 'string' && BLINDMINT_ERROR_CODE_SET.has(value);
+}
+
+function resolveBlindMintCodeFromValue(value: unknown): BlindMintErrorCode | undefined {
+  return isBlindMintErrorCode(value) ? value : undefined;
+}
+
+function resolveBlindMintCode(error: BlindMintError): BlindMintErrorCode | undefined {
+  return (
+    resolveBlindMintCodeFromValue(error.blindMintCode) ??
+    resolveBlindMintCodeFromValue(error.code)
+  );
+}
+
 /**
  * BlindMint-specific error class with enhanced context
  */
 export class BlindMintError extends ClientSDKError {
+  public readonly blindMintCode?: BlindMintErrorCode;
+
   constructor(
     code: ErrorCode | BlindMintErrorCode,
     message: string,
@@ -67,6 +86,7 @@ export class BlindMintError extends ClientSDKError {
     details?: unknown,
   ) {
     super(code as ErrorCode, message, details);
+    this.blindMintCode = resolveBlindMintCodeFromValue(code);
     this.name = 'BlindMintError';
   }
 }
@@ -520,7 +540,10 @@ export const BLINDMINT_ERROR_CLASSIFICATIONS: Record<BlindMintErrorCode, ErrorMe
  */
 export function isRecoverableError(error: Error): boolean {
   if (error instanceof BlindMintError) {
-    const errorCode = error.code as BlindMintErrorCode;
+    const errorCode = resolveBlindMintCode(error);
+    if (!errorCode) {
+      return false;
+    }
     return BLINDMINT_ERROR_CLASSIFICATIONS[errorCode]?.recoverable ?? false;
   }
   return false;
@@ -531,9 +554,12 @@ export function isRecoverableError(error: Error): boolean {
  */
 export function getUserFriendlyMessage(error: Error): string {
   if (error instanceof BlindMintError) {
-    const errorCode = error.code as BlindMintErrorCode;
+    const errorCode = resolveBlindMintCode(error);
+    if (!errorCode) {
+      return error.message;
+    }
     const classification = BLINDMINT_ERROR_CLASSIFICATIONS[errorCode];
-    
+
     if (classification?.userActions?.length) {
       return `${error.message}. Try: ${classification.userActions.join(', ')}.`;
     }
@@ -547,11 +573,14 @@ export function getUserFriendlyMessage(error: Error): string {
  */
 export function getSuggestedActions(error: Error): string[] {
   if (error instanceof BlindMintError) {
-    const errorCode = error.code as BlindMintErrorCode;
+    const errorCode = resolveBlindMintCode(error);
+    if (!errorCode) {
+      return [];
+    }
     const classification = BLINDMINT_ERROR_CLASSIFICATIONS[errorCode];
     return classification?.userActions ?? [];
   }
-  
+
   return [];
 }
 
@@ -560,7 +589,10 @@ export function getSuggestedActions(error: Error): string[] {
  */
 export function shouldReportError(error: Error): boolean {
   if (error instanceof BlindMintError) {
-    const errorCode = error.code as BlindMintErrorCode;
+    const errorCode = resolveBlindMintCode(error);
+    if (!errorCode) {
+      return true;
+    }
     return BLINDMINT_ERROR_CLASSIFICATIONS[errorCode]?.reportable ?? true;
   }
   

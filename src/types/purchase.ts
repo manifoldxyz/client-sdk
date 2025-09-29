@@ -1,4 +1,5 @@
-import type { Address, Cost, NetworkId, Money } from './common';
+import type { Address, NetworkId } from './common';
+import type { Cost, Money } from './money';
 import type { IAccountAdapter } from './account-adapter';
 
 export interface PreparePurchaseParams<T> {

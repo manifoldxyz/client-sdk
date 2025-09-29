@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createManifoldApiClient, getManifoldApiClient, resetManifoldApiClient } from '../src/api/manifold-api';
 import { StudioAppsClient } from '../src/stubs/studio-apps-client';

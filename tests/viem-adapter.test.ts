@@ -97,7 +97,7 @@ describe('ViemAdapter', () => {
     it('should throw error when viem is not installed', () => {
       // Create a new class that will use a throwing require
       class TestAdapter extends ViemAdapter {
-        private _initializeViem(): void {
+        protected override _initializeViem(): void {
           throw new ClientSDKError(
             'INVALID_INPUT' as any,
             'Viem is not installed. Please install viem as a peer dependency: npm install viem'

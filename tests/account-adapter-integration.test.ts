@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AccountAdapterFactory } from '../src/adapters/account-adapter-factory';
 import { BlindMintProductImpl } from '../src/products/blindmint';

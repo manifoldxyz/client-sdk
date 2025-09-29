@@ -1,5 +1,6 @@
 import type { InstancePreview, PublicInstance } from '@manifoldxyz/studio-apps-client';
-import type { Address, AppId, AppType, ProductStatus, Money } from './common';
+import type { Address, AppId, AppType, ProductStatus } from './common';
+import type { Money } from '../libs/money';
 import type { PreparedPurchase, PurchaseParams, PreparePurchaseParams, Order } from './purchase';
 import type { BlindMintProduct } from './blindmint';
 

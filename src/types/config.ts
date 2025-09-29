@@ -1,4 +1,4 @@
-import type { Address, NetworkId } from './common';
+import type { NetworkId } from './common';
 
 // =============================================================================
 // BASIC CONFIGURATION TYPES
@@ -47,6 +47,18 @@ export interface NetworkConfig {
   rpcUrl: string;
   /** Block explorer base URL */
   explorerUrl: string;
+  /** Optional canonical contracts keyed by purpose */
+  contracts?: {
+    erc20Tokens: {
+      usdc?: string;
+      usdt?: string;
+      weth?: string;
+    };
+    claimExtensions: {
+      blindMint?: string;
+      gacha?: string;
+    };
+  };
 }
 
 // =============================================================================

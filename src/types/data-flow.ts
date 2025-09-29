@@ -1,6 +1,4 @@
-import type { Address, NetworkId, Money } from './common';
-import type { Media, Contract, Creator } from './product';
-import type { BlindMintPublicData } from './blindmint';
+import type { Address } from './common';
 
 // =============================================================================
 // ESSENTIAL API RESPONSE TYPES

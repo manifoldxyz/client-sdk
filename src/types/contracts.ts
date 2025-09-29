@@ -157,7 +157,7 @@ export interface NetworkProviderConfig {
 /**
  * Enhanced transaction response with SDK-specific metadata
  */
-export interface TransactionResponse extends ContractTransaction {
+export interface TransactionResponse extends Omit<ContractTransaction, 'type'> {
   /** SDK-generated transaction ID for tracking */
   sdkTxId: string;
   /** Estimated gas used */
@@ -414,15 +414,12 @@ export interface ManifoldBridgeProvider {
   getBlockNumber(): Promise<number>;
 }
 
-export interface BridgeContract {
+export type BridgeContract = {
   /** Contract address */
   readonly address: Address;
   /** Contract ABI */
   readonly interface: unknown;
-  
-  /** Call read-only method */
-  [methodName: string]: (...args: unknown[]) => Promise<unknown>;
-}
+} & Record<string, (...args: unknown[]) => Promise<unknown>>;
 
 export interface CallRequest {
   to: Address;

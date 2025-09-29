@@ -51,8 +51,8 @@ function createPrimaryProvider(
     if (customRpcUrls?.[networkId]) {
       const networkConfig = getNetworkConfig(networkId);
       return new ethers.providers.JsonRpcProvider(customRpcUrls[networkId], {
-        name: networkConfig.name,
-        chainId: networkConfig.chainId,
+        name: networkConfig?.name ?? `network-${networkId}`,
+        chainId: networkConfig?.chainId ?? networkId,
       });
     }
 

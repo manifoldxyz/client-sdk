@@ -21,7 +21,7 @@ export interface ManifoldProviderConfig {
  */
 export class ManifoldProvider {
   private bridgeProvider: ManifoldBridgeProvider;
-  private config: ManifoldProviderConfig;
+  private readonly config: ManifoldProviderConfig;
 
   constructor(networkId: NetworkId, config: ManifoldProviderConfig = {}) {
     this.config = {
@@ -54,7 +54,7 @@ export class ManifoldProvider {
    * Make an RPC request through the bridge provider
    * This provides a simple interface that matches our SDK patterns
    */
-  async request(method: string, params: any[]): Promise<any> {
+  async request(method: string, params: any[]): Promise<unknown> {
     if (!method || typeof method !== 'string') {
       throw new ClientSDKError(
         ErrorCode.INVALID_INPUT,
@@ -69,31 +69,44 @@ export class ManifoldProvider {
       );
     }
 
-    try {
+    const provider = this.bridgeProvider as { request?: (payload: { method: string; params: unknown[] }) => Promise<unknown> };
 
-      // The ManifoldBridgeProvider should handle RPC calls
-      // This follows the pattern from gachapon-widgets where the bridge provider
-      // is used as a fallback when the user's provider is not available
-      // Cast to any since ManifoldBridgeProvider may have request method
-      const provider = this.bridgeProvider as any;
-      if (!provider.request) {
-        throw new Error('Bridge provider does not support request method');
-      }
-      const result = await provider.request({
-        method,
-        params,
-      });
-
-      return result;
-
-    } catch (error) {
-      
+    if (typeof provider.request !== 'function') {
       throw new ClientSDKError(
-        ErrorCode.NETWORK_ERROR,
-        `RPC request failed for method ${method}: ${(error as any).message}`,
-        { method, params, originalError: (error as any).message }
+        ErrorCode.INVALID_INPUT,
+        'Bridge provider does not support request method'
       );
     }
+
+    const retries = this.config.retries ?? 0;
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const requestPromise = provider.request({ method, params });
+        const timeout = this.config.timeout ?? 0;
+
+        return timeout > 0
+          ? await this._withTimeout(requestPromise, timeout)
+          : await requestPromise;
+      } catch (error) {
+        lastError = error;
+        if (attempt === retries) {
+          break;
+        }
+      }
+    }
+
+    throw new ClientSDKError(
+      ErrorCode.NETWORK_ERROR,
+      `RPC request failed for method ${method}: ${(lastError as Error)?.message || 'Unknown error'}`,
+      {
+        method,
+        params,
+        attempts: retries + 1,
+        originalError: lastError instanceof Error ? lastError : undefined,
+      }
+    );
   }
 
   /**
@@ -114,6 +127,28 @@ export class ManifoldProvider {
     } catch (error) {
       return null;
     }
+  }
+
+  private async _withTimeout<T>(promise: Promise<T>, timeout: number): Promise<T> {
+    if (timeout <= 0) {
+      return promise;
+    }
+
+    return await new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new ClientSDKError(ErrorCode.TIMEOUT, 'Bridge provider request timed out'));
+      }, timeout);
+
+      promise
+        .then((value) => {
+          clearTimeout(timer);
+          resolve(value);
+        })
+        .catch((error) => {
+          clearTimeout(timer);
+          reject(error);
+        });
+    });
   }
 }
 

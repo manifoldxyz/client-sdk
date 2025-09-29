@@ -6,13 +6,15 @@
 import { StudioAppsClientForPublic } from '@manifoldxyz/studio-apps-client';
 import type { PreviewData } from '../types/product';
 import { ClientSDKError, ErrorCode } from '../types/errors';
-import { getCacheConfig } from '../config/cache';
+import { createCacheConfig } from '../config/cache';
+import type { CacheConfig } from '../types/config';
 
 export interface StudioAppsConfig {
   apiKey?: string;
   baseUrl?: string;
   timeout?: number;
   debug?: boolean;
+  environment?: 'development' | 'production' | 'test';
 }
 
 /**
@@ -22,13 +24,21 @@ export interface StudioAppsConfig {
 export class StudioAppsClient {
   private config: StudioAppsConfig;
   private previewCache = new Map<string, { data: PreviewData | null; expiresAt: number }>();
-  private cacheConfig = getCacheConfig();
+  private cacheConfig: CacheConfig;
 
   constructor(config: StudioAppsConfig) {
     this.config = {
       timeout: 10000,
       ...config,
     };
+
+    const environment = this.config.environment
+      ? this.config.environment
+      : this.config.debug
+        ? 'development'
+        : 'production';
+
+    this.cacheConfig = createCacheConfig({ environment });
   }
 
   /**
@@ -54,8 +64,8 @@ export class StudioAppsClient {
       
       // Create client and get preview using the studio app SDK public client
       const client = new StudioAppsClientForPublic({ baseUrl: this.config.baseUrl || 'https://api.manifold.xyz' });
-      const { instancePreviews: allPreviews } = await client.public.getPreviews({ 
-        instanceIds: [instanceId] 
+      const { instancePreviews: allPreviews } = await client.public.getPreviews({
+        instanceIds: [instanceId],
       });
       
       if (!Array.isArray(allPreviews)) {
@@ -72,33 +82,10 @@ export class StudioAppsClient {
         String(preview?.id) === String(instanceId)
       );
 
-      let previewData: PreviewData | null = null;
-
-      if (matchedPreview) {
-
-        // Transform to match PreviewData format
-        previewData = {
-          title: matchedPreview.title || '',
-          description: matchedPreview.description || '',
-          contract: matchedPreview.contract ? {
-            address: matchedPreview.contract.contractAddress,
-            name: matchedPreview.contract.name,
-            symbol: matchedPreview.contract.symbol,
-            networkId: matchedPreview.contract.network,
-            explorer: {
-              etherscanUrl: `https://etherscan.io/address/${matchedPreview.contract.contractAddress}`,
-            },
-            spec: 'erc1155' as const,
-          } : undefined,
-          thumbnail: matchedPreview.thumbnail || '',
-          network: matchedPreview.network || 1,
-          // Additional fields mapped to standard fields
-        };
-      } else {
-      }
+      const previewData: PreviewData | null = matchedPreview ? (matchedPreview as PreviewData) : null;
 
       // Cache the result (even if null)
-      const ttl = this.cacheConfig.memory?.defaultTTL || 600; // 10 minutes default in seconds
+      const ttl = this.cacheConfig.ttl || 600; // ttl in seconds
       this.previewCache.set(instanceId, {
         data: previewData,
         expiresAt: Date.now() + (ttl * 1000), // Convert seconds to milliseconds
