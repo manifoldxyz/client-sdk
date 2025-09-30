@@ -152,8 +152,8 @@ export class ViemAdapter implements IAccountAdapter {
   async getBalance(tokenAddress?: string): Promise<Money> {
     try {
       await this._ensureAddress();
-      const networkId = await this.getConnectedNetworkId();
       const publicClient = this._getPublicClient();
+      const networkId = await this.getConnectedNetworkId();
 
       if (!tokenAddress || tokenAddress === '0x0000000000000000000000000000000000000000') {
         // Get native token balance using viem

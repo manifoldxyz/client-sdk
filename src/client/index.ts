@@ -20,6 +20,7 @@ export function createClient(config?: ClientConfig): ManifoldClient {
   const manifoldApi = createManifoldApiClient();
 
   return {
+    httpRPCs,
     async getProduct(instanceIdOrUrl: string): Promise<Product> {
       let instanceId: string;
 

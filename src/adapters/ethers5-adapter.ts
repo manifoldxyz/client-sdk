@@ -9,6 +9,49 @@ import { Money } from '../libs/money';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import { checkERC20Balance } from '../utils/gas-estimation';
 import type { ManifoldClient } from '../types';
+import { createProvider } from '../utils';
+
+const FALLBACK_CLIENT: ManifoldClient = {
+  httpRPCs: {},
+  async getProduct(): Promise<never> {
+    throw new ClientSDKError(
+      ErrorCode.INVALID_INPUT,
+      'Manifold client context is required to fetch product data.',
+    );
+  },
+  async getProductsByWorkspace(): Promise<never> {
+    throw new ClientSDKError(
+      ErrorCode.INVALID_INPUT,
+      'Manifold client context is required to fetch workspace products.',
+    );
+  },
+};
+
+function isManifoldClient(value: unknown): value is ManifoldClient {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as ManifoldClient).getProduct === 'function' &&
+    typeof (value as ManifoldClient).getProductsByWorkspace === 'function'
+  );
+}
+
+function isJsonRpcSigner(value: unknown): value is ethers.providers.JsonRpcSigner {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as ethers.providers.JsonRpcSigner).getAddress === 'function' &&
+    typeof (value as ethers.providers.JsonRpcSigner).sendTransaction === 'function'
+  );
+}
+
+function isJsonRpcProvider(value: unknown): value is ethers.providers.JsonRpcProvider {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as ethers.providers.JsonRpcProvider).getSigner === 'function'
+  );
+}
 
 // =============================================================================
 // ERC-20 CONSTANTS
@@ -54,7 +97,7 @@ export class Ethers5Adapter implements IAccountAdapter {
   private _signer: ethers.providers.JsonRpcSigner | undefined;
   private _wallet: ethers.Wallet | undefined;
   private _client: ManifoldClient;
-  private _address: string | undefined;
+  readonly address: string;
 
   /**
    * Initialize adapter with ethers v5 provider or signer
@@ -83,6 +126,7 @@ export class Ethers5Adapter implements IAccountAdapter {
     if (signer) {
       this._signer = signer;
     }
+    this.address = this._signer?._address || this._wallet?.address || '';
   }
 
   get provider() {
@@ -109,8 +153,6 @@ export class Ethers5Adapter implements IAccountAdapter {
    */
   async sendTransaction(request: UniversalTransactionRequest): Promise<string> {
     try {
-      await this._ensureAddress();
-
       // Convert universal request to ethers v5 transaction request
       const ethersRequest = this._convertToEthersRequest(request);
 
@@ -132,8 +174,6 @@ export class Ethers5Adapter implements IAccountAdapter {
     const networkId = await this.getConnectedNetworkId();
 
     try {
-      await this._ensureAddress();
-
       const ethersRequest = this._convertToEthersRequest(request);
       const tx = await this.provider.sendTransaction(ethersRequest);
       const receipt = await tx.wait(confirmations);
@@ -157,22 +197,23 @@ export class Ethers5Adapter implements IAccountAdapter {
    */
   async getBalance(tokenAddress?: string): Promise<Money> {
     try {
-      const address = await this._ensureAddress();
       const networkId = await this.getConnectedNetworkId();
-
+      const provider = createProvider({
+        networkId,
+        customRpcUrls: this._client.httpRPCs,
+      });
       if (!tokenAddress || tokenAddress === ethers.constants.AddressZero) {
         // Get native token balance
-        const balance = await this.provider.getBalance(address);
+        const balance = await provider.getBalance(this.address);
 
         return Money.create({
           value: balance,
           networkId,
-          provider: this.provider,
           fetchUSD: true,
         });
       } else {
         // Get ERC-20 token balance
-        const balance = await checkERC20Balance(tokenAddress, address, this._signer);
+        const balance = await checkERC20Balance(tokenAddress, this.address, provider);
 
         return Money.create({
           value: balance,
@@ -276,16 +317,6 @@ export class Ethers5Adapter implements IAccountAdapter {
   // =============================================================================
   // PRIVATE HELPER METHODS
   // =============================================================================
-
-  /**
-   * Ensure address is initialized by fetching it from signer
-   */
-  private async _ensureAddress(): Promise<string> {
-    if (!this._address) {
-      this._address = await this.provider.getAddress();
-    }
-    return this._address;
-  }
 
   /**
    * Convert universal transaction request to ethers v5 format
@@ -408,7 +439,7 @@ export class Ethers5Adapter implements IAccountAdapter {
   ): UniversalTransactionResponse {
     return {
       hash: receipt.transactionHash,
-      from: receipt.from ?? this._address ?? '',
+      from: receipt.from ?? this.address ?? '',
       to: receipt.to ?? request.to ?? '',
       blockNumber: receipt.blockNumber ?? undefined,
       blockHash: receipt.blockHash ?? undefined,
@@ -626,8 +657,43 @@ export class Ethers5Adapter implements IAccountAdapter {
  * const adapter = createEthers5Adapter(signer);
  * ```
  */
-export function createEthers5Adapter(_signer: ethers.providers.JsonRpcSigner): IAccountAdapter {
-  return new Ethers5Adapter(_signer);
+export function createEthers5Adapter(
+  signer: ethers.providers.JsonRpcSigner,
+): IAccountAdapter;
+export function createEthers5Adapter(
+  client: ManifoldClient,
+  signer: ethers.providers.JsonRpcSigner,
+): IAccountAdapter;
+export function createEthers5Adapter(
+  clientOrSigner:
+    | ManifoldClient
+    | ethers.providers.JsonRpcSigner
+    | ethers.providers.JsonRpcProvider,
+  signer?: ethers.providers.JsonRpcSigner,
+): IAccountAdapter {
+  if (isManifoldClient(clientOrSigner)) {
+    if (!signer) {
+      throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Signer is required to create adapter');
+    }
+    return new Ethers5Adapter(clientOrSigner, signer);
+  }
+
+  let resolvedSigner: ethers.providers.JsonRpcSigner | undefined;
+
+  if (isJsonRpcSigner(clientOrSigner)) {
+    resolvedSigner = clientOrSigner;
+  } else if (isJsonRpcProvider(clientOrSigner)) {
+    resolvedSigner = clientOrSigner.getSigner();
+  }
+
+  if (!resolvedSigner) {
+    throw new ClientSDKError(
+      ErrorCode.INVALID_INPUT,
+      'Unable to resolve signer from provided ethers object',
+    );
+  }
+
+  return new Ethers5Adapter(FALLBACK_CLIENT, resolvedSigner);
 }
 
 // =============================================================================

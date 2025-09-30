@@ -344,10 +344,10 @@ describe('createEthers5Adapter', () => {
   });
 
   it('should throw error for invalid input', () => {
-    expect(() => createEthers5Adapter(null as unknown as ethers.Signer)).toThrow(
+    expect(() => createEthers5Adapter(null as unknown as ethers.providers.JsonRpcSigner)).toThrow(
       ClientSDKError,
     );
-    expect(() => createEthers5Adapter('invalid' as unknown as ethers.Signer)).toThrow(
+    expect(() => createEthers5Adapter('invalid' as unknown as ethers.providers.JsonRpcSigner)).toThrow(
       ClientSDKError,
     );
   });

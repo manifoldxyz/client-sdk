@@ -8,6 +8,7 @@ export interface ClientConfig {
 }
 
 export interface ManifoldClient {
+  httpRPCs?: HttpRPCs;
   getProduct(instanceIdOrUrl: string): Promise<Product>;
   getProductsByWorkspace(
     workspaceId: string,

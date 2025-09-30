@@ -45,7 +45,7 @@ export class Money implements MoneyData {
     value: ethers.BigNumber | string | number;
     networkId: number;
     erc20?: string;
-    provider:
+    provider?:
       | ethers.providers.JsonRpcProvider
       | ethers.providers.Web3Provider
       | ethers.providers.JsonRpcSigner;
