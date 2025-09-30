@@ -99,6 +99,9 @@ export interface UniversalTransactionResponse {
 
   /** Chain ID where transaction was sent */
   chainId?: number;
+
+  /** Normalized receipt details when available */
+  receipt?: TransactionConfirmationResult;
 }
 
 /**
@@ -108,6 +111,32 @@ export type TransactionStatus =
   | 'pending' // Transaction submitted but not mined
   | 'confirmed' // Transaction mined and confirmed
   | 'failed'; // Transaction reverted or failed
+
+/**
+ * Normalized transaction confirmation result returned by adapters
+ */
+export interface TransactionConfirmationResult {
+  /** Transaction hash */
+  hash: string;
+
+  /** Block number where transaction was mined */
+  blockNumber?: number;
+
+  /** Gas used (as string) */
+  gasUsed?: string;
+
+  /** Effective gas price paid (as string) */
+  effectiveGasPrice?: string;
+
+  /** Transaction status */
+  status: TransactionStatus;
+
+  /** Network ID where transaction was confirmed */
+  networkId: number;
+
+  /** Number of confirmations observed */
+  confirmations: number;
+}
 
 // =============================================================================
 // ACCOUNT ADAPTER INTERFACES
@@ -175,7 +204,20 @@ export interface IAccountAdapter {
    * });
    * ```
    */
-  sendTransaction(request: UniversalTransactionRequest): Promise<UniversalTransactionResponse>;
+  sendTransaction(request: UniversalTransactionRequest): Promise<string>;
+
+  /**
+   * Send a transaction and wait for confirmation
+   *
+   * @param request - Universal transaction request
+   * @param options - Confirmation options
+   * @returns Promise resolving to normalized confirmation result
+   * @throws {AccountAdapterError} When transaction submission or confirmation fails
+   */
+  sendTransactionWithConfirmation(
+    request: UniversalTransactionRequest,
+    options?: { confirmations?: number },
+  ): Promise<UniversalTransactionResponse>;
 
   /**
    * Get token balance for connected wallet
@@ -252,6 +294,29 @@ export interface IAccountAdapter {
    * @throws {AccountAdapterError} When signing fails or is rejected
    */
   signTypedData?(typedData: TypedDataPayload): Promise<string>;
+
+  /**
+   * Send raw RPC calls to the wallet provider (optional)
+   * Useful for wallet-specific methods like adding custom networks, tokens, etc.
+   *
+   * @param method - RPC method name (e.g., 'wallet_addEthereumChain')
+   * @param params - Method parameters
+   * @returns Promise resolving to the RPC response
+   * @throws {AccountAdapterError} When RPC call fails or is not supported
+   *
+   * @example
+   * ```typescript
+   * // Add a custom network
+   * await adapter.sendCalls?.('wallet_addEthereumChain', [{
+   *   chainId: '0x89',
+   *   chainName: 'Polygon',
+   *   nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 },
+   *   rpcUrls: ['https://polygon-rpc.com'],
+   *   blockExplorerUrls: ['https://polygonscan.com']
+   * }]);
+   * ```
+   */
+  sendCalls?(method: string, params?: unknown[]): Promise<unknown>;
 }
 
 /**
@@ -386,39 +451,6 @@ export interface IAccountAdapterFactory {
 // =============================================================================
 
 /**
- * Account adapter specific error types for better error handling
- */
-export interface AccountAdapterError extends Error {
-  /** Error code for categorization */
-  code: AccountAdapterErrorCode;
-
-  /** Adapter type where error occurred */
-  adapterType: AdapterType;
-
-  /** Additional error context */
-  context?: {
-    method?: string;
-    params?: unknown;
-    originalError?: Error;
-  };
-}
-
-/**
- * Error codes for account adapter operations
- */
-export type AccountAdapterErrorCode =
-  | 'TRANSACTION_FAILED' // Transaction execution failed
-  | 'TRANSACTION_REJECTED' // User rejected transaction
-  | 'INSUFFICIENT_BALANCE' // Not enough balance for transaction
-  | 'NETWORK_MISMATCH' // Wrong network for operation
-  | 'NETWORK_SWITCH_FAILED' // Network switching failed
-  | 'PROVIDER_ERROR' // Underlying provider error
-  | 'INVALID_ADDRESS' // Invalid wallet address
-  | 'UNSUPPORTED_METHOD' // Method not supported by provider
-  | 'TIMEOUT' // Operation timed out
-  | 'UNKNOWN_ERROR'; // Unexpected error
-
-/**
  * Factory-specific error types
  */
 export interface FactoryError extends Error {
@@ -539,10 +571,3 @@ export interface AdapterCreationOptions {
     maxGasLimit: string;
   };
 }
-
-// =============================================================================
-// RE-EXPORTS
-// =============================================================================
-
-// Re-export Money type for convenience
-export type { Money } from '../libs/money';

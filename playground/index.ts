@@ -150,7 +150,7 @@ async function main() {
       console.log(`   Wallet: ${wallet.address.slice(0, 10)}...`);
 
       try {
-        accountAdapter = AccountAdapterFactory.fromEthers5({signer: wallet});
+        accountAdapter = AccountAdapterFactory.fromEthers5(wallet.connect(provider));
         // Prime adapter with balance lookup so address becomes available
         await accountAdapter.getBalance().catch(() => undefined);
       } catch (adapterError) {

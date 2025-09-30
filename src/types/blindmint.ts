@@ -32,8 +32,6 @@ export interface BlindMintOnchainData {
   totalSupply: number;
   /** Current number of tokens minted */
   totalMinted: number;
-  /** Maximum tokens per wallet (0 = unlimited) */
-  walletMax: number;
   /** Mint start timestamp */
   startDate?: Date;
   /** Mint end timestamp */

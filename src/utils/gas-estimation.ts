@@ -72,7 +72,10 @@ export function applyGasBuffer(
 export async function checkERC20Balance(
   tokenAddress: string,
   ownerAddress: string,
-  provider: ethers.providers.Provider,
+  provider:
+    | ethers.providers.JsonRpcProvider
+    | ethers.providers.Web3Provider
+    | ethers.providers.JsonRpcSigner,
 ): Promise<ethers.BigNumber> {
   const erc20Abi = ['function balanceOf(address owner) view returns (uint256)'];
 

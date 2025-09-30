@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ViemAdapter, createViemAdapter, isViemCompatible } from '../src/adapters/viem-adapter';
 import { AccountAdapterFactory } from '../src/adapters/account-adapter-factory';
-import type { UniversalTransactionRequest } from '../src/types/account-adapter';
+import type { UniversalTransactionRequest, UniversalTransactionResponse } from '../src/types/account-adapter';
 import { ClientSDKError } from '../src/types/errors';
 
 // =============================================================================
@@ -159,7 +159,7 @@ describe('ViemAdapter', () => {
         gasLimit: '21000',
       };
 
-      const response = await adapter.sendTransaction(request);
+      const response = (await adapter.sendTransaction(request)) as unknown as UniversalTransactionResponse;
 
       expect(response.hash).toBe('0xmockedtxhash');
       expect(response.status).toBe('pending');

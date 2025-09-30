@@ -5,7 +5,7 @@ import type {
   ProviderDetection,
 } from '../types/account-adapter';
 import { ClientSDKError } from '../types/errors';
-import type { Signer } from 'ethers';
+import type * as ethers from 'ethers';
 import { createEthers5Adapter } from './ethers5-adapter';
 import { createViemAdapter, isViemCompatible } from './viem-adapter';
 
@@ -44,16 +44,15 @@ export class AccountAdapterFactory {
    * const adapter = AccountAdapterFactory.fromEthers5(signer);
    * ```
    */
-  static fromEthers5(options: { signer: Signer }): IAccountAdapter  {
-    const { signer } = options;
+  static fromEthers5(provider: ethers.providers.JsonRpcSigner): IAccountAdapter {
     try {
-      return createEthers5Adapter(signer);
+      return createEthers5Adapter(provider);
     } catch (error) {
       if (error instanceof ClientSDKError) {
         throw this._createFactoryError(
           'INITIALIZATION_FAILED',
           `Failed to create ethers v5 adapter: ${error.message}`,
-          { provider: signer, originalError: error },
+          { provider, originalError: error },
         );
       }
       throw error;
@@ -157,7 +156,7 @@ export class AccountAdapterFactory {
     }
 
     if (detection.isEthers5) {
-      return this.fromEthers5(provider as { signer: Signer });
+      return this.fromEthers5(provider as ethers.providers.JsonRpcSigner);
     } else if (detection.isEthers6) {
       return this.fromEthers6(provider);
     } else if (detection.isViem) {

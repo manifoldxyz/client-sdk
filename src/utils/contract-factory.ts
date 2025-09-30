@@ -1,85 +1,6 @@
 import * as ethers from 'ethers';
 import type { NetworkId, Address } from '../types/common';
-import { getNetworkConfig } from '../config/networks';
-
-type DualProvider = {
-  current: ethers.providers.Provider;
-  primary?: ethers.providers.Provider;
-  bridge?: ethers.providers.Provider;
-};
-
-/**
- * Contract factory for BlindMint operations
- * Based on CONTRACT_PATTERNS.md analysis and ethers v5 patterns
- */
-
-// =============================================================================
-// CONTRACT INTERFACES AND ABIS
-// =============================================================================
-
-/**
- * BlindMint claim extension ABI (simplified)
- * Based on gachapon-widgets contract analysis
- */
-export const BLINDMINT_CLAIM_ABI = [
-  // Read functions from ABIv2
-  'function MINT_FEE() external view returns (uint256)',
-  'function getClaim(address creatorContractAddress, uint256 instanceId) external view returns (tuple(uint8 storageProtocol, uint32 total, uint32 totalMax, uint48 startDate, uint48 endDate, uint80 startingTokenId, uint8 tokenVariations, string location, address paymentReceiver, uint96 cost, address erc20))',
-  'function getUserMints(address minter, address creatorContractAddress, uint256 instanceId) external view returns (tuple(uint32 reservedCount, uint32 deliveredCount))',
-
-  // Additional read functions
-  'function getClaimForToken(address creatorContractAddress, uint256 tokenId) external view returns (uint256 instanceId, tuple(uint8 storageProtocol, uint32 total, uint32 totalMax, uint48 startDate, uint48 endDate, uint80 startingTokenId, uint8 tokenVariations, string location, address paymentReceiver, uint96 cost, address erc20))',
-  'function tokenURI(address creatorContractAddress, uint256 tokenId) external view returns (string)',
-
-  // Mint functions from ABIv2
-  'function mintReserve(address creatorContractAddress, uint256 instanceId, uint32 mintCount) external payable',
-  // Admin functions
-  'function initializeClaim(address creatorContractAddress, uint256 instanceId, tuple(uint8 storageProtocol, uint32 totalMax, uint48 startDate, uint48 endDate, uint8 tokenVariations, string location, address paymentReceiver, uint96 cost, address erc20) claimParameters) external payable',
-  'function updateClaim(address creatorContractAddress, uint256 instanceId, tuple(uint8 storageProtocol, address paymentReceiver, uint32 totalMax, uint48 startDate, uint48 endDate, uint96 cost, string location) updateClaimParameters) external',
-
-  // Events
-  'event SerendipityMintReserved(address indexed creatorContract, uint256 indexed instanceId, address indexed collector, uint32 mintCount)',
-  'event SerendipityClaimInitialized(address indexed creatorContract, uint256 indexed instanceId, address initializer)',
-  'event SerendipityClaimUpdated(address indexed creatorContract, uint256 indexed instanceId)',
-] as const;
-
-/**
- * ERC721 Creator Contract ABI (simplified)
- */
-export const CREATOR_CONTRACT_ABI = [
-  // Standard ERC721 functions
-  'function balanceOf(address owner) external view returns (uint256)',
-  'function ownerOf(uint256 tokenId) external view returns (address)',
-  'function tokenURI(uint256 tokenId) external view returns (string)',
-  'function approve(address to, uint256 tokenId) external',
-  'function getApproved(uint256 tokenId) external view returns (address)',
-  'function setApprovalForAll(address operator, bool approved) external',
-  'function isApprovedForAll(address owner, address operator) external view returns (bool)',
-  'function transferFrom(address from, address to, uint256 tokenId) external',
-
-  // Creator-specific functions
-  'function totalSupply() external view returns (uint256)',
-  'function contractURI() external view returns (string)',
-
-  // Events
-  'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
-  'event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId)',
-  'event ApprovalForAll(address indexed owner, address indexed operator, bool approved)',
-] as const;
-
-/**
- * ERC20 Token ABI (for payment tokens)
- */
-export const ERC20_ABI = [
-  'function balanceOf(address owner) external view returns (uint256)',
-  'function allowance(address owner, address spender) external view returns (uint256)',
-  'function approve(address spender, uint256 amount) external returns (bool)',
-  'function transfer(address to, uint256 amount) external returns (bool)',
-  'function transferFrom(address from, address to, uint256 amount) external returns (bool)',
-  'function decimals() external view returns (uint8)',
-  'function symbol() external view returns (string)',
-  'function name() external view returns (string)',
-] as const;
+import { GachaExtensionERC1155ABIv2, CreatorContractABI, ERC20ABI } from '../abis';
 
 // =============================================================================
 // CONTRACT TYPES
@@ -112,12 +33,6 @@ export type BlindMintClaimContract = ethers.Contract & {
     reservedCount: number;
     deliveredCount: number;
   }>;
-
-  getTotalMints(
-    minter: string,
-    creatorContractAddress: string,
-    instanceId: number,
-  ): Promise<number>;
 
   // MintReserve - the main minting method (ABIv2)
   mintReserve(
@@ -206,7 +121,7 @@ export type ERC20Contract = ethers.Contract & {
 // =============================================================================
 
 export interface ContractFactoryOptions {
-  provider: DualProvider;
+  provider: ethers.providers.JsonRpcProvider;
   networkId: NetworkId;
   signer?: ethers.Signer;
 }
@@ -215,14 +130,10 @@ export interface ContractFactoryOptions {
  * Factory for creating contract instances with dual provider support
  */
 export class ContractFactory {
-  private provider: DualProvider;
-  private networkId: NetworkId;
-  private signer?: ethers.Signer;
+  private provider: ethers.providers.JsonRpcProvider;
 
   constructor(options: ContractFactoryOptions) {
     this.provider = options.provider;
-    this.networkId = options.networkId;
-    this.signer = options.signer;
   }
 
   /**
@@ -230,30 +141,13 @@ export class ContractFactory {
    */
   createBlindMintContract(address: Address): BlindMintClaimContract {
     // Use primary provider for write operations if signer is available
-    const providerOrSigner = this.signer || this.provider.current;
+    const provider = this.provider;
 
     const contract = new ethers.Contract(
       address,
-      BLINDMINT_CLAIM_ABI,
-      providerOrSigner,
+      GachaExtensionERC1155ABIv2,
+      provider,
     ) as BlindMintClaimContract;
-
-    // Add getTotalMints method implementation using getUserMints
-    contract.getTotalMints = async (
-      minter: string,
-      creatorContractAddress: string,
-      instanceId: number,
-    ): Promise<number> => {
-      try {
-        const userMints = await contract.getUserMints(minter, creatorContractAddress, instanceId);
-        // Return sum of reserved and delivered counts
-        return userMints.reservedCount + userMints.deliveredCount;
-      } catch (error) {
-        // If getUserMints fails, return 0 (no mints found)
-        console.warn('Failed to get user mints:', error);
-        return 0;
-      }
-    };
 
     return contract;
   }
@@ -262,68 +156,18 @@ export class ContractFactory {
    * Create Creator (ERC721) contract instance
    */
   createCreatorContract(address: Address): CreatorContract {
-    const providerOrSigner = this.signer || this.provider.current;
+    const provider = this.provider;
 
-    return new ethers.Contract(address, CREATOR_CONTRACT_ABI, providerOrSigner) as CreatorContract;
+    return new ethers.Contract(address, CreatorContractABI, provider) as CreatorContract;
   }
 
   /**
    * Create ERC20 token contract instance
    */
   createERC20Contract(address: Address): ERC20Contract {
-    const providerOrSigner = this.signer || this.provider.current;
+    const provider = this.provider;
 
-    return new ethers.Contract(address, ERC20_ABI, providerOrSigner) as ERC20Contract;
-  }
-
-  /**
-   * Get well-known contract instances for the current network
-   */
-  getWellKnownContracts() {
-    const networkConfig = getNetworkConfig(this.networkId);
-    const contracts = networkConfig?.contracts;
-
-    if (!contracts) {
-      return {
-        usdc: null,
-        usdt: null,
-        weth: null,
-        blindMint: null,
-        gacha: null,
-      };
-    }
-
-    return {
-      usdc: contracts.erc20Tokens.usdc
-        ? this.createERC20Contract(contracts.erc20Tokens.usdc)
-        : null,
-      usdt: contracts.erc20Tokens.usdt
-        ? this.createERC20Contract(contracts.erc20Tokens.usdt)
-        : null,
-      weth: contracts.erc20Tokens.weth
-        ? this.createERC20Contract(contracts.erc20Tokens.weth)
-        : null,
-      blindMint: contracts.claimExtensions.blindMint
-        ? this.createBlindMintContract(contracts.claimExtensions.blindMint)
-        : null,
-      gacha: contracts.claimExtensions.gacha
-        ? this.createBlindMintContract(contracts.claimExtensions.gacha)
-        : null,
-    };
-  }
-
-  /**
-   * Update the signer (when user connects wallet)
-   */
-  setSigner(signer: ethers.Signer) {
-    this.signer = signer;
-  }
-
-  /**
-   * Remove the signer (when user disconnects wallet)
-   */
-  removeSigner() {
-    this.signer = undefined;
+    return new ethers.Contract(address, ERC20ABI, provider) as ERC20Contract;
   }
 }
 

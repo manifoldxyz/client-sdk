@@ -46,13 +46,30 @@ export interface TransactionData {
   networkId: number;
 }
 
+export type TransactionStepType = 'mint' | 'approve';
+
+export type TransactionStepExecuteOptions = {
+  confirmations?: number;
+  callbacks?: TransactionOnProgress;
+};
+
 export interface TransactionStep {
   id: string;
   name: string;
-  type: 'mint' | 'approve';
-  execute: (adapter: IAccountAdapter) => Promise<TransactionReceipt>;
+  type: TransactionStepType;
+  execute: (
+    adapter: IAccountAdapter,
+    options?: TransactionStepExecuteOptions,
+  ) => Promise<TransactionReceipt>;
   description?: string;
   cost?: { native?: Money; erc20s?: Money[] };
+}
+
+export interface TransactionOnProgress {
+  status: 'pending' | 'confirmed' | 'failed';
+  steps: TransactionStep[];
+  currentStep?: TransactionStep;
+  receipt?: TransactionReceipt[];
 }
 
 export interface PurchaseParams {

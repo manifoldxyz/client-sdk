@@ -5,7 +5,7 @@ import {
   createEthers5Adapter,
 } from '../src/adapters/ethers5-adapter';
 import { AccountAdapterFactory } from '../src/adapters/account-adapter-factory';
-import type { UniversalTransactionRequest } from '../src/types/account-adapter';
+import type { UniversalTransactionRequest, UniversalTransactionResponse } from '../src/types/account-adapter';
 import { ClientSDKError } from '../src/types/errors';
 
 // =============================================================================
@@ -124,7 +124,7 @@ describe('Ethers5Adapter', () => {
         gasLimit: '21000',
       };
 
-      const response = await adapter.sendTransaction(request);
+      const response = (await adapter.sendTransaction(request)) as unknown as UniversalTransactionResponse;
 
       expect(response.hash).toBe('0xmockedtxhash');
       expect(response.from).toBe('0x742d35cc6488ad532a3b33a8b3c9f9b8eb8c5b3a');

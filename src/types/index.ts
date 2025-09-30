@@ -54,8 +54,6 @@ export type {
   AdapterCreationOptions,
 
   // Error types
-  AccountAdapterError,
-  AccountAdapterErrorCode,
   FactoryError,
   FactoryErrorCode,
 

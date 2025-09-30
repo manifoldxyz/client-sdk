@@ -3,13 +3,12 @@ import type {
   IAccountAdapter,
   UniversalTransactionRequest,
   UniversalTransactionResponse,
-  AccountAdapterError,
-  AccountAdapterErrorCode,
   AdapterType,
 } from '../types/account-adapter';
 import { Money } from '../libs/money';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import { checkERC20Balance } from '../utils/gas-estimation';
+import type { ManifoldClient } from '../types';
 
 // =============================================================================
 // ERC-20 CONSTANTS
@@ -52,9 +51,10 @@ import { checkERC20Balance } from '../utils/gas-estimation';
 export class Ethers5Adapter implements IAccountAdapter {
   readonly adapterType: AdapterType = 'ethers5';
 
-  private _address: string | null = null;
-  private _provider: ethers.providers.Provider;
-  private _signer: ethers.Signer | null;
+  private _signer: ethers.providers.JsonRpcSigner | undefined;
+  private _wallet: ethers.Wallet | undefined;
+  private _client: ManifoldClient;
+  private _address: string | undefined;
 
   /**
    * Initialize adapter with ethers v5 provider or signer
@@ -62,36 +62,42 @@ export class Ethers5Adapter implements IAccountAdapter {
    * @param providerOrSigner - ethers v5 Provider or Signer instance
    * @throws {ClientSDKError} When provider is invalid or missing account
    */
-  constructor(providerOrSigner: ethers.providers.Provider | ethers.Signer) {
-    if (this._isProvider(providerOrSigner)) {
-      this._provider = providerOrSigner;
-      this._signer = null;
-    } else if (this._isSigner(providerOrSigner)) {
-      this._signer = providerOrSigner;
-      this._provider = providerOrSigner.provider!;
-
-      if (!this._provider) {
-        throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Signer must have a connected provider');
-      }
-    } else {
+  constructor(
+    client: ManifoldClient,
+    signer?: ethers.providers.JsonRpcSigner,
+    wallet?: ethers.Wallet,
+  ) {
+    this._client = client;
+    if (!signer && !wallet) {
+      throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Signer or wallet is required');
+    }
+    if (signer && wallet) {
       throw new ClientSDKError(
         ErrorCode.INVALID_INPUT,
-        'Invalid provider or signer instance for ethers v5',
+        'Provide either signer or wallet, not both',
       );
     }
+    if (wallet) {
+      this._wallet = wallet;
+    }
+    if (signer) {
+      this._signer = signer;
+    }
+  }
+
+  get provider() {
+    const provider = this._signer || this._wallet;
+    if (!provider) {
+      throw new ClientSDKError(ErrorCode.UNKNOWN_ERROR, 'No client or wallet available');
+    }
+    return provider;
   }
 
   /**
    * Get wallet address (cached after first call)
    */
-  get address(): string {
-    if (!this._address) {
-      throw new ClientSDKError(
-        ErrorCode.INVALID_INPUT,
-        'Address not initialized. Call an async method first to initialize address.',
-      );
-    }
-    return this._address;
+  async getAddress(): Promise<string> {
+    return this._wallet?.address || this._signer!.getAddress();
   }
 
   /**
@@ -99,25 +105,46 @@ export class Ethers5Adapter implements IAccountAdapter {
    *
    * @param request - Universal transaction request
    * @returns Promise resolving to universal transaction response
-   * @throws {AccountAdapterError} When transaction fails or is rejected
+   * @throws {ClientSDKError} When transaction fails or is rejected
    */
-  async sendTransaction(
-    request: UniversalTransactionRequest,
-  ): Promise<UniversalTransactionResponse> {
+  async sendTransaction(request: UniversalTransactionRequest): Promise<string> {
     try {
-      const signer = await this._getSigner();
       await this._ensureAddress();
 
       // Convert universal request to ethers v5 transaction request
       const ethersRequest = this._convertToEthersRequest(request);
 
       // Send transaction
-      const tx = await signer.sendTransaction(ethersRequest);
+      const tx = await this.provider.sendTransaction(ethersRequest);
 
-      // Convert response to universal format
-      return this._convertToUniversalResponse(tx);
+      return tx.hash;
     } catch (error) {
       throw this._wrapError(error, 'sendTransaction', { request });
+    }
+  }
+
+  async sendTransactionWithConfirmation(
+    request: UniversalTransactionRequest,
+    options: { confirmations?: number } = {},
+  ): Promise<UniversalTransactionResponse> {
+    const confirmations = options.confirmations ?? 1;
+
+    const networkId = await this.getConnectedNetworkId();
+
+    try {
+      await this._ensureAddress();
+
+      const ethersRequest = this._convertToEthersRequest(request);
+      const tx = await this.provider.sendTransaction(ethersRequest);
+      const receipt = await tx.wait(confirmations);
+      return this._convertToUniversalResponse(tx, receipt);
+    } catch (error) {
+      const replacementReceipt = await this._handleReplacementTransaction(error, confirmations);
+      if (replacementReceipt) {
+        return this._createResponseFromReceipt(replacementReceipt, request, networkId);
+      }
+
+      throw this._wrapError(error, 'sendTransactionWithConfirmation', { request, confirmations });
     }
   }
 
@@ -126,36 +153,32 @@ export class Ethers5Adapter implements IAccountAdapter {
    *
    * @param tokenAddress - ERC-20 token address (optional, defaults to native token)
    * @returns Promise resolving to Money instance with balance
-   * @throws {AccountAdapterError} When balance query fails
+   * @throws {ClientSDKError} When balance query fails
    */
   async getBalance(tokenAddress?: string): Promise<Money> {
     try {
-      await this._ensureAddress();
+      const address = await this._ensureAddress();
       const networkId = await this.getConnectedNetworkId();
 
       if (!tokenAddress || tokenAddress === ethers.constants.AddressZero) {
         // Get native token balance
-        const balance = await this._provider.getBalance(this._address!);
+        const balance = await this.provider.getBalance(address);
 
         return Money.create({
           value: balance,
           networkId,
-          provider: this._provider as
-            | ethers.providers.JsonRpcProvider
-            | ethers.providers.Web3Provider,
+          provider: this.provider,
           fetchUSD: true,
         });
       } else {
         // Get ERC-20 token balance
-        const balance = await checkERC20Balance(tokenAddress, this._address!, this._provider);
+        const balance = await checkERC20Balance(tokenAddress, address, this._signer);
 
         return Money.create({
           value: balance,
           networkId,
           erc20: tokenAddress,
-          provider: this._provider as
-            | ethers.providers.JsonRpcProvider
-            | ethers.providers.Web3Provider,
+          provider: this._signer,
           fetchUSD: true,
         });
       }
@@ -168,12 +191,12 @@ export class Ethers5Adapter implements IAccountAdapter {
    * Get the currently connected network ID
    *
    * @returns Promise resolving to network ID (chain ID)
-   * @throws {AccountAdapterError} When network query fails
+   * @throws {ClientSDKError} When network query fails
    */
   async getConnectedNetworkId(): Promise<number> {
     try {
-      const network = await this._provider.getNetwork();
-      return network.chainId;
+      const network = await this.provider.getChainId();
+      return network;
     } catch (error) {
       throw this._wrapError(error, 'getConnectedNetworkId');
     }
@@ -184,27 +207,30 @@ export class Ethers5Adapter implements IAccountAdapter {
    *
    * @param chainId - Target network ID to switch to
    * @returns Promise resolving when network switch is complete
-   * @throws {AccountAdapterError} When network switch fails or is rejected
+   * @throws {ClientSDKError} When network switch fails or is rejected
    */
   async switchNetwork(chainId: number): Promise<void> {
-    try {
-      // For ethers v5, we need to use the provider's request method if available
-      const provider = this._provider as unknown as Record<string, unknown>;
-
-      if (typeof provider.request === 'function') {
-        // This is likely a Web3Provider connected to MetaMask or similar
-        await (provider.request as (params: unknown) => Promise<unknown>)({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: `0x${chainId.toString(16)}` }],
-        });
-      } else {
-        throw new ClientSDKError(
-          ErrorCode.UNSUPPORTED_TYPE,
-          'Network switching not supported by this provider',
-        );
+    if (this._wallet) {
+      return;
+    }
+    if (this._signer) {
+      try {
+        // For ethers v5, we need to use the provider's request method if available
+        const provider = this._signer.provider;
+        if (typeof provider.send === 'function') {
+          // This is likely a Web3Provider connected to MetaMask or similar
+          await provider.send('wallet_switchEthereumChain', [
+            { chainId: `0x${chainId.toString(16)}` },
+          ]);
+        } else {
+          throw new ClientSDKError(
+            ErrorCode.UNSUPPORTED_TYPE,
+            'Network switching not supported by this provider',
+          );
+        }
+      } catch (error) {
+        throw this._wrapError(error, 'switchNetwork', { chainId });
       }
-    } catch (error) {
-      throw this._wrapError(error, 'switchNetwork', { chainId });
     }
   }
 
@@ -213,15 +239,38 @@ export class Ethers5Adapter implements IAccountAdapter {
    *
    * @param message - Message to sign
    * @returns Promise resolving to signature string
-   * @throws {AccountAdapterError} When signing fails or is rejected
+   * @throws {ClientSDKError} When signing fails or is rejected
    */
   async signMessage(message: string): Promise<string> {
     try {
-      const signer = await this._getSigner();
-      return await signer.signMessage(message);
+      return await this.provider.signMessage(message);
     } catch (error) {
       throw this._wrapError(error, 'signMessage', { message });
     }
+  }
+
+  /**
+   * Send raw RPC calls to the wallet provider
+   * Useful for wallet-specific methods like adding custom networks, tokens, etc.
+   *
+   * @param method - RPC method name (e.g., 'wallet_addEthereumChain')
+   * @param params - Method parameters
+   * @returns Promise resolving to the RPC response
+   * @throws {ClientSDKError} When RPC call fails or is not supported
+   */
+  async sendCalls(method: string, params?: unknown[]): Promise<unknown> {
+    if (this._wallet) {
+      return;
+    }
+    if (this._signer) {
+      try {
+        const signerProvider = this._signer.provider;
+        return signerProvider.send(method, params as unknown[]);
+      } catch (error) {
+        throw this._wrapError(error, 'sendCalls', { method, params });
+      }
+    }
+    return;
   }
 
   // =============================================================================
@@ -229,59 +278,13 @@ export class Ethers5Adapter implements IAccountAdapter {
   // =============================================================================
 
   /**
-   * Type guard to check if object is an ethers v5 Provider
-   */
-  private _isProvider(obj: unknown): obj is ethers.providers.Provider {
-    if (!obj || typeof obj !== 'object') {
-      return false;
-    }
-    const provider = obj as Record<string, unknown>;
-    return (
-      typeof provider.getNetwork === 'function' &&
-      typeof provider.getBalance === 'function' &&
-      !provider.signTransaction
-    ); // Signer has signTransaction, Provider doesn't
-  }
-
-  /**
-   * Type guard to check if object is an ethers v5 Signer
-   */
-  private _isSigner(obj: unknown): obj is ethers.Signer {
-    if (!obj || typeof obj !== 'object') {
-      return false;
-    }
-    const signer = obj as Record<string, unknown>;
-    return typeof signer.signTransaction === 'function' && typeof signer.getAddress === 'function';
-  }
-
-  /**
-   * Get signer instance, throwing error if only provider is available
-   */
-  private async _getSigner(): Promise<ethers.Signer> {
-    if (this._signer) {
-      return this._signer;
-    }
-
-    throw new ClientSDKError(
-      ErrorCode.INVALID_INPUT,
-      'No signer available. Cannot perform transactions with read-only provider.',
-    );
-  }
-
-  /**
    * Ensure address is initialized by fetching it from signer
    */
-  private async _ensureAddress(): Promise<void> {
+  private async _ensureAddress(): Promise<string> {
     if (!this._address) {
-      if (this._signer) {
-        this._address = await this._signer.getAddress();
-      } else {
-        throw new ClientSDKError(
-          ErrorCode.INVALID_INPUT,
-          'Cannot get address from read-only provider',
-        );
-      }
+      this._address = await this.provider.getAddress();
     }
+    return this._address;
   }
 
   /**
@@ -333,51 +336,99 @@ export class Ethers5Adapter implements IAccountAdapter {
    * Convert ethers v5 transaction response to universal format
    */
   private _convertToUniversalResponse(
-    tx: ethers.providers.TransactionResponse,
+    txResponse: ethers.providers.TransactionResponse,
+    receipt: ethers.providers.TransactionReceipt,
   ): UniversalTransactionResponse {
     const response: UniversalTransactionResponse = {
-      hash: tx.hash,
-      from: tx.from,
-      to: tx.to || '',
-      confirmations: tx.confirmations,
-      nonce: tx.nonce,
-      chainId: tx.chainId,
+      hash: txResponse.hash,
+      from: txResponse.from,
+      to: txResponse.to || '',
+      confirmations: txResponse.confirmations,
+      nonce: txResponse.nonce,
+      chainId: txResponse.chainId,
     };
 
-    if (tx.blockNumber) {
-      response.blockNumber = tx.blockNumber;
+    if (txResponse.blockNumber) {
+      response.blockNumber = txResponse.blockNumber;
     }
 
-    if (tx.blockHash) {
-      response.blockHash = tx.blockHash;
+    if (txResponse.blockHash) {
+      response.blockHash = txResponse.blockHash;
     }
 
     // Note: gasUsed and effectiveGasPrice are not available on TransactionResponse
     // They would be available on TransactionReceipt after waiting for confirmation
-    // if (tx.gasUsed) {
-    //   response.gasUsed = tx.gasUsed.toString();
-    // }
+    if (receipt.gasUsed) {
+      response.gasUsed = receipt.gasUsed.toString();
+    }
 
-    // if (tx.effectiveGasPrice) {
-    //   response.effectiveGasPrice = tx.effectiveGasPrice.toString();
-    // }
+    if (receipt.effectiveGasPrice) {
+      response.effectiveGasPrice = receipt.effectiveGasPrice.toString();
+    }
 
     // Determine transaction status
-    if (tx.confirmations === 0) {
+    if (receipt.confirmations === 0) {
       response.status = 'pending';
-    } else if (tx.confirmations > 0) {
+    } else if (receipt.confirmations > 0) {
       response.status = 'confirmed';
     }
 
     return response;
   }
 
+  private async _handleReplacementTransaction(
+    error: unknown,
+    confirmations: number,
+  ): Promise<ethers.providers.TransactionReceipt | null> {
+    if (!error || typeof error !== 'object') {
+      return null;
+    }
+
+    const err = error as Record<string, unknown> & {
+      code?: unknown;
+      cancelled?: boolean;
+      replacement?: ethers.providers.TransactionResponse;
+    };
+
+    if (err.code === 'TRANSACTION_REPLACED' && !err.cancelled && err.replacement) {
+      try {
+        return await err.replacement.wait(confirmations);
+      } catch (replacementError) {
+        throw this._wrapError(replacementError, 'transactionReplacement', { confirmations });
+      }
+    }
+
+    return null;
+  }
+
+  private _createResponseFromReceipt(
+    receipt: ethers.providers.TransactionReceipt,
+    request: UniversalTransactionRequest,
+    networkId: number,
+  ): UniversalTransactionResponse {
+    return {
+      hash: receipt.transactionHash,
+      from: receipt.from ?? this._address ?? '',
+      to: receipt.to ?? request.to ?? '',
+      blockNumber: receipt.blockNumber ?? undefined,
+      blockHash: receipt.blockHash ?? undefined,
+      gasUsed: receipt.gasUsed ? receipt.gasUsed.toString() : undefined,
+      effectiveGasPrice: receipt.effectiveGasPrice
+        ? receipt.effectiveGasPrice.toString()
+        : undefined,
+      status: 'pending',
+      confirmations: receipt.confirmations ?? 0,
+      nonce: request.nonce,
+      chainId: networkId,
+    };
+  }
+
   /**
-   * Wrap errors in AccountAdapterError format
+   * Normalize errors into ClientSDKError instances
    */
-  private _wrapError(error: unknown, method?: string, params?: unknown): AccountAdapterError {
+  private _wrapError(error: unknown, method?: string, params?: unknown): ClientSDKError {
     // Determine error code based on error type
-    let code: AccountAdapterErrorCode = 'UNKNOWN_ERROR';
+    let code: ErrorCode = ErrorCode.UNKNOWN_ERROR;
     let message = 'An unexpected error occurred';
 
     if (error instanceof ClientSDKError) {
@@ -385,50 +436,172 @@ export class Ethers5Adapter implements IAccountAdapter {
       throw error;
     }
 
-    const errorObj = error as Record<string, unknown>;
+    const errorObj = error as Record<string, unknown> & {
+      code?: string | number;
+      message?: string;
+      data?: { message?: string };
+      cancelled?: boolean;
+      replacement?: unknown;
+    };
 
+    const errorMessage = errorObj?.message?.toLowerCase() ?? '';
+    const dataMessage = (errorObj?.data?.message as string)?.toLowerCase() ?? '';
+
+    // Handle user rejection cases
     if (
-      errorObj?.code === 4001 ||
-      (typeof errorObj?.message === 'string' && errorObj.message.includes('User denied'))
+      errorObj?.code === 'ACTION_REJECTED' ||
+      errorObj?.code === 4001 || // MetaMask user rejected
+      errorMessage.includes('user denied transaction signature') ||
+      errorMessage.includes('userrefusedondevice') ||
+      (errorMessage.includes('cancelled') && !errorObj?.cancelled) ||
+      errorMessage.includes('rejected transaction') ||
+      dataMessage.includes('rejected transaction')
     ) {
-      code = 'TRANSACTION_REJECTED';
-      message = 'Transaction was rejected by user';
-    } else if (
+      code = ErrorCode.TRANSACTION_REJECTED;
+      message = 'Transaction Rejected';
+    }
+    // Handle network switch rejection
+    else if (errorObj?.code === 4902) {
+      code = ErrorCode.NETWORK_ERROR;
+      message = 'Network not available in wallet';
+    }
+    // Handle transaction replacement cases
+    else if (errorObj?.code === 'TRANSACTION_REPLACED') {
+      code = ErrorCode.TRANSACTION_REPLACED;
+      if (errorObj.cancelled) {
+        message = 'Transaction was cancelled';
+      } else if (errorObj.replacement) {
+        message = 'Transaction was replaced with a new transaction (usually due to speed up)';
+      }
+    }
+    // Handle Ledger specific errors
+    else if (errorMessage.includes('ledger') || dataMessage.includes('ledger')) {
+      code = ErrorCode.HARDWARE_WALLET_ERROR;
+      message = 'Error with Ledger device. Please ensure device is connected and unlocked';
+    }
+    // Handle pending transaction errors
+    else if (
+      errorObj?.code === -32002 &&
+      errorMessage.includes('pending') &&
+      dataMessage.includes('pending')
+    ) {
+      code = ErrorCode.TRANSACTION_PENDING;
+      message = 'Transaction already pending in wallet. Please check your wallet';
+    }
+    // Handle invalid amount errors
+    else if (dataMessage.includes('invalid amount') || errorMessage.includes('invalid amount')) {
+      code = ErrorCode.INVALID_INPUT;
+      message = 'Price calculation is incorrect, contact support!';
+    }
+    // Handle insufficient funds
+    else if (
       errorObj?.code === 'INSUFFICIENT_FUNDS' ||
-      (typeof errorObj?.message === 'string' && errorObj.message.includes('insufficient funds'))
+      dataMessage.includes('insufficient funds') ||
+      errorMessage.includes('insufficient funds')
     ) {
-      code = 'INSUFFICIENT_BALANCE';
-      message = 'Insufficient balance for transaction';
-    } else if (
-      errorObj?.code === 'NETWORK_ERROR' ||
-      (typeof errorObj?.message === 'string' && errorObj.message.includes('network'))
+      code = ErrorCode.INSUFFICIENT_FUNDS;
+      message =
+        'Your wallet does not have enough funds to complete this transaction. Please try again with a different wallet or add more funds to your wallet.';
+    }
+    // Handle insufficient balance for transaction
+    else if (
+      dataMessage.includes('balance too low to proceed') ||
+      errorMessage.includes('balance too low to proceed')
     ) {
-      code = 'NETWORK_MISMATCH';
-      message = 'Network error occurred';
-    } else if (typeof errorObj?.message === 'string' && errorObj.message.includes('timeout')) {
-      code = 'TIMEOUT';
-      message = 'Operation timed out';
-    } else if (
-      typeof errorObj?.message === 'string' &&
-      (errorObj.message.includes('revert') || errorObj.message.includes('reverted'))
+      code = ErrorCode.INSUFFICIENT_FUNDS;
+      message =
+        'Your wallet does not have enough funds to complete this transaction. Please try again with a different wallet or add more funds to your wallet.';
+    }
+    // Handle nonce too low errors
+    else if (dataMessage.includes('nonce too low') || errorMessage.includes('nonce too low')) {
+      code = ErrorCode.NONCE_ERROR;
+      message = 'Transaction nonce is too low. Please try again';
+    }
+    // Handle gas price too low
+    else if (
+      errorMessage.includes('max fee per gas less than block base fee') ||
+      dataMessage.includes('max fee per gas less than block base fee')
     ) {
-      code = 'TRANSACTION_FAILED';
+      code = ErrorCode.GAS_PRICE_TOO_LOW;
+      message = 'Gas price too low for current network conditions. Please try again';
+    }
+    // Handle timeout errors
+    else if (
+      errorObj?.code === 'TIMEOUT' ||
+      dataMessage.includes('timeout') ||
+      errorMessage.includes('timeout')
+    ) {
+      code = ErrorCode.TIMEOUT;
+      message =
+        'Transaction timed out. Your wallet connection is having issues. Disconnect and reconnect your wallet, then please try again';
+    }
+    // Handle network disconnection
+    else if (
+      dataMessage.includes('network disconnected') ||
+      errorMessage.includes('network disconnected')
+    ) {
+      code = ErrorCode.NETWORK_ERROR;
+      message = 'Network connection lost. Please check your internet connection and try again';
+    }
+    // Handle wrong network errors
+    else if (dataMessage.includes('wrong network') || errorMessage.includes('wrong network')) {
+      code = ErrorCode.NETWORK_ERROR;
+      message = 'Wrong network selected. Please switch to the correct network';
+    }
+    // Handle user balance too low to pay for gas fees
+    else if (
+      dataMessage.includes('insufficient funds for gas') ||
+      errorMessage.includes('insufficient funds for gas')
+    ) {
+      code = ErrorCode.INSUFFICIENT_FUNDS;
+      message =
+        'Your wallet does not have enough funds to pay for gas fees. Please try again with a different wallet or add more funds to your wallet.';
+    }
+    // Handle ERC20 transfer amount exceeds balance
+    else if (errorMessage.includes('erc20: transfer amount exceeds balance')) {
+      code = ErrorCode.INSUFFICIENT_FUNDS;
+      message = 'You do not have the required amount of ERC20 tokens to complete this transaction.';
+    }
+    // Handle base case gas estimation failures
+    else if (
+      errorObj?.code === 'UNPREDICTABLE_GAS_LIMIT' ||
+      errorMessage.includes('cannot estimate gas') ||
+      dataMessage.includes('cannot estimate gas')
+    ) {
+      code = ErrorCode.GAS_ESTIMATION_FAILED;
+      console.error('Gas estimation error:', error);
+      message =
+        'Unable to estimate gas for transaction. The transaction may fail. Please try again.';
+    }
+    // Handle call exceptions
+    else if (errorObj?.code === 'CALL_EXCEPTION') {
+      code = ErrorCode.CONTRACT_ERROR;
+      message = 'Transaction failed due to contract execution error';
+    }
+    // Handle revert errors
+    else if (errorMessage.includes('revert') || errorMessage.includes('reverted')) {
+      code = ErrorCode.TRANSACTION_REVERTED;
       message = 'Transaction reverted';
-    } else if (typeof errorObj?.message === 'string') {
-      message = errorObj.message;
+    }
+    // Handle network errors
+    else if (errorObj?.code === 'NETWORK_ERROR' || errorMessage.includes('network')) {
+      code = ErrorCode.NETWORK_ERROR;
+      message = 'Network error occurred';
+    }
+    // Default case - use original message if available
+    else if (errorObj?.message) {
+      // For debugging purposes, log the full error
+      console.error('Transaction error:', error);
+      message = 'Transaction failed. Please try again. If it fails again, please contact support.';
     }
 
-    const adapterError: AccountAdapterError = Object.assign(new Error(message), {
-      code,
+    return new ClientSDKError(code, message, {
+      adapterCode: code,
       adapterType: this.adapterType,
-      context: {
-        method,
-        params,
-        originalError: error instanceof Error ? error : undefined,
-      },
+      method,
+      params,
+      originalError: error instanceof Error ? error : undefined,
     });
-
-    return adapterError;
   }
 }
 
@@ -453,15 +626,8 @@ export class Ethers5Adapter implements IAccountAdapter {
  * const adapter = createEthers5Adapter(signer);
  * ```
  */
-export function createEthers5Adapter(signer: ethers.Signer): IAccountAdapter {
-  if (!signer || typeof signer !== 'object') {
-    throw new ClientSDKError(
-      ErrorCode.INVALID_INPUT,
-      'Provider must be a valid ethers v5 Provider or Signer instance',
-    );
-  }
-
-  return new Ethers5Adapter(signer);
+export function createEthers5Adapter(_signer: ethers.providers.JsonRpcSigner): IAccountAdapter {
+  return new Ethers5Adapter(_signer);
 }
 
 // =============================================================================

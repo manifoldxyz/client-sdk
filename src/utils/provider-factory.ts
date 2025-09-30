@@ -22,7 +22,7 @@ export interface ProviderFactoryOptions {
 // =============================================================================
 
 /**
- * Create dual provider instance with primary and bridge providers
+ * Create dual provider instance with primary and bridge providers as fallback
  */
 export function createProvider(options: ProviderFactoryOptions): ethers.providers.JsonRpcProvider {
   const { networkId, customRpcUrls } = options;

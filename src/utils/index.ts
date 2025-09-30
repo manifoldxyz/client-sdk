@@ -26,9 +26,6 @@ export {
   batchContractCalls,
   validateContract,
   parseContractEvents,
-  BLINDMINT_CLAIM_ABI,
-  CREATOR_CONTRACT_ABI,
-  ERC20_ABI,
 } from './contract-factory';
 
 export type {
@@ -48,6 +45,11 @@ export {
 } from './gas-estimation';
 
 export type { GasEstimationParams } from './gas-estimation';
+
+// Transaction helpers
+export { poll, ensureConnectedNetwork } from './transactions';
+
+export type { EnsureConnectedNetworkOptions } from './transactions';
 
 // =============================================================================
 // ADDITIONAL UTILITY FUNCTIONS
