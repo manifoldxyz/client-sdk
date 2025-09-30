@@ -657,9 +657,7 @@ export class Ethers5Adapter implements IAccountAdapter {
  * const adapter = createEthers5Adapter(signer);
  * ```
  */
-export function createEthers5Adapter(
-  signer: ethers.providers.JsonRpcSigner,
-): IAccountAdapter;
+export function createEthers5Adapter(signer: ethers.providers.JsonRpcSigner): IAccountAdapter;
 export function createEthers5Adapter(
   client: ManifoldClient,
   signer: ethers.providers.JsonRpcSigner,
