@@ -16,21 +16,7 @@ export type {
 } from './blindmint';
 
 // Essential contract types
-export type {
-  ClaimExtensionContract,
-  ERC20Contract,
-  ContractCallOptions,
-  TransactionResult,
-} from './contracts';
-
-// Enhanced error handling
-export type {
-  BlindMintError,
-  BlindMintErrorCode,
-  ErrorSeverity,
-  ErrorCategory,
-  ErrorMetadata,
-} from './enhanced-errors';
+export type { ClaimExtensionContract, ERC20Contract, ContractCallOptions } from './contracts';
 
 // Configuration
 export type { NetworkConfig, CacheConfig, ApiConfig, GasConfig, ProviderConfig } from './config';

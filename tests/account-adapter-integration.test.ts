@@ -4,7 +4,6 @@ import { AccountAdapterFactory } from '../src/adapters/account-adapter-factory';
 import { BlindMintProductImpl } from '../src/products/blindmint';
 import type { IAccountAdapter } from '../src/types/account-adapter';
 import type { InstanceData } from '../src/types/product';
-import { BlindMintError, BlindMintErrorCode } from '../src/types/enhanced-errors';
 
 // Mock implementations for testing
 const createMockAdapter = (

@@ -7,7 +7,6 @@ import {
 } from '../src/products/blindmint';
 import type { InstanceData } from '../src/types/product';
 import type { Address, NetworkId } from '../src/types/common';
-import { BlindMintError, BlindMintErrorCode } from '../src/types/enhanced-errors';
 
 // Mock the external dependencies
 vi.mock('../src/utils/provider-factory', () => {

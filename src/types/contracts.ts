@@ -177,30 +177,6 @@ export interface TransactionResponse extends Omit<ContractTransaction, 'type'> {
   context?: TransactionContext;
 }
 
-/**
- * Enhanced transaction result after completion
- */
-export interface TransactionResult {
-  /** Original transaction response */
-  transaction: TransactionResponse;
-  /** Receipt after mining */
-  receipt: ContractReceipt;
-  /** Success/failure status */
-  success: boolean;
-  /** Error if transaction failed */
-  error?: ContractError;
-  /** Gas actually used */
-  gasUsed: BigNumber;
-  /** Gas price paid */
-  gasPrice: BigNumber;
-  /** Total gas cost in wei */
-  gasCost: BigNumber;
-  /** Network fees in USD (if available) */
-  gasCostUSD?: number;
-  /** Transaction execution time in milliseconds */
-  executionTime: number;
-}
-
 export type TransactionType =
   | 'approve'
   | 'mint'
@@ -314,20 +290,6 @@ export interface ContractError extends Error {
     gasEstimate?: BigNumber;
     provider?: 'wallet' | 'bridge';
   };
-}
-
-/**
- * Network-related errors
- */
-export interface NetworkError extends Error {
-  /** Network ID where error occurred */
-  networkId: NetworkId;
-  /** Expected network ID */
-  expectedNetworkId?: NetworkId;
-  /** Error type */
-  type: NetworkErrorType;
-  /** Whether error is recoverable */
-  recoverable: boolean;
 }
 
 export type NetworkErrorType =
