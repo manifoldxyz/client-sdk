@@ -338,90 +338,8 @@ export type NetworkErrorType =
   | 'timeout';
 
 // =============================================================================
-// VALIDATION TYPES
-// =============================================================================
-
-/**
- * Pre-transaction validation results
- */
-export interface ContractValidation {
-  /** Whether transaction would succeed */
-  isValid: boolean;
-  /** Validation errors */
-  errors: ContractValidationError[];
-  /** Validation warnings */
-  warnings: ContractValidationWarning[];
-  /** Gas estimation if valid */
-  estimatedGas?: BigNumber;
-  /** Required allowance for ERC20 payments */
-  requiredAllowance?: BigNumber;
-  /** Current allowance */
-  currentAllowance?: BigNumber;
-}
-
-export interface ContractValidationError {
-  /** Error code */
-  code: ContractValidationErrorCode;
-  /** Human-readable message */
-  message: string;
-  /** Field that caused the error */
-  field?: string;
-  /** Additional error data */
-  data?: unknown;
-}
-
-export interface ContractValidationWarning {
-  /** Warning code */
-  code: string;
-  /** Human-readable message */
-  message: string;
-  /** Severity level */
-  severity: 'low' | 'medium' | 'high';
-}
-
-export type ContractValidationErrorCode =
-  | 'insufficient-balance'
-  | 'insufficient-allowance'
-  | 'invalid-quantity'
-  | 'not-eligible'
-  | 'mint-not-active'
-  | 'exceeds-wallet-limit'
-  | 'exceeds-total-supply'
-  | 'invalid-proofs'
-  | 'wrong-network'
-  | 'gas-too-high';
-
-// =============================================================================
 // PROVIDER TYPES
 // =============================================================================
-
-/**
- * Manifold Bridge Provider interface
- */
-export interface ManifoldBridgeProvider {
-  /** Network ID this provider serves */
-  readonly networkId: NetworkId;
-  /** RPC endpoint URL */
-  readonly rpcUrl: string;
-
-  /** Get contract instance through bridge */
-  getContract(address: Address, abi: unknown[]): BridgeContract;
-  /** Execute read-only contract call */
-  call(request: CallRequest): Promise<unknown>;
-  /** Estimate gas for transaction */
-  estimateGas(request: TransactionRequest): Promise<BigNumber>;
-  /** Get current gas price */
-  getGasPrice(): Promise<BigNumber>;
-  /** Get block number */
-  getBlockNumber(): Promise<number>;
-}
-
-export type BridgeContract = {
-  /** Contract address */
-  readonly address: Address;
-  /** Contract ABI */
-  readonly interface: unknown;
-} & Record<string, (...args: unknown[]) => Promise<unknown>>;
 
 export interface CallRequest {
   to: Address;
@@ -437,17 +355,3 @@ export interface TransactionRequest {
   gasPrice?: BigNumber;
   from?: Address;
 }
-
-// =============================================================================
-// CONSTANTS
-// =============================================================================
-
-/** Storage protocol mapping */
-export const STORAGE_PROTOCOLS = {
-  0: 'none',
-  1: 'ipfs',
-  2: 'arweave',
-  3: 'http',
-} as const;
-
-// Note: Gas configurations moved to config.ts for centralized management

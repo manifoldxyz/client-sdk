@@ -31,11 +31,52 @@ export interface BlindMintPayload {
   quantity: number;
 }
 
+/**
+ * Prepared purchase data returned from preparePurchase().
+ *
+ * Contains all information needed to execute a purchase, including
+ * transaction steps that can be executed individually for better UX.
+ *
+ * @public
+ */
 export interface PreparedPurchase {
+  /** Total cost breakdown including fees */
   cost: Cost;
-  transactionData?: TransactionData; // Optional for adapter-based flows
+
+  /** Raw transaction data (optional for adapter-based flows) */
+  transactionData?: TransactionData;
+
+  /**
+   * Individual transaction steps that need to be executed.
+   *
+   * @remarks
+   * Steps allow for granular control over multi-transaction purchases.
+   * Common patterns include:
+   * - ERC20 approval followed by mint
+   * - Multiple burn transactions followed by redeem
+   *
+   * Each step can be executed individually, allowing users to:
+   * - See explicit approval requests
+   * - Understand what each transaction does
+   * - Cancel between steps if needed
+   * - Retry failed steps
+   *
+   * @example
+   * ```typescript
+   * // Execute steps manually for better UX
+   * for (const step of preparedPurchase.steps) {
+   *   console.log(`Executing: ${step.name}`);
+   *   const receipt = await step.execute(adapter);
+   *   console.log(`✓ ${step.name} complete: ${receipt.txHash}`);
+   * }
+   * ```
+   */
   steps: TransactionStep[];
-  gasEstimate?: Money; // Optional for adapter-based flows
+
+  /** Estimated gas cost (optional) */
+  gasEstimate?: Money;
+
+  /** Whether the wallet is eligible to purchase */
   isEligible: boolean;
 }
 
@@ -53,16 +94,74 @@ export type TransactionStepExecuteOptions = {
   callbacks?: TransactionOnProgress;
 };
 
+/**
+ * Individual transaction step within a purchase flow.
+ *
+ * Represents a single blockchain transaction that needs to be executed.
+ * Steps enable explicit user control over multi-transaction operations,
+ * following Web3 best practices for transparency and user consent.
+ *
+ * @remarks
+ * Common step types:
+ * - `approve`: ERC20 token approval for payment
+ * - `mint`: Actual NFT minting transaction
+ *
+ * Steps should be executed in order, as later steps may depend on earlier ones.
+ *
+ * @example
+ * ```typescript
+ * // Manual step execution with user confirmation
+ * const step = preparedPurchase.steps[0];
+ *
+ * if (step.type === 'approve') {
+ *   const confirmed = await showApprovalModal({
+ *     token: step.cost?.erc20s?.[0],
+ *     spender: contractAddress
+ *   });
+ *
+ *   if (confirmed) {
+ *     const receipt = await step.execute(adapter);
+ *     console.log('Approval TX:', receipt.txHash);
+ *   }
+ * }
+ * ```
+ *
+ * @public
+ */
 export interface TransactionStep {
+  /** Unique identifier for this step */
   id: string;
+
+  /** Human-readable step name (e.g., "Approve USDC", "Mint NFT") */
   name: string;
+
+  /** Type of transaction */
   type: TransactionStepType;
+
+  /**
+   * Executes this transaction step.
+   *
+   * @param adapter - Wallet adapter for signing
+   * @param options - Execution options (confirmations, callbacks)
+   * @returns Transaction receipt upon completion
+   *
+   * @throws {ClientSDKError} On transaction failure or rejection
+   */
   execute: (
     adapter: IAccountAdapter,
     options?: TransactionStepExecuteOptions,
   ) => Promise<TransactionReceipt>;
+
+  /** Optional detailed description of what this step does */
   description?: string;
-  cost?: { native?: Money; erc20s?: Money[] };
+
+  /** Cost breakdown for this specific step */
+  cost?: {
+    /** Native token cost (ETH, etc.) */
+    native?: Money;
+    /** ERC20 token costs */
+    erc20s?: Money[];
+  };
 }
 
 export interface TransactionOnProgress {

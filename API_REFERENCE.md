@@ -371,6 +371,238 @@ try {
 | `ENDED` | Sale has ended |
 | `TRANSACTION_REJECTED` | User rejected transaction |
 
+## Transaction Steps - Best Practices
+
+### Understanding Transaction Steps
+
+When you call `preparePurchase()`, the SDK returns a `PreparedPurchase` object containing a `steps` array. Each step represents a individual blockchain transaction that needs to be executed. This design follows Web3 best practices by:
+
+1. **Providing transparency** - Users see exactly what transactions they're signing
+2. **Enabling explicit consent** - Each transaction requires user approval
+3. **Allowing cancellation** - Users can stop between steps
+4. **Supporting retry logic** - Failed steps can be retried individually
+
+### Common Step Patterns
+
+#### ERC20 Payment Flow (2 steps)
+1. **Approve** - Grant permission for contract to spend tokens
+2. **Mint** - Execute the actual purchase
+
+#### Burn/Redeem Flow (multiple steps)
+1. **Burn Token 1** - Burn first required token
+2. **Burn Token 2** - Burn second required token  
+3. **Redeem** - Mint the new token
+
+### Manual Step Execution
+
+Instead of calling `product.purchase()` which executes all steps automatically, you can execute each step individually for better UX:
+
+```typescript
+import { PreparedPurchase, TransactionStep } from '@manifoldxyz/client-sdk';
+
+// Custom UI component for step-by-step execution
+async function executeWithUI(
+  preparedPurchase: PreparedPurchase,
+  adapter: IAccountAdapter
+) {
+  const results = [];
+  
+  for (const [index, step] of preparedPurchase.steps.entries()) {
+    // Show step details to user
+    await showStepModal({
+      title: `Step ${index + 1} of ${preparedPurchase.steps.length}`,
+      name: step.name,
+      type: step.type,
+      description: step.description,
+      cost: step.cost
+    });
+    
+    try {
+      // Execute the step
+      console.log(`Executing: ${step.name}`);
+      const receipt = await step.execute(adapter, {
+        confirmations: 1,
+        callbacks: {
+          onProgress: (progress) => {
+            updateUI(`${step.name}: ${progress.status}`);
+          }
+        }
+      });
+      
+      results.push(receipt);
+      console.log(`✅ ${step.name} complete: ${receipt.txHash}`);
+      
+      // Update UI to show completion
+      await showSuccessToast(`${step.name} completed!`);
+      
+    } catch (error) {
+      // Handle step failure
+      console.error(`Failed at step: ${step.name}`, error);
+      
+      const retry = await showRetryModal({
+        step: step.name,
+        error: error.message
+      });
+      
+      if (!retry) {
+        throw new Error(`Purchase cancelled at step: ${step.name}`);
+      }
+      
+      // Retry logic here...
+    }
+  }
+  
+  return results;
+}
+```
+
+### React Component Example
+
+```typescript
+import React, { useState } from 'react';
+import { TransactionStep } from '@manifoldxyz/client-sdk';
+
+function PurchaseSteps({ 
+  preparedPurchase,
+  adapter 
+}: {
+  preparedPurchase: PreparedPurchase;
+  adapter: IAccountAdapter;
+}) {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>();
+  
+  const executeStep = async (step: TransactionStep) => {
+    setLoading(true);
+    setError(undefined);
+    
+    try {
+      const receipt = await step.execute(adapter);
+      setCompletedSteps([...completedSteps, step.id]);
+      setCurrentStep(currentStep + 1);
+      return receipt;
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  return (
+    <div className="purchase-steps">
+      <h3>Transaction Steps</h3>
+      
+      {preparedPurchase.steps.map((step, index) => (
+        <div key={step.id} className="step">
+          <div className="step-header">
+            <span className="step-number">{index + 1}</span>
+            <span className="step-name">{step.name}</span>
+            {completedSteps.includes(step.id) && (
+              <span className="step-status">✅</span>
+            )}
+          </div>
+          
+          {step.description && (
+            <p className="step-description">{step.description}</p>
+          )}
+          
+          {step.type === 'approve' && (
+            <div className="approval-info">
+              ⚠️ This step will approve the contract to spend your tokens
+            </div>
+          )}
+          
+          {currentStep === index && (
+            <button 
+              onClick={() => executeStep(step)}
+              disabled={loading}
+            >
+              {loading ? 'Processing...' : `Execute ${step.name}`}
+            </button>
+          )}
+          
+          {error && currentStep === index && (
+            <div className="error">{error}</div>
+          )}
+        </div>
+      ))}
+      
+      <div className="total-cost">
+        Total Cost: {preparedPurchase.cost.total.formatted}
+      </div>
+    </div>
+  );
+}
+```
+
+### Step Types and User Messaging
+
+#### Approve Steps
+```typescript
+if (step.type === 'approve') {
+  // Show specific messaging for approval
+  showModal({
+    title: 'Token Approval Required',
+    message: `This transaction will allow the contract to spend your ${tokenSymbol}.`,
+    details: `Amount: ${step.cost?.erc20s?.[0]?.formatted}`,
+    warning: 'This is a one-time approval for this purchase.',
+    confirmText: 'Approve Spending',
+    cancelText: 'Cancel Purchase'
+  });
+}
+```
+
+#### Mint Steps
+```typescript
+if (step.type === 'mint') {
+  // Show specific messaging for minting
+  showModal({
+    title: 'Mint NFT',
+    message: 'This transaction will mint your NFT.',
+    details: `Quantity: ${quantity}`,
+    gasEstimate: step.cost?.native?.formatted,
+    confirmText: 'Mint Now',
+    cancelText: 'Cancel'
+  });
+}
+```
+
+### Error Recovery
+
+```typescript
+// Retry failed steps with exponential backoff
+async function executeStepWithRetry(
+  step: TransactionStep,
+  adapter: IAccountAdapter,
+  maxRetries = 3
+): Promise<TransactionReceipt> {
+  let lastError;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await step.execute(adapter);
+    } catch (error) {
+      lastError = error;
+      
+      // Don't retry user rejections
+      if (error.code === 'TRANSACTION_REJECTED') {
+        throw error;
+      }
+      
+      // Wait before retry with exponential backoff
+      const delay = Math.pow(2, attempt) * 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      console.log(`Retrying step ${step.name}, attempt ${attempt + 1}`);
+    }
+  }
+  
+  throw lastError;
+}
+```
+
 ## Examples
 
 ### Complete Purchase Flow

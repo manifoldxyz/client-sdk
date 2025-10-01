@@ -37,9 +37,3 @@ export type {
   ProviderConfig,
   NetworkConfig,
 } from '../types/config';
-export {
-  DEFAULT_PROVIDER_CONFIG,
-  DEFAULT_GAS_CONFIG,
-  DEFAULT_CACHE_CONFIG,
-  DEFAULT_API_CONFIG,
-} from '../types/config';
