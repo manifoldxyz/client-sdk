@@ -9,49 +9,8 @@ import { Money } from '../libs/money';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import { checkERC20Balance } from '../utils/gas-estimation';
 import type { ManifoldClient } from '../types';
-import { createProvider } from '../utils';
-
-const FALLBACK_CLIENT: ManifoldClient = {
-  httpRPCs: {},
-  async getProduct(): Promise<never> {
-    throw new ClientSDKError(
-      ErrorCode.INVALID_INPUT,
-      'Manifold client context is required to fetch product data.',
-    );
-  },
-  async getProductsByWorkspace(): Promise<never> {
-    throw new ClientSDKError(
-      ErrorCode.INVALID_INPUT,
-      'Manifold client context is required to fetch workspace products.',
-    );
-  },
-};
-
-function isManifoldClient(value: unknown): value is ManifoldClient {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as ManifoldClient).getProduct === 'function' &&
-    typeof (value as ManifoldClient).getProductsByWorkspace === 'function'
-  );
-}
-
-function isJsonRpcSigner(value: unknown): value is ethers.providers.JsonRpcSigner {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as ethers.providers.JsonRpcSigner).getAddress === 'function' &&
-    typeof (value as ethers.providers.JsonRpcSigner).sendTransaction === 'function'
-  );
-}
-
-function isJsonRpcProvider(value: unknown): value is ethers.providers.JsonRpcProvider {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as ethers.providers.JsonRpcProvider).getSigner === 'function'
-  );
-}
+import { ensureConnectedNetwork } from '../utils';
+import type { NetworkConfigs } from '../utils/transactions';
 
 // =============================================================================
 // ERC-20 CONSTANTS
@@ -107,9 +66,13 @@ export class Ethers5Adapter implements IAccountAdapter {
    */
   constructor(
     client: ManifoldClient,
-    signer?: ethers.providers.JsonRpcSigner,
-    wallet?: ethers.Wallet,
+    provider: {
+      signer?: ethers.providers.JsonRpcSigner;
+      wallet?: ethers.Wallet;
+    },
   ) {
+    const { signer, wallet } = provider;
+
     this._client = client;
     if (!signer && !wallet) {
       throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Signer or wallet is required');
@@ -129,12 +92,37 @@ export class Ethers5Adapter implements IAccountAdapter {
     this.address = this._signer?._address || this._wallet?.address || '';
   }
 
-  get provider() {
-    const provider = this._signer || this._wallet;
-    if (!provider) {
-      throw new ClientSDKError(ErrorCode.UNKNOWN_ERROR, 'No client or wallet available');
+  // Optionally specify a networkId to ensure the provider is on the correct network
+  async getProvider(networkId?: number) {
+    if (!networkId) {
+      // We don't care about the networkId of the provider
+      const provider = this._signer || this._wallet;
+      if (!provider)
+        throw new ClientSDKError(
+          ErrorCode.UNKNOWN_ERROR,
+          `Unknown error, could not locate provider`,
+        );
+      return provider;
     }
-    return provider;
+    // We do care about the networkId of the provider, need to ensure we are on the correct network
+    const signer = this._signer;
+    if (signer) {
+      await this.switchNetwork(networkId);
+      return signer;
+    }
+    const wallet = this._wallet;
+    if (!wallet) {
+      throw new ClientSDKError(ErrorCode.UNKNOWN_ERROR, `Unknown error, could not locate wallet`);
+    }
+    // Make sure the wallet is connected to the proper rpc
+    const provider = this._client.providers?.[networkId];
+    if (!provider) {
+      throw new ClientSDKError(
+        ErrorCode.MISSING_RPC_URL,
+        `Missing RPC Url for networkId ${networkId}`,
+      );
+    }
+    return wallet.connect(provider);
   }
 
   /**
@@ -152,12 +140,14 @@ export class Ethers5Adapter implements IAccountAdapter {
    * @throws {ClientSDKError} When transaction fails or is rejected
    */
   async sendTransaction(request: UniversalTransactionRequest): Promise<string> {
+    const { chainId } = request;
     try {
+      const provider = await this.getProvider(chainId);
       // Convert universal request to ethers v5 transaction request
       const ethersRequest = this._convertToEthersRequest(request);
 
       // Send transaction
-      const tx = await this.provider.sendTransaction(ethersRequest);
+      const tx = await provider.sendTransaction(ethersRequest);
 
       return tx.hash;
     } catch (error) {
@@ -170,18 +160,18 @@ export class Ethers5Adapter implements IAccountAdapter {
     options: { confirmations?: number } = {},
   ): Promise<UniversalTransactionResponse> {
     const confirmations = options.confirmations ?? 1;
-
-    const networkId = await this.getConnectedNetworkId();
+    const { chainId } = request;
 
     try {
+      const provider = await this.getProvider(chainId);
       const ethersRequest = this._convertToEthersRequest(request);
-      const tx = await this.provider.sendTransaction(ethersRequest);
+      const tx = await provider.sendTransaction(ethersRequest);
       const receipt = await tx.wait(confirmations);
       return this._convertToUniversalResponse(tx, receipt);
     } catch (error) {
       const replacementReceipt = await this._handleReplacementTransaction(error, confirmations);
       if (replacementReceipt) {
-        return this._createResponseFromReceipt(replacementReceipt, request, networkId);
+        return this._createResponseFromReceipt(replacementReceipt, request, chainId);
       }
 
       throw this._wrapError(error, 'sendTransactionWithConfirmation', { request, confirmations });
@@ -195,16 +185,26 @@ export class Ethers5Adapter implements IAccountAdapter {
    * @returns Promise resolving to Money instance with balance
    * @throws {ClientSDKError} When balance query fails
    */
-  async getBalance(tokenAddress?: string): Promise<Money> {
+  async getBalance(networkId: number, tokenAddress?: string): Promise<Money> {
     try {
-      const networkId = await this.getConnectedNetworkId();
-      const provider = createProvider({
-        networkId,
-        customRpcUrls: this._client.httpRPCs,
-      });
+      let networkProvider:
+        | ethers.providers.JsonRpcSigner
+        | ethers.providers.JsonRpcProvider
+        | undefined = this._client?.providers?.[networkId];
+      if (!networkProvider) {
+        // Try using signer provider
+        await this.switchNetwork(networkId);
+        networkProvider = this._signer;
+      }
+      if (!networkProvider) {
+        throw new ClientSDKError(
+          ErrorCode.UNKNOWN_ERROR,
+          `Missing network provider for networkId ${networkId}`,
+        );
+      }
       if (!tokenAddress || tokenAddress === ethers.constants.AddressZero) {
         // Get native token balance
-        const balance = await provider.getBalance(this.address);
+        const balance = await networkProvider.getBalance(this.address);
 
         return Money.create({
           value: balance,
@@ -213,7 +213,7 @@ export class Ethers5Adapter implements IAccountAdapter {
         });
       } else {
         // Get ERC-20 token balance
-        const balance = await checkERC20Balance(tokenAddress, this.address, provider);
+        const balance = await checkERC20Balance(tokenAddress, this.address, networkProvider);
 
         return Money.create({
           value: balance,
@@ -229,21 +229,6 @@ export class Ethers5Adapter implements IAccountAdapter {
   }
 
   /**
-   * Get the currently connected network ID
-   *
-   * @returns Promise resolving to network ID (chain ID)
-   * @throws {ClientSDKError} When network query fails
-   */
-  async getConnectedNetworkId(): Promise<number> {
-    try {
-      const network = await this.provider.getChainId();
-      return network;
-    } catch (error) {
-      throw this._wrapError(error, 'getConnectedNetworkId');
-    }
-  }
-
-  /**
    * Switch to a different network
    *
    * @param chainId - Target network ID to switch to
@@ -254,21 +239,17 @@ export class Ethers5Adapter implements IAccountAdapter {
     if (this._wallet) {
       return;
     }
-    if (this._signer) {
+    const signer = this._signer;
+    if (signer) {
       try {
-        // For ethers v5, we need to use the provider's request method if available
-        const provider = this._signer.provider;
-        if (typeof provider.send === 'function') {
-          // This is likely a Web3Provider connected to MetaMask or similar
-          await provider.send('wallet_switchEthereumChain', [
-            { chainId: `0x${chainId.toString(16)}` },
-          ]);
-        } else {
-          throw new ClientSDKError(
-            ErrorCode.UNSUPPORTED_TYPE,
-            'Network switching not supported by this provider',
-          );
-        }
+        await ensureConnectedNetwork({
+          getConnectedNetwork: () => signer.getChainId(),
+          switchNetwork: () =>
+            signer.provider.send('eth_switchNetwork', [{ chainId: `0x${chainId.toString(16)}` }]),
+          addNetwork: (networkConfig: NetworkConfigs) =>
+            signer.provider.send('wallet_addEthereumChain', [networkConfig]),
+          targetNetworkId: chainId,
+        });
       } catch (error) {
         throw this._wrapError(error, 'switchNetwork', { chainId });
       }
@@ -283,8 +264,9 @@ export class Ethers5Adapter implements IAccountAdapter {
    * @throws {ClientSDKError} When signing fails or is rejected
    */
   async signMessage(message: string): Promise<string> {
+    const provider = await this.getProvider();
     try {
-      return await this.provider.signMessage(message);
+      return provider.signMessage(message);
     } catch (error) {
       throw this._wrapError(error, 'signMessage', { message });
     }
@@ -635,65 +617,3 @@ export class Ethers5Adapter implements IAccountAdapter {
     });
   }
 }
-
-// =============================================================================
-// ADAPTER FACTORY HELPER
-// =============================================================================
-
-/**
- * Create Ethers5Adapter from ethers v5 provider or signer
- *
- * @param provider - ethers v5 Provider or Signer instance
- * @returns Ethers5Adapter instance
- * @throws {ClientSDKError} When provider is invalid
- *
- * @example
- * ```typescript
- * import { ethers } from 'ethers'; // v5
- * import { createEthers5Adapter } from './adapters/ethers5-adapter';
- *
- * const provider = new ethers.providers.Web3Provider(window.ethereum);
- * const signer = provider.getSigner();
- * const adapter = createEthers5Adapter(signer);
- * ```
- */
-export function createEthers5Adapter(signer: ethers.providers.JsonRpcSigner): IAccountAdapter;
-export function createEthers5Adapter(
-  client: ManifoldClient,
-  signer: ethers.providers.JsonRpcSigner,
-): IAccountAdapter;
-export function createEthers5Adapter(
-  clientOrSigner:
-    | ManifoldClient
-    | ethers.providers.JsonRpcSigner
-    | ethers.providers.JsonRpcProvider,
-  signer?: ethers.providers.JsonRpcSigner,
-): IAccountAdapter {
-  if (isManifoldClient(clientOrSigner)) {
-    if (!signer) {
-      throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Signer is required to create adapter');
-    }
-    return new Ethers5Adapter(clientOrSigner, signer);
-  }
-
-  let resolvedSigner: ethers.providers.JsonRpcSigner | undefined;
-
-  if (isJsonRpcSigner(clientOrSigner)) {
-    resolvedSigner = clientOrSigner;
-  } else if (isJsonRpcProvider(clientOrSigner)) {
-    resolvedSigner = clientOrSigner.getSigner();
-  }
-
-  if (!resolvedSigner) {
-    throw new ClientSDKError(
-      ErrorCode.INVALID_INPUT,
-      'Unable to resolve signer from provided ethers object',
-    );
-  }
-
-  return new Ethers5Adapter(FALLBACK_CLIENT, resolvedSigner);
-}
-
-// =============================================================================
-// TYPE GUARDS AND DETECTION
-// =============================================================================

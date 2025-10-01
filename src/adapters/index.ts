@@ -3,11 +3,8 @@
 // =============================================================================
 
 // Main adapter implementations
-export { Ethers5Adapter, createEthers5Adapter } from './ethers5-adapter';
+export { Ethers5Adapter } from './ethers5-adapter';
 export { ViemAdapter, createViemAdapter, isViemCompatible } from './viem-adapter';
-
-// Factory for creating adapters
-export { AccountAdapterFactory, accountAdapterFactory } from './account-adapter-factory';
 
 // Re-export types for convenience
 export type {

@@ -1,5 +1,6 @@
 import type { HttpRPCs } from './common';
 import type { Product } from './product';
+import type { ethers } from 'ethers';
 
 export interface ClientConfig {
   httpRPCs?: HttpRPCs;
@@ -8,7 +9,9 @@ export interface ClientConfig {
 }
 
 export interface ManifoldClient {
-  httpRPCs?: HttpRPCs;
+  providers?: {
+    [networkId: number]: ethers.providers.JsonRpcProvider;
+  };
   getProduct(instanceIdOrUrl: string): Promise<Product>;
   getProductsByWorkspace(
     workspaceId: string,

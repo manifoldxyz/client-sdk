@@ -1,10 +1,13 @@
 import type { ClientConfig, ManifoldClient, WorkspaceProductsOptions } from '../types/client';
 import type { Product, InstanceData, BlindMintPublicData } from '../types/product';
+import type { NetworkId } from '../types/common';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import { AppId } from '../types/common';
 import { BlindMintProduct } from '../products/blindmint';
 import { validateInstanceId, parseManifoldUrl } from '../utils/validation';
 import { createManifoldApiClient } from '../api/manifold-api';
+import * as ethers from 'ethers';
+import { getNetworkConfig } from '../config/networks';
 
 // Type guard to check if instanceData is for BlindMint
 function isBlindMintInstanceData(
@@ -16,11 +19,23 @@ function isBlindMintInstanceData(
 export function createClient(config?: ClientConfig): ManifoldClient {
   const httpRPCs = config?.httpRPCs ?? {};
 
+  // Create JsonRpcProvider instances if httpRPCs is defined
+  const providers: Record<NetworkId, ethers.providers.JsonRpcProvider> = {};
+  if (httpRPCs && Object.keys(httpRPCs).length > 0) {
+    for (const [networkIdStr, rpcUrl] of Object.entries(httpRPCs)) {
+      const networkId = Number(networkIdStr);
+      const networkConfig = getNetworkConfig(networkId);
+      providers[networkId] = new ethers.providers.JsonRpcProvider(rpcUrl as string, {
+        name: networkConfig?.name ?? `network-${networkId}`,
+        chainId: networkConfig?.chainId ?? networkId,
+      });
+    }
+  }
+
   // Initialize Manifold API client with Studio Apps Client
   const manifoldApi = createManifoldApiClient();
 
   return {
-    httpRPCs,
     async getProduct(instanceIdOrUrl: string): Promise<Product> {
       let instanceId: string;
 
@@ -52,6 +67,7 @@ export function createClient(config?: ClientConfig): ManifoldClient {
           // Following technical spec pattern
           return new BlindMintProduct(instanceData, previewData, {
             httpRPCs,
+            providers,
           });
         }
 

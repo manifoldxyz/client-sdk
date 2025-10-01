@@ -25,6 +25,9 @@ export interface UniversalTransactionRequest {
   /** Target contract or wallet address */
   to: string;
 
+  /** Chain ID for transaction */
+  chainId: number;
+
   /** Value to send in wei (as string) */
   value?: string;
 
@@ -45,9 +48,6 @@ export interface UniversalTransactionRequest {
 
   /** Transaction nonce (optional, provider will set if not provided) */
   nonce?: number;
-
-  /** Chain ID for transaction (optional, adapter will use connected network) */
-  chainId?: number;
 
   /** Transaction type (0 = Legacy, 2 = EIP-1559) */
   type?: number;
@@ -189,6 +189,16 @@ export interface IAccountAdapter {
   readonly adapterType: AdapterType;
 
   /**
+   * Get wallet address asynchronously
+   */
+  getAddress(): Promise<string>;
+
+  /**
+   * Get provider for a specific network
+   */
+  getProvider(networkId?: number): Promise<unknown>;
+
+  /**
    * Send a transaction through the connected wallet
    *
    * @param request - Universal transaction request
@@ -235,22 +245,7 @@ export interface IAccountAdapter {
    * const usdcBalance = await adapter.getBalance('0xA0b86a33E6441d7B2c15e9A9d98b56e3F42E9b9B');
    * ```
    */
-  getBalance(tokenAddress?: string): Promise<Money>;
-
-  /**
-   * Get the currently connected network ID
-   *
-   * @returns Promise resolving to network ID (chain ID)
-   * @throws {AccountAdapterError} When network query fails
-   *
-   * @example
-   * ```typescript
-   * const networkId = await adapter.getConnectedNetworkId();
-   * console.log(`Connected to network: ${networkId}`);
-   * // Output: "Connected to network: 1" (Ethereum mainnet)
-   * ```
-   */
-  getConnectedNetworkId(): Promise<number>;
+  getBalance(networkId: number, tokenAddress?: string): Promise<Money>;
 
   /**
    * Switch to a different network
@@ -272,7 +267,7 @@ export interface IAccountAdapter {
   switchNetwork(chainId: number): Promise<void>;
 
   /**
-   * Sign a message with the connected wallet (optional enhancement)
+   * Sign a message with the connected wallet
    *
    * @param message - Message to sign
    * @returns Promise resolving to signature string
@@ -280,11 +275,11 @@ export interface IAccountAdapter {
    *
    * @example
    * ```typescript
-   * const signature = await adapter.signMessage?.('Hello, Web3!');
+   * const signature = await adapter.signMessage('Hello, Web3!');
    * console.log(`Signature: ${signature}`);
    * ```
    */
-  signMessage?(message: string): Promise<string>;
+  signMessage(message: string): Promise<string>;
 
   /**
    * Sign typed data (EIP-712) with the connected wallet (optional enhancement)
@@ -296,7 +291,7 @@ export interface IAccountAdapter {
   signTypedData?(typedData: TypedDataPayload): Promise<string>;
 
   /**
-   * Send raw RPC calls to the wallet provider (optional)
+   * Send raw RPC calls to the wallet provider
    * Useful for wallet-specific methods like adding custom networks, tokens, etc.
    *
    * @param method - RPC method name (e.g., 'wallet_addEthereumChain')
@@ -307,7 +302,7 @@ export interface IAccountAdapter {
    * @example
    * ```typescript
    * // Add a custom network
-   * await adapter.sendCalls?.('wallet_addEthereumChain', [{
+   * await adapter.sendCalls('wallet_addEthereumChain', [{
    *   chainId: '0x89',
    *   chainName: 'Polygon',
    *   nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 },
@@ -316,7 +311,7 @@ export interface IAccountAdapter {
    * }]);
    * ```
    */
-  sendCalls?(method: string, params?: unknown[]): Promise<unknown>;
+  sendCalls(method: string, params?: unknown[]): Promise<unknown>;
 }
 
 /**

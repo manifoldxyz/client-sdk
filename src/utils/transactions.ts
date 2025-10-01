@@ -1,8 +1,6 @@
-import type { IAccountAdapter } from '../types/account-adapter';
 import type { NetworkId } from '../types/common';
 import { NETWORK_CONFIGS } from '../config/networks';
 import { ClientSDKError, ErrorCode } from '../types/errors';
-import type { ethers } from 'ethers';
 import { Network } from '@manifoldxyz/js-ts-utils';
 
 export interface PollOptions<T> {
@@ -44,9 +42,22 @@ function getNetworkDisplayName(networkId: NetworkId): string {
   return config?.name ?? `Chain ${networkId}`;
 }
 
+export interface NetworkConfigs {
+  chainId: string;
+  chainName: string;
+  nativeCurrency: {
+    name: string;
+    symbol: string;
+    decimals: number;
+  };
+  rpcUrls: string[];
+  blockExplorerUrls: string[];
+}
+
 export interface EnsureConnectedNetworkOptions {
-  provider: ethers.providers.JsonRpcProvider;
-  accountAdapter: IAccountAdapter;
+  getConnectedNetwork: () => Promise<number>;
+  switchNetwork: (networkId: number) => Promise<void>;
+  addNetwork: (networkConfig: NetworkConfigs) => Promise<void>;
   targetNetworkId: NetworkId;
   pollIntervalMs?: number;
   maxAttempts?: number;
@@ -55,19 +66,19 @@ export interface EnsureConnectedNetworkOptions {
 export async function ensureConnectedNetwork(
   options: EnsureConnectedNetworkOptions,
 ): Promise<void> {
-  const { accountAdapter, targetNetworkId, pollIntervalMs = 500, maxAttempts = 20 } = options;
-
-  const initialNetworkId = await accountAdapter.getConnectedNetworkId();
-  if (initialNetworkId === targetNetworkId) {
-    return;
-  }
+  const {
+    getConnectedNetwork,
+    switchNetwork,
+    addNetwork,
+    targetNetworkId,
+    pollIntervalMs = 500,
+    maxAttempts = 20,
+  } = options;
 
   const networkName = getNetworkDisplayName(targetNetworkId);
 
   const throwEnsureError = async (message: string, originalError?: unknown): Promise<never> => {
-    const actualNetworkId = await accountAdapter
-      .getConnectedNetworkId()
-      .catch(() => initialNetworkId);
+    const actualNetworkId = await getConnectedNetwork();
 
     throw new ClientSDKError(ErrorCode.WRONG_NETWORK, message, {
       expectedNetworkId: targetNetworkId,
@@ -77,7 +88,7 @@ export async function ensureConnectedNetwork(
   };
 
   try {
-    await accountAdapter.switchNetwork(targetNetworkId);
+    await switchNetwork(targetNetworkId);
   } catch (switchError) {
     const code = (switchError as { code?: unknown })?.code;
 
@@ -92,10 +103,11 @@ export async function ensureConnectedNetwork(
             rpcUrls: networkConfigs.rpcUrls,
             blockExplorerUrls: networkConfigs.blockExplorerUrls,
           };
-          await accountAdapter.sendCalls?.('wallet_addEthereumChain', [params]);
+          await addNetwork(params);
+          // await accountAdapter.sendCalls?.('wallet_addEthereumChain', [params]);
         }
         // try switching network again
-        await accountAdapter.switchNetwork(targetNetworkId);
+        await switchNetwork(targetNetworkId);
       } catch (addNetworkError) {
         const message =
           addNetworkError instanceof Error && addNetworkError.message
@@ -114,7 +126,7 @@ export async function ensureConnectedNetwork(
 
   try {
     await poll<number>({
-      fetch: () => accountAdapter.getConnectedNetworkId(),
+      fetch: () => getConnectedNetwork(),
       validate: (value) => value === targetNetworkId,
       intervalMs: pollIntervalMs,
       maxAttempts,

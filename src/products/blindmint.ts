@@ -45,7 +45,6 @@ import { estimateGas } from '../utils/gas-estimation';
 import { Money } from '../libs/money';
 import type { Cost } from '../types/money';
 import type { TransactionReceipt } from '../types/purchase';
-import { ensureConnectedNetwork } from '../utils/transactions';
 
 /**
  * BlindMintProduct implementation following technical spec CON-2729
@@ -65,16 +64,19 @@ export class BlindMintProduct implements IBlindMintProduct {
   private _extensionAddress: Address;
   private _platformFee?: Money;
   private _httpRPCs?: Record<number, string>;
+  private _providers?: Record<number, ethers.providers.JsonRpcProvider>;
 
   constructor(
     instanceData: InstanceData<BlindMintPublicData>,
     previewData: InstancePreview,
     options: {
       httpRPCs?: Record<number, string>;
+      providers?: Record<number, ethers.providers.JsonRpcProvider>;
     } = {},
   ) {
-    const { httpRPCs } = options;
+    const { httpRPCs, providers } = options;
     this._httpRPCs = httpRPCs;
+    this._providers = providers;
 
     // Validate app ID
     if (instanceData.appId !== AppId.BLIND_MINT_1155) {
@@ -119,10 +121,12 @@ export class BlindMintProduct implements IBlindMintProduct {
       // Fetch platform fee from contract and create Money object
       const mintFee = await contract.MINT_FEE();
       const networkId = this.data.publicData.network;
-      const provider = createProvider({
-        networkId,
-        customRpcUrls: this._httpRPCs,
-      });
+      const provider =
+        this._providers?.[networkId] ||
+        createProvider({
+          networkId,
+          customRpcUrls: this._httpRPCs,
+        });
 
       this._platformFee = await Money.create({
         value: mintFee,
@@ -186,10 +190,12 @@ export class BlindMintProduct implements IBlindMintProduct {
     }
 
     const onchainData = await this.fetchOnchainData();
-    const provider = createProvider({
-      networkId,
-      customRpcUrls: this._httpRPCs,
-    });
+    const provider =
+      this._providers?.[networkId] ||
+      createProvider({
+        networkId,
+        customRpcUrls: this._httpRPCs,
+      });
 
     // Calculate costs
     const productCost = onchainData.cost.multiplyInt(quantity);
@@ -246,11 +252,7 @@ export class BlindMintProduct implements IBlindMintProduct {
               accountAdapter: IAccountAdapter,
               options?: TransactionStepExecuteOptions,
             ) => {
-              await ensureConnectedNetwork({
-                provider,
-                accountAdapter,
-                targetNetworkId: networkId,
-              });
+              await accountAdapter.switchNetwork(networkId);
 
               const gasEstimate = await estimateGas({
                 contract: erc20Contract,
@@ -266,6 +268,7 @@ export class BlindMintProduct implements IBlindMintProduct {
                 to: tokenAddress,
                 data: this._buildApprovalData(this._extensionAddress, totalCost.raw.toString()),
                 gasLimit,
+                chainId: networkId,
               };
 
               const confirmation = await accountAdapter.sendTransactionWithConfirmation(txRequest, {
@@ -325,11 +328,8 @@ export class BlindMintProduct implements IBlindMintProduct {
       description: `Mint ${quantity} random NFT(s)`,
       cost: mintCost,
       execute: async (accountAdapter: IAccountAdapter) => {
-        await ensureConnectedNetwork({
-          provider,
-          accountAdapter,
-          targetNetworkId: networkId,
-        });
+        // This will handle network switch and adding custom network to user wallet if needed
+        await accountAdapter.switchNetwork(networkId);
 
         const blindMintContract = contractFactory.createBlindMintContract(this._extensionAddress);
         const gasEstimate = await estimateGas({
@@ -348,6 +348,7 @@ export class BlindMintProduct implements IBlindMintProduct {
           data: this._buildMintData(this._creatorContract, this.id, quantity),
           value: nativePaymentValue.toString(),
           gasLimit,
+          chainId: networkId,
         };
 
         const confirmation = await accountAdapter.sendTransactionWithConfirmation(txRequest, {
@@ -433,10 +434,12 @@ export class BlindMintProduct implements IBlindMintProduct {
     const networkId = this.data.publicData.network || 1;
 
     // Use configured providers (READ operations)
-    const provider = createProvider({
-      networkId,
-      customRpcUrls: this._httpRPCs,
-    });
+    const provider =
+      this._providers?.[networkId] ||
+      createProvider({
+        networkId,
+        customRpcUrls: this._httpRPCs,
+      });
 
     const factory = new ContractFactoryClass({
       provider,
@@ -468,10 +471,12 @@ export class BlindMintProduct implements IBlindMintProduct {
     };
 
     const networkId = this.data.publicData.network;
-    const provider = createProvider({
-      networkId,
-      customRpcUrls: this._httpRPCs,
-    });
+    const provider =
+      this._providers?.[networkId] ||
+      createProvider({
+        networkId,
+        customRpcUrls: this._httpRPCs,
+      });
 
     // Create Money object which will fetch all metadata automatically
     const costMoney = await Money.create({

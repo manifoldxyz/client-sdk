@@ -3,7 +3,7 @@ import { ethers } from 'ethers';
 import {
   createClient,
   AppType,
-  AccountAdapterFactory,
+  Ethers5Adapter,
   type IAccountAdapter,
   type Product,
 } from '../src/index';
@@ -138,7 +138,7 @@ async function main() {
 
   // Create wallet if private key provided
   let wallet: ethers.Wallet | undefined;
-  let accountAdapter: IAccountAdapter | undefined;
+
   if (
     privateKey &&
     privateKey !== '0x0000000000000000000000000000000000000000000000000000000000000000'
@@ -149,13 +149,6 @@ async function main() {
       wallet = new ethers.Wallet(privateKey, provider);
       console.log(`   Wallet: ${wallet.address.slice(0, 10)}...`);
 
-      try {
-        accountAdapter = AccountAdapterFactory.fromEthers5(wallet.connect(provider));
-        // Prime adapter with balance lookup so address becomes available
-        await accountAdapter.getBalance().catch(() => undefined);
-      } catch (adapterError) {
-        console.warn('   ⚠️  Unable to initialise ethers5 adapter:', adapterError);
-      }
 
       const balance = await wallet.getBalance();
       console.log(`   Balance: ${ethers.utils.formatEther(balance)} ETH`);
@@ -170,6 +163,15 @@ async function main() {
   const client = createClient({
     httpRPCs,
   });
+
+  let accountAdapter: IAccountAdapter | undefined;
+  try {
+    accountAdapter = new Ethers5Adapter(client,undefined, wallet)
+    // Prime adapter with balance lookup so address becomes available
+    await accountAdapter.getBalance().catch(() => undefined);
+  } catch (adapterError) {
+    console.warn('   ⚠️  Unable to initialise ethers5 adapter:', adapterError);
+  }
 
   console.log('\n✅ Client created successfully');
 
