@@ -36,6 +36,7 @@ export function createClient(config?: ClientConfig): ManifoldClient {
   const manifoldApi = createManifoldApiClient();
 
   return {
+    providers,
     async getProduct(instanceIdOrUrl: string): Promise<Product> {
       let instanceId: string;
 
@@ -67,7 +68,6 @@ export function createClient(config?: ClientConfig): ManifoldClient {
           // Following technical spec pattern
           return new BlindMintProduct(instanceData, previewData, {
             httpRPCs,
-            providers,
           });
         }
 

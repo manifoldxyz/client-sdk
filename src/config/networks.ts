@@ -1,56 +1,28 @@
 import type { NetworkConfig } from '../types/config';
 import type { NetworkId } from '../types/common';
+import { Network } from '@manifoldxyz/js-ts-utils';
 
 /**
- * Simple network configurations
+ * Network configurations from @manifoldxyz/js-ts-utils
+ * Maps NetworkId to NetworkConfig, converting from the package's format
  */
-export const NETWORK_CONFIGS: Record<NetworkId, NetworkConfig> = {
-  1: {
-    // Ethereum Mainnet
-    networkId: 1,
-    chainId: 1,
-    name: 'Ethereum',
-    nativeCurrency: 'ETH',
-    rpcUrl: 'https://eth.llamarpc.com',
-    explorerUrl: 'https://etherscan.io',
+export const NETWORK_CONFIGS: Record<NetworkId, NetworkConfig> = Object.entries(
+  Network.NETWORK_CONFIGS,
+).reduce(
+  (acc, [networkId, config]) => {
+    const id = parseInt(networkId);
+    acc[id] = {
+      networkId: id,
+      chainId: id,
+      name: config.chainName,
+      nativeCurrency: config.nativeCurrency.symbol,
+      rpcUrl: config.rpcUrls[0] || `https://eth.llamarpc.com`,
+      explorerUrl: config.blockExplorerUrls[0] || 'https://etherscan.io',
+    };
+    return acc;
   },
-  137: {
-    // Polygon
-    networkId: 137,
-    chainId: 137,
-    name: 'Polygon',
-    nativeCurrency: 'MATIC',
-    rpcUrl: 'https://polygon.llamarpc.com',
-    explorerUrl: 'https://polygonscan.com',
-  },
-  10: {
-    // Optimism
-    networkId: 10,
-    chainId: 10,
-    name: 'Optimism',
-    nativeCurrency: 'ETH',
-    rpcUrl: 'https://optimism.llamarpc.com',
-    explorerUrl: 'https://optimistic.etherscan.io',
-  },
-  42161: {
-    // Arbitrum
-    networkId: 42161,
-    chainId: 42161,
-    name: 'Arbitrum One',
-    nativeCurrency: 'ETH',
-    rpcUrl: 'https://arbitrum.llamarpc.com',
-    explorerUrl: 'https://arbiscan.io',
-  },
-  8453: {
-    // Base
-    networkId: 8453,
-    chainId: 8453,
-    name: 'Base',
-    nativeCurrency: 'ETH',
-    rpcUrl: 'https://base.llamarpc.com',
-    explorerUrl: 'https://basescan.org',
-  },
-};
+  {} as Record<NetworkId, NetworkConfig>,
+);
 
 /**
  * Get network configuration by ID

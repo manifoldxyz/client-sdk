@@ -166,9 +166,11 @@ async function main() {
 
   let accountAdapter: IAccountAdapter | undefined;
   try {
-    accountAdapter = new Ethers5Adapter(client,undefined, wallet)
+    accountAdapter = new Ethers5Adapter(client,  {
+      wallet
+    })
     // Prime adapter with balance lookup so address becomes available
-    await accountAdapter.getBalance().catch(() => undefined);
+    await accountAdapter.getBalance(11155111).catch(() => undefined);
   } catch (adapterError) {
     console.warn('   ⚠️  Unable to initialise ethers5 adapter:', adapterError);
   }

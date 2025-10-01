@@ -443,7 +443,7 @@ export class Ethers5Adapter implements IAccountAdapter {
     // Determine error code based on error type
     let code: ErrorCode = ErrorCode.UNKNOWN_ERROR;
     let message = 'An unexpected error occurred';
-
+    console.log(error);
     if (error instanceof ClientSDKError) {
       // Re-throw ClientSDK errors directly
       throw error;

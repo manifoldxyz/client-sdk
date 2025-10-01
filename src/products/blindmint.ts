@@ -64,19 +64,16 @@ export class BlindMintProduct implements IBlindMintProduct {
   private _extensionAddress: Address;
   private _platformFee?: Money;
   private _httpRPCs?: Record<number, string>;
-  private _providers?: Record<number, ethers.providers.JsonRpcProvider>;
 
   constructor(
     instanceData: InstanceData<BlindMintPublicData>,
     previewData: InstancePreview,
     options: {
       httpRPCs?: Record<number, string>;
-      providers?: Record<number, ethers.providers.JsonRpcProvider>;
     } = {},
   ) {
-    const { httpRPCs, providers } = options;
+    const { httpRPCs } = options;
     this._httpRPCs = httpRPCs;
-    this._providers = providers;
 
     // Validate app ID
     if (instanceData.appId !== AppId.BLIND_MINT_1155) {
@@ -121,12 +118,10 @@ export class BlindMintProduct implements IBlindMintProduct {
       // Fetch platform fee from contract and create Money object
       const mintFee = await contract.MINT_FEE();
       const networkId = this.data.publicData.network;
-      const provider =
-        this._providers?.[networkId] ||
-        createProvider({
-          networkId,
-          customRpcUrls: this._httpRPCs,
-        });
+      const provider = createProvider({
+        networkId,
+        customRpcUrls: this._httpRPCs,
+      });
 
       this._platformFee = await Money.create({
         value: mintFee,
@@ -190,12 +185,10 @@ export class BlindMintProduct implements IBlindMintProduct {
     }
 
     const onchainData = await this.fetchOnchainData();
-    const provider =
-      this._providers?.[networkId] ||
-      createProvider({
-        networkId,
-        customRpcUrls: this._httpRPCs,
-      });
+    const provider = createProvider({
+      networkId,
+      customRpcUrls: this._httpRPCs,
+    });
 
     // Calculate costs
     const productCost = onchainData.cost.multiplyInt(quantity);
@@ -434,12 +427,10 @@ export class BlindMintProduct implements IBlindMintProduct {
     const networkId = this.data.publicData.network || 1;
 
     // Use configured providers (READ operations)
-    const provider =
-      this._providers?.[networkId] ||
-      createProvider({
-        networkId,
-        customRpcUrls: this._httpRPCs,
-      });
+    const provider = createProvider({
+      networkId,
+      customRpcUrls: this._httpRPCs,
+    });
 
     const factory = new ContractFactoryClass({
       provider,
@@ -471,12 +462,10 @@ export class BlindMintProduct implements IBlindMintProduct {
     };
 
     const networkId = this.data.publicData.network;
-    const provider =
-      this._providers?.[networkId] ||
-      createProvider({
-        networkId,
-        customRpcUrls: this._httpRPCs,
-      });
+    const provider = createProvider({
+      networkId,
+      customRpcUrls: this._httpRPCs,
+    });
 
     // Create Money object which will fetch all metadata automatically
     const costMoney = await Money.create({
@@ -738,12 +727,12 @@ export class BlindMintProduct implements IBlindMintProduct {
   /**
    * Build mint transaction data
    */
-  private _buildMintData(creatorContract: string, claimIndex: number, quantity: number): string {
+  private _buildMintData(creatorContract: string, instanceId: number, quantity: number): string {
     // Using the actual mint function signature from the contract
     const mintInterface = new ethers.utils.Interface([
-      'function mintReserve(address creatorContract, uint256 claimIndex, uint256 quantity)',
+      'function mintReserve(address creatorContractAddress,uint256 instanceId,uint32 mintCount)',
     ]);
-    return mintInterface.encodeFunctionData('mintReserve', [creatorContract, claimIndex, quantity]);
+    return mintInterface.encodeFunctionData('mintReserve', [creatorContract, instanceId, quantity]);
   }
 
   /**

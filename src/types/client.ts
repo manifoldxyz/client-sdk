@@ -9,7 +9,7 @@ export interface ClientConfig {
 }
 
 export interface ManifoldClient {
-  providers?: {
+  providers: {
     [networkId: number]: ethers.providers.JsonRpcProvider;
   };
   getProduct(instanceIdOrUrl: string): Promise<Product>;
