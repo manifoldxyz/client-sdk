@@ -39,16 +39,23 @@ import type { NetworkConfigs } from '../utils/transactions';
  * @example
  * ```typescript
  * import { ethers } from 'ethers'; // v5
- * import { Ethers5Adapter } from './adapters/ethers5-adapter';
+ * import { Ethers5Adapter } from '@manifoldxyz/client-sdk/adapters';
  *
+ * // Browser wallet (MetaMask, etc.)
  * const provider = new ethers.providers.Web3Provider(window.ethereum);
  * const signer = provider.getSigner();
- * const adapter = new Ethers5Adapter(signer);
+ * const adapter = new Ethers5Adapter(client, { signer });
  *
- * // Use unified interface
+ * // Private key wallet (server-side)
+ * const wallet = new ethers.Wallet(privateKey, provider);
+ * const adapter = new Ethers5Adapter(client, { wallet });
+ *
+ * // Use unified interface for purchases
  * const balance = await adapter.getBalance();
- * const networkId = await adapter.getConnectedNetworkId();
+ * const tx = await adapter.sendTransaction(txRequest);
  * ```
+ *
+ * @public
  */
 export class Ethers5Adapter implements IAccountAdapter {
   readonly adapterType: AdapterType = 'ethers5';
@@ -59,10 +66,27 @@ export class Ethers5Adapter implements IAccountAdapter {
   readonly address: string;
 
   /**
-   * Initialize adapter with ethers v5 provider or signer
+   * Initialize adapter with ethers v5 provider or signer.
    *
-   * @param providerOrSigner - ethers v5 Provider or Signer instance
-   * @throws {ClientSDKError} When provider is invalid or missing account
+   * @param client - The ManifoldClient instance
+   * @param provider - Provider configuration
+   * @param provider.signer - ethers v5 JsonRpcSigner (for browser wallets)
+   * @param provider.wallet - ethers v5 Wallet (for private key wallets)
+   *
+   * @throws {ClientSDKError} When:
+   * - Neither signer nor wallet is provided
+   * - Both signer and wallet are provided
+   *
+   * @example
+   * ```typescript
+   * // Browser wallet
+   * const signer = provider.getSigner();
+   * const adapter = new Ethers5Adapter(client, { signer });
+   *
+   * // Private key wallet
+   * const wallet = new ethers.Wallet(privateKey);
+   * const adapter = new Ethers5Adapter(client, { wallet });
+   * ```
    */
   constructor(
     client: ManifoldClient,

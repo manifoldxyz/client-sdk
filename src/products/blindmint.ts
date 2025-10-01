@@ -47,16 +47,45 @@ import type { Cost } from '../types/money';
 import type { TransactionReceipt } from '../types/purchase';
 
 /**
- * BlindMintProduct implementation following technical spec CON-2729
- * and gachapon-widgets pattern for getClaim parsing
+ * BlindMint product implementation for mystery/gacha-style NFT mints.
+ *
+ * BlindMint products allow creators to offer randomized NFTs with different
+ * rarity tiers and probabilities. Buyers receive a random NFT from the pool
+ * when they mint, with the actual reveal happening either immediately or
+ * at a specified time.
+ *
+ * @remarks
+ * - Follows technical spec CON-2729
+ * - Uses gachapon-widgets pattern for getClaim parsing
+ * - Supports tier-based probability systems
+ * - Handles both immediate and delayed reveals
+ *
+ * @public
  */
 export class BlindMintProduct implements IBlindMintProduct {
+  /**
+   * Unique instance ID for this product.
+   */
   readonly id: number;
+
+  /**
+   * Product type identifier (always BLIND_MINT).
+   */
   readonly type = AppType.BLIND_MINT;
+
+  /**
+   * Off-chain product data including metadata and configuration.
+   */
   readonly data: InstanceData<BlindMintPublicData>;
+
+  /**
+   * Preview data for display purposes.
+   */
   readonly previewData: InstancePreview;
 
-  // Onchain data (fetched lazily)
+  /**
+   * On-chain data (pricing, supply, etc.). Populated after calling fetchOnchainData().
+   */
   onchainData?: BlindMintOnchainData;
 
   // Internal state
@@ -65,6 +94,18 @@ export class BlindMintProduct implements IBlindMintProduct {
   private _platformFee?: Money;
   private _httpRPCs?: Record<number, string>;
 
+  /**
+   * Creates a new BlindMintProduct instance.
+   *
+   * @param instanceData - Product instance data from the API
+   * @param previewData - Preview data for the product
+   * @param options - Configuration options
+   * @param options.httpRPCs - Custom RPC endpoints by network ID
+   *
+   * @throws {ClientSDKError} If the app ID doesn't match BLIND_MINT_1155
+   *
+   * @internal
+   */
   constructor(
     instanceData: InstanceData<BlindMintPublicData>,
     previewData: InstancePreview,
@@ -97,9 +138,33 @@ export class BlindMintProduct implements IBlindMintProduct {
   }
 
   // =============================================================================
-  // ONCHAIN DATA FETCHING (following gachapon-widgets pattern)
+  // ONCHAIN DATA FETCHING
   // =============================================================================
 
+  /**
+   * Fetches and caches on-chain data for the BlindMint product.
+   *
+   * Retrieves information including:
+   * - Total supply and minted count
+   * - Pricing information
+   * - Wallet limits
+   * - Start and end dates
+   * - Token variations and probabilities
+   *
+   * @param force - Force refresh even if data is already cached (default: false)
+   * @returns Promise resolving to on-chain data
+   *
+   * @throws {ClientSDKError} If fetching on-chain data fails
+   *
+   * @example
+   * ```typescript
+   * const onchainData = await product.fetchOnchainData();
+   * console.log(`Total supply: ${onchainData.totalSupply}`);
+   * console.log(`Price: ${onchainData.cost.formatted}`);
+   * ```
+   *
+   * @public
+   */
   async fetchOnchainData(force = false): Promise<BlindMintOnchainData> {
     if (this.onchainData && !force) {
       return this.onchainData;
@@ -140,6 +205,48 @@ export class BlindMintProduct implements IBlindMintProduct {
     }
   }
 
+  /**
+   * Prepares a purchase transaction for the BlindMint product.
+   *
+   * This method:
+   * - Validates eligibility (wallet limits, supply, dates)
+   * - Calculates total cost including gas
+   * - Generates transaction data
+   * - Returns prepared transaction steps
+   *
+   * @param params - Purchase preparation parameters
+   * @param params.address - Wallet address making the purchase
+   * @param params.recipientAddress - Optional different recipient address
+   * @param params.payload - Purchase payload
+   * @param params.payload.quantity - Number of tokens to mint (default: 1)
+   * @param params.networkId - Optional network ID for cross-chain purchases
+   * @param params.gasBuffer - Optional gas buffer configuration
+   *
+   * @returns PreparedPurchase object with cost breakdown and transaction steps
+   *
+   * @throws {ClientSDKError} With error codes:
+   * - `INVALID_INPUT` - Invalid address or quantity
+   * - `NOT_ELIGIBLE` - Wallet not eligible to purchase
+   * - `SOLD_OUT` - Product sold out
+   * - `LIMIT_REACHED` - Wallet limit reached
+   * - `NOT_STARTED` - Sale hasn't started
+   * - `ENDED` - Sale has ended
+   * - `INSUFFICIENT_FUNDS` - Insufficient balance
+   *
+   * @example
+   * ```typescript
+   * const prepared = await product.preparePurchase({
+   *   address: '0x123...',
+   *   payload: { quantity: 2 },
+   *   gasBuffer: { multiplier: 0.25 } // 25% gas buffer
+   * });
+   *
+   * console.log(`Total cost: ${prepared.cost.total.formatted}`);
+   * console.log(`Gas estimate: ${prepared.gasEstimate.formatted}`);
+   * ```
+   *
+   * @public
+   */
   async preparePurchase(
     params: PreparePurchaseParams<BlindMintPayload>,
   ): Promise<PreparedPurchase> {
@@ -320,7 +427,7 @@ export class BlindMintProduct implements IBlindMintProduct {
       type: 'mint',
       description: `Mint ${quantity} random NFT(s)`,
       cost: mintCost,
-      execute: async (accountAdapter: IAccountAdapter) => {
+      execute: async (accountAdapter: IAccountAdapter, options?: TransactionStepExecuteOptions) => {
         // This will handle network switch and adding custom network to user wallet if needed
         await accountAdapter.switchNetwork(networkId);
 
@@ -345,7 +452,7 @@ export class BlindMintProduct implements IBlindMintProduct {
         };
 
         const confirmation = await accountAdapter.sendTransactionWithConfirmation(txRequest, {
-          confirmations: 1,
+          confirmations: options?.confirmations || 1,
         });
 
         const receiptInfo = confirmation.receipt;

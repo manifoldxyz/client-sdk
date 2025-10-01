@@ -170,7 +170,8 @@ async function main() {
       wallet
     })
     // Prime adapter with balance lookup so address becomes available
-    await accountAdapter.getBalance(11155111).catch(() => undefined);
+   const balance=  await accountAdapter.getBalance(11155111).catch(() => undefined);
+   console.log('current balance', balance)
   } catch (adapterError) {
     console.warn('   ⚠️  Unable to initialise ethers5 adapter:', adapterError);
   }
