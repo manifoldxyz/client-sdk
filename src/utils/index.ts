@@ -39,7 +39,6 @@ export type {
 export {
   estimateGas,
   applyGasBuffer,
-  checkERC20Balance,
   checkERC20Allowance,
   createERC20ApprovalTx,
 } from './gas-estimation';

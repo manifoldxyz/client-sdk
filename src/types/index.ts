@@ -25,9 +25,7 @@ export type { NetworkConfig, CacheConfig, ApiConfig, GasConfig, ProviderConfig }
 // Account adapter interfaces (CON-2740)
 export type {
   // Core interfaces
-  IAccountAdapter,
-  IAccountAdapterFactory,
-
+  IAccount,
   // Transaction types
   UniversalTransactionRequest,
   UniversalTransactionResponse,

@@ -39,13 +39,12 @@
 // =============================================================================
 
 // Main adapter implementations
-export { Ethers5Adapter } from './ethers5-adapter';
-export { ViemAdapter, createViemAdapter, isViemCompatible } from './viem-adapter';
+export { createAccount as createAccountEthers5 } from './ethers5-adapter';
+export { createAccount as createAccountViem } from './viem-adapter';
 
 // Re-export types for convenience
 export type {
-  IAccountAdapter,
-  IAccountAdapterFactory,
+  IAccount,
   UniversalTransactionRequest,
   UniversalTransactionResponse,
   FactoryError,
@@ -56,6 +55,3 @@ export type {
   AdapterCreationOptions,
   TypedDataPayload,
 } from '../types/account-adapter';
-
-// Re-export Money for convenience
-export { Money } from '../libs/money';

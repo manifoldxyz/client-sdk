@@ -1,30 +1,18 @@
 import type {
-  IAccountAdapter,
+  IAccount,
   UniversalTransactionRequest,
   UniversalTransactionResponse,
   AdapterType,
 } from '../types/account-adapter';
 import { Money } from '../libs/money';
 import { ClientSDKError, ErrorCode } from '../types/errors';
-import { checkERC20BalanceViem } from '../utils/gas-estimation';
 import { ethers } from 'ethers';
-import type { ManifoldClient } from '../types';
 
 // =============================================================================
 // VIEM TYPE IMPORTS
 // =============================================================================
 
-import type * as Viem from 'viem';
-import type { WalletClient as ViemWalletClient, PublicClient as ViemPublicClient } from 'viem';
-
-/**
- * Import viem types conditionally to support optional peer dependency
- * Using type-only imports to avoid runtime errors when viem is not installed
- */
-type ViemModule = typeof Viem;
-type ViemAddress = `0x${string}`;
-type ViemHash = `0x${string}`;
-type ViemClient = ViemWalletClient | ViemPublicClient;
+import type { WalletClient, PublicClient, TransactionReceipt } from 'viem';
 
 // =============================================================================
 // VIEM ADAPTER IMPLEMENTATION
@@ -54,72 +42,39 @@ type ViemClient = ViemWalletClient | ViemPublicClient;
  * const networkId = await adapter.getConnectedNetworkId();
  * ```
  */
-export class ViemAdapter implements IAccountAdapter {
+class ViemAccount implements IAccount {
   readonly adapterType: AdapterType = 'viem';
-  address: string = '';
+  _address: string;
 
-  private _walletClient: ViemWalletClient | null = null;
-  private _publicClient: ViemPublicClient | null = null;
-  private _viem: ViemModule | null = null; // Dynamically imported viem module
-  private _client: ManifoldClient;
+  private _walletClient: WalletClient;
+  private _publicClient: PublicClient;
 
   /**
    * Initialize adapter with viem WalletClient or PublicClient
    *
-   * @param manifoldClient - Manifold client instance
+   * @param client - Manifold client instance
    * @param provider - Object containing viem wallet or public client
    * @throws {ClientSDKError} When client is invalid or viem is not installed
    */
-  constructor(
-    manifoldClient: ManifoldClient,
-    provider: {
-      walletClient?: ViemWalletClient;
-      publicClient?: ViemPublicClient;
-    },
-  ) {
+  constructor(provider: { walletClient: WalletClient; publicClient: PublicClient }) {
     const { walletClient, publicClient } = provider;
-    this._client = manifoldClient;
-    this._initializeViem();
-
-    if (!walletClient && !publicClient) {
+    this._walletClient = walletClient;
+    const account = this._walletClient.account;
+    if (!account) {
       throw new ClientSDKError(
         ErrorCode.INVALID_INPUT,
-        'Either walletClient or publicClient is required',
+        'Account not foud, please pass Account explicitly when creating viem client.',
       );
     }
-
-    if (walletClient && publicClient) {
-      throw new ClientSDKError(
-        ErrorCode.INVALID_INPUT,
-        'Provide either walletClient or publicClient, not both',
-      );
-    }
-
-    if (walletClient) {
-      this._walletClient = walletClient;
-      // Get address synchronously if available
-      if (walletClient.account && 'address' in walletClient.account) {
-        this.address = walletClient.account.address as string;
-      } else {
-        // Will need to call getAddress() to initialize
-        this.address = '';
-      }
-    } else if (publicClient) {
-      this._publicClient = publicClient;
-      this._walletClient = null;
-      this.address = ''; // Read-only client has no address
-    }
+    this._publicClient = publicClient;
+    this._address = account.address;
   }
 
   /**
    * Get wallet address
    */
   async getAddress(): Promise<string> {
-    if (this.address) {
-      return this.address;
-    }
-    await this._ensureAddress();
-    return this.address;
+    return this._address;
   }
 
   /**
@@ -131,15 +86,11 @@ export class ViemAdapter implements IAccountAdapter {
    */
   async sendTransaction(request: UniversalTransactionRequest): Promise<string> {
     try {
-      const walletClient = this._getWalletClient();
-      await this._ensureAddress();
-
       // Convert universal request to viem transaction request
       const viemRequest = this._convertToViemRequest(request);
 
       // Send transaction using viem
-      const walletClientTyped = walletClient;
-      const hash = await walletClientTyped.sendTransaction(viemRequest);
+      const hash = await this._walletClient.sendTransaction(viemRequest);
 
       return hash;
     } catch (error) {
@@ -154,10 +105,13 @@ export class ViemAdapter implements IAccountAdapter {
     const confirmations = options.confirmations ?? 1;
     const networkId = await this.getConnectedNetworkId();
     try {
-      const hash = (await this.sendTransaction(request)) as `0x{string}`;
+      const hash = (await this.sendTransaction(request)) as `0x${string}`;
 
       // waitForViemReceipt handles TransactionReplaced internally
-      const receipt = await this._waitForViemReceipt(hash, confirmations);
+      const receipt = await this._publicClient.waitForTransactionReceipt({
+        hash,
+        confirmations,
+      });
       const baseResponse = this._convertToUniversalResponse(networkId, hash, receipt);
 
       return baseResponse;
@@ -176,61 +130,41 @@ export class ViemAdapter implements IAccountAdapter {
    */
   async getBalance(networkId: number, tokenAddress?: string): Promise<Money> {
     try {
-      await this._ensureAddress();
-
-      // Try to use pre-configured provider from client if available
-      let publicClient: ViemPublicClient | undefined;
-      const configuredProvider = this._client.providers?.[networkId];
-
-      if (configuredProvider) {
-        // Create a viem public client from the ethers provider if needed
-        // For now, use the existing public client
-        publicClient = this._getPublicClient();
-      } else {
-        // Switch to the requested network if needed
-        const currentNetworkId = await this.getConnectedNetworkId();
-        if (currentNetworkId !== networkId) {
-          await this.switchNetwork(networkId);
-        }
-        publicClient = this._getPublicClient();
+      // Switch to the requested network if needed
+      const currentNetworkId = await this.getConnectedNetworkId();
+      if (currentNetworkId !== networkId) {
+        await this.switchNetwork(networkId);
       }
 
       if (!tokenAddress || tokenAddress === '0x0000000000000000000000000000000000000000') {
         // Get native token balance using viem
-        const publicClientTyped = publicClient;
-        const balance = await publicClientTyped.getBalance({
-          address: this.address as ViemAddress,
+        const balance = await this._publicClient.getBalance({
+          address: this._address as `0x${string}`,
         });
 
         // Convert viem bigint to ethers BigNumber for Money class
         const ethersBN = ethers.BigNumber.from(balance.toString());
 
-        // Create a mock provider for Money class (it only needs basic functionality)
-        const mockProvider = this._createMockEthersProvider(publicClient);
-
         return Money.create({
           value: ethersBN,
           networkId,
-          provider: mockProvider as unknown as
-            | ethers.providers.JsonRpcProvider
-            | ethers.providers.Web3Provider,
           fetchUSD: true,
         });
       } else {
         // Get ERC-20 token balance using viem
-        const balance = await checkERC20BalanceViem(tokenAddress, this.address, publicClient);
+        const balance = await this._checkERC20BalanceViem(
+          tokenAddress,
+          this._address,
+          this._publicClient,
+        );
 
         // Convert viem bigint to ethers BigNumber
         const ethersBN = ethers.BigNumber.from(balance.toString());
-        const mockProvider = this._createMockEthersProvider(publicClient);
 
         return Money.create({
           value: ethersBN,
           networkId,
           erc20: tokenAddress,
-          provider: mockProvider as unknown as
-            | ethers.providers.JsonRpcProvider
-            | ethers.providers.Web3Provider,
           fetchUSD: true,
         });
       }
@@ -247,30 +181,11 @@ export class ViemAdapter implements IAccountAdapter {
    */
   async getConnectedNetworkId(): Promise<number> {
     try {
-      const publicClient = this._getPublicClient();
-      const chainId = await publicClient.getChainId();
+      const chainId = await this._walletClient.getChainId();
       return Number(chainId);
     } catch (error) {
       throw this._wrapError(error, 'getConnectedNetworkId');
     }
-  }
-
-  /**
-   * Get provider for a specific network
-   */
-  async getProvider(networkId?: number): Promise<ViemWalletClient | ViemPublicClient> {
-    if (!networkId) {
-      // Return any available client
-      return this._walletClient || this._publicClient!;
-    }
-
-    // Check if we need to switch networks
-    const currentNetworkId = await this.getConnectedNetworkId();
-    if (currentNetworkId !== networkId) {
-      await this.switchNetwork(networkId);
-    }
-
-    return this._walletClient || this._publicClient!;
   }
 
   /**
@@ -282,11 +197,8 @@ export class ViemAdapter implements IAccountAdapter {
    */
   async switchNetwork(chainId: number): Promise<void> {
     try {
-      const walletClient = this._getWalletClient();
-
       // Use viem's switchChain action
-      const walletClientTyped = walletClient;
-      await walletClientTyped.switchChain({ id: chainId });
+      await this._walletClient.switchChain({ id: chainId });
     } catch (error) {
       throw this._wrapError(error, 'switchNetwork', { chainId });
     }
@@ -301,12 +213,8 @@ export class ViemAdapter implements IAccountAdapter {
    */
   async signMessage(message: string): Promise<string> {
     try {
-      const walletClient = this._getWalletClient();
-      await this._ensureAddress();
-
-      const walletClientTyped = walletClient;
-      const signature = await walletClientTyped.signMessage({
-        account: this.address as ViemAddress,
+      const signature = await this._walletClient.signMessage({
+        account: this._address as `0x${string}`,
         message,
       });
 
@@ -369,138 +277,31 @@ export class ViemAdapter implements IAccountAdapter {
   // =============================================================================
 
   /**
-   * Dynamically import viem to avoid hard dependency
+   * Check ERC20 token balance using viem client
    */
-  protected _initializeViem(): void {
-    try {
-      // Try to require viem - this will throw if not installed
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      this._viem = require('viem') as ViemModule;
-    } catch (error) {
-      throw new ClientSDKError(
-        ErrorCode.INVALID_INPUT,
-        'Viem is not installed. Please install viem as a peer dependency: npm install viem',
-      );
-    }
-  }
+  private async _checkERC20BalanceViem(
+    tokenAddress: string,
+    ownerAddress: string,
+    publicClient: Pick<PublicClient, 'readContract'>,
+  ): Promise<bigint> {
+    const erc20Abi = [
+      {
+        name: 'balanceOf',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [{ name: 'owner', type: 'address' }],
+        outputs: [{ name: '', type: 'uint256' }],
+      },
+    ] as const;
 
-  /**
-   * Create a PublicClient from WalletClient's transport and chain
-   */
-  private _createPublicClient(walletClient: ViemWalletClient): ViemPublicClient {
-    if (!this._viem) {
-      throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Viem module not properly initialized');
-    }
+    const balance = await publicClient.readContract({
+      address: tokenAddress as `0x${string}`,
+      abi: erc20Abi,
+      functionName: 'balanceOf',
+      args: [ownerAddress as `0x${string}`],
+    });
 
-    const { createPublicClient } = this._viem;
-
-    if (typeof createPublicClient !== 'function') {
-      throw new ClientSDKError(
-        ErrorCode.INVALID_INPUT,
-        'createPublicClient function not found in viem module',
-      );
-    }
-
-    const clientWithProps = walletClient as ViemWalletClient & {
-      chain?: unknown;
-      transport?: unknown;
-    };
-
-    const { chain, transport } = clientWithProps;
-
-    if (!chain || !transport) {
-      throw new ClientSDKError(
-        ErrorCode.INVALID_INPUT,
-        'Wallet client missing chain or transport required to create public client',
-      );
-    }
-
-    type PublicClientConfig = Parameters<typeof createPublicClient>[0];
-
-    const config: PublicClientConfig = {
-      chain: chain as PublicClientConfig['chain'],
-      transport: transport as unknown as PublicClientConfig['transport'],
-    };
-
-    return createPublicClient(config) as ViemPublicClient;
-  }
-
-  /**
-   * Get wallet client, throwing error if not available
-   */
-  private _getWalletClient(): ViemWalletClient {
-    if (!this._walletClient) {
-      throw new ClientSDKError(
-        ErrorCode.INVALID_INPUT,
-        'No wallet client available. Cannot perform transactions with read-only client.',
-      );
-    }
-    return this._walletClient;
-  }
-
-  /**
-   * Get public client for read operations
-   */
-  private _getPublicClient(): ViemPublicClient {
-    if (this._publicClient) {
-      return this._publicClient;
-    }
-
-    // If we have a wallet client, try to create a public client from it
-    if (this._walletClient) {
-      this._publicClient = this._createPublicClient(this._walletClient);
-      return this._publicClient;
-    }
-
-    throw new ClientSDKError(
-      ErrorCode.INVALID_INPUT,
-      'No public client available for read operations',
-    );
-  }
-
-  /**
-   * Ensure address is initialized by fetching it from client
-   */
-  private async _ensureAddress(): Promise<void> {
-    if (!this.address) {
-      if (this._walletClient) {
-        const walletClient = this._walletClient;
-
-        // Get address from wallet client
-        if (walletClient.account) {
-          // Account is hoisted on the client
-          const account = walletClient.account;
-          if ('address' in account && typeof account.address === 'string') {
-            (this as { address: string }).address = account.address;
-          } else {
-            throw new ClientSDKError(
-              ErrorCode.INVALID_INPUT,
-              'Invalid account address format in wallet client',
-            );
-          }
-        } else if (typeof walletClient.getAddresses === 'function') {
-          // Get addresses from provider (JSON-RPC account)
-          const addresses = await walletClient.getAddresses();
-          if (!Array.isArray(addresses) || addresses.length === 0) {
-            throw new ClientSDKError(
-              ErrorCode.INVALID_INPUT,
-              'No accounts available from wallet client',
-            );
-          }
-          (this as { address: string }).address = addresses[0]!;
-        } else {
-          throw new ClientSDKError(
-            ErrorCode.INVALID_INPUT,
-            'Wallet client has no account or getAddresses method',
-          );
-        }
-      } else {
-        throw new ClientSDKError(
-          ErrorCode.INVALID_INPUT,
-          'Cannot get address from read-only client',
-        );
-      }
-    }
+    return balance;
   }
 
   /**
@@ -508,15 +309,15 @@ export class ViemAdapter implements IAccountAdapter {
    */
   private _convertToViemRequest(
     request: UniversalTransactionRequest,
-  ): Parameters<ViemWalletClient['sendTransaction']>[0] {
+  ): Parameters<WalletClient['sendTransaction']>[0] {
     const viemRequest: Record<string, unknown> = {
-      to: request.to as ViemAddress,
+      to: request.to,
     };
 
     // Add account if not hoisted
     const walletClient = this._walletClient;
-    if (!walletClient?.account && this.address) {
-      viemRequest.account = this.address as ViemAddress;
+    if (!walletClient?.account && this._address) {
+      viemRequest.account = this._address;
     }
 
     if (request.value) {
@@ -551,7 +352,7 @@ export class ViemAdapter implements IAccountAdapter {
       viemRequest.maxPriorityFeePerGas = BigInt(request.maxPriorityFeePerGas);
     }
 
-    return viemRequest as Parameters<ViemWalletClient['sendTransaction']>[0];
+    return viemRequest as Parameters<WalletClient['sendTransaction']>[0];
   }
 
   /**
@@ -559,45 +360,20 @@ export class ViemAdapter implements IAccountAdapter {
    */
   private _convertToUniversalResponse(
     chainId: number,
-    hash: ViemHash,
-    receipt: Viem.TransactionReceipt,
+    hash: string,
+    receipt: TransactionReceipt,
   ): UniversalTransactionResponse {
-    const hashStr = hash as string;
+    const hashStr = hash as `0x${string}`;
 
     const response: UniversalTransactionResponse = {
       hash: hashStr,
-      from: (receipt.from as string) || this.address || '',
+      from: receipt.from,
       to: (receipt.to as string) || '',
       status: 'pending', // viem sendTransaction only returns hash, transaction is initially pending
       chainId,
     };
 
     return response;
-  }
-
-  private async _waitForViemReceipt(hash: ViemHash, confirmations: number) {
-    const publicClient = this._getPublicClient();
-    const publicClientTyped = publicClient;
-
-    return await publicClientTyped.waitForTransactionReceipt({
-      hash,
-      confirmations,
-    });
-  }
-
-  /**
-   * Create a mock ethers provider that implements the minimal interface needed by Money class
-   */
-  private _createMockEthersProvider(publicClient: ViemPublicClient): Record<string, unknown> {
-    const client = publicClient;
-
-    return {
-      // Mock the methods that Money class might use
-      getNetwork: async () => ({
-        chainId: await client.getChainId(),
-      }),
-      // Add other methods as needed by the Money class
-    };
   }
 
   /**
@@ -820,101 +596,8 @@ export class ViemAdapter implements IAccountAdapter {
   }
 }
 
-// =============================================================================
-// ADAPTER FACTORY HELPER
-// =============================================================================
-
-/**
- * Create ViemAdapter from viem WalletClient or PublicClient
- *
- * @param manifoldClient - Manifold client instance
- * @param client - viem WalletClient or PublicClient instance
- * @returns ViemAdapter instance
- * @throws {ClientSDKError} When client is invalid
- *
- * @example
- * ```typescript
- * import { createWalletClient, custom } from 'viem';
- * import { mainnet } from 'viem/chains';
- * import { createViemAdapter } from './adapters/viem-adapter';
- *
- * const client = createWalletClient({
- *   chain: mainnet,
- *   transport: custom(window.ethereum)
- * });
- *
- * const adapter = createViemAdapter(manifoldClient, client);
- * ```
- */
-export function createViemAdapter(
-  manifoldClient: ManifoldClient,
-  client: unknown,
-): IAccountAdapter {
-  if (!client || typeof client !== 'object') {
-    throw new ClientSDKError(
-      ErrorCode.INVALID_INPUT,
-      'Client must be a valid viem WalletClient or PublicClient instance',
-    );
-  }
-
-  const viemClient = client as ViemClient;
-
-  // Determine if it's a wallet or public client
-  const isWallet =
-    'sendTransaction' in viemClient && typeof viemClient.sendTransaction === 'function';
-  const isPublic = 'getBalance' in viemClient && !('sendTransaction' in viemClient);
-
-  if (isWallet) {
-    return new ViemAdapter(manifoldClient, { walletClient: viemClient });
-  } else if (isPublic) {
-    return new ViemAdapter(manifoldClient, { publicClient: viemClient });
-  } else {
-    throw new ClientSDKError(
-      ErrorCode.INVALID_INPUT,
-      'Invalid viem client. Must be WalletClient or PublicClient instance',
-    );
-  }
+function createAccount(provider: { walletClient: WalletClient; publicClient: PublicClient }) {
+  return new ViemAccount(provider);
 }
 
-// =============================================================================
-// TYPE GUARDS AND DETECTION
-// =============================================================================
-
-/**
- * Detect if a client instance is compatible with viem
- *
- * @param client - Unknown client instance
- * @returns True if client appears to be viem compatible
- */
-export function isViemCompatible(client: unknown): boolean {
-  if (!client || typeof client !== 'object') {
-    return false;
-  }
-
-  const obj = client as Record<string, unknown>;
-
-  // Check for viem specific patterns
-  const hasViemMethods =
-    (typeof obj.sendTransaction === 'function' && typeof obj.signMessage === 'function') || // WalletClient
-    (typeof obj.getBalance === 'function' && typeof obj.readContract === 'function'); // PublicClient
-
-  if (!hasViemMethods) {
-    return false;
-  }
-
-  // Check for viem-specific properties
-  const hasViemProperties = obj.transport && (obj.chain || obj.getChainId) && obj.mode !== 'anvil'; // Exclude test clients
-
-  // Check against ethers patterns to avoid false positives
-  const providerObj = obj.provider as Record<string, unknown> | undefined;
-  const getNetworkObj = obj.getNetwork as Record<string, unknown> | undefined;
-
-  const hasEthersPatterns =
-    obj._isProvider === true ||
-    providerObj?._isProvider === true ||
-    (typeof getNetworkObj?.constructor === 'function' &&
-      typeof getNetworkObj.constructor.name === 'string' &&
-      getNetworkObj.constructor.name.includes('ethers'));
-
-  return Boolean(hasViemProperties) && !hasEthersPatterns;
-}
+export { createAccount };

@@ -175,12 +175,11 @@ export type AdapterType =
  * });
  * ```
  */
-export interface IAccountAdapter {
+export interface IAccount {
   /**
    * Wallet address (checksummed)
-   * @readonly
    */
-  readonly address: string;
+  _address: string | undefined;
 
   /**
    * Adapter type identifier for debugging and type checking
@@ -192,11 +191,6 @@ export interface IAccountAdapter {
    * Get wallet address asynchronously
    */
   getAddress(): Promise<string>;
-
-  /**
-   * Get provider for a specific network
-   */
-  getProvider(networkId?: number): Promise<unknown>;
 
   /**
    * Send a transaction through the connected wallet
@@ -344,104 +338,6 @@ export interface TypedDataPayload {
 }
 
 // =============================================================================
-// ADAPTER FACTORY INTERFACE
-// =============================================================================
-
-/**
- * Factory interface for creating account adapters with explicit type safety.
- * Provides type-safe methods for each supported Web3 library and includes
- * backward compatibility with auto-detection.
- *
- * @example
- * ```typescript
- * // Recommended: Explicit factory methods (type-safe)
- * const ethers5Adapter = AccountAdapterFactory.fromEthers5(signer);
- * const ethers6Adapter = AccountAdapterFactory.fromEthers6(provider);
- * const viemAdapter = AccountAdapterFactory.fromViem(walletClient);
- *
- * // Legacy: Auto-detect (may be deprecated in future)
- * const adapter = AccountAdapterFactory.create(provider);
- * ```
- */
-export interface IAccountAdapterFactory {
-  /**
-   * Create adapter from ethers v5 provider or signer
-   *
-   * @param provider - ethers v5 Provider or Signer instance
-   * @returns IAccountAdapter instance configured for ethers v5
-   * @throws {FactoryError} When provider is invalid or unsupported
-   *
-   * @example
-   * ```typescript
-   * import { ethers } from 'ethers'; // v5
-   *
-   * const provider = new ethers.providers.Web3Provider(window.ethereum);
-   * const signer = provider.getSigner();
-   * const adapter = AccountAdapterFactory.fromEthers5(signer);
-   * ```
-   */
-  fromEthers5(provider: unknown): IAccountAdapter;
-
-  /**
-   * Create adapter from ethers v6 provider or signer
-   *
-   * @param provider - ethers v6 Provider or Signer instance
-   * @returns IAccountAdapter instance configured for ethers v6
-   * @throws {FactoryError} When provider is invalid or unsupported
-   *
-   * @example
-   * ```typescript
-   * import { ethers } from 'ethers'; // v6
-   *
-   * const provider = new ethers.BrowserProvider(window.ethereum);
-   * const signer = await provider.getSigner();
-   * const adapter = AccountAdapterFactory.fromEthers6(signer);
-   * ```
-   */
-  fromEthers6(provider: unknown): IAccountAdapter;
-
-  /**
-   * Create adapter from viem wallet client
-   *
-   * @param client - viem WalletClient or PublicClient with account
-   * @returns IAccountAdapter instance configured for viem
-   * @throws {FactoryError} When client is invalid or unsupported
-   *
-   * @example
-   * ```typescript
-   * import { createWalletClient, custom } from 'viem';
-   * import { mainnet } from 'viem/chains';
-   *
-   * const client = createWalletClient({
-   *   chain: mainnet,
-   *   transport: custom(window.ethereum)
-   * });
-   * const adapter = AccountAdapterFactory.fromViem(client);
-   * ```
-   */
-  fromViem(client: unknown): IAccountAdapter;
-
-  /**
-   * Auto-detect provider type and create appropriate adapter
-   *
-   * @deprecated Use explicit factory methods (fromEthers5, fromEthers6, fromViem) for better type safety
-   * @param provider - Unknown provider instance to auto-detect
-   * @returns IAccountAdapter instance for detected provider type
-   * @throws {FactoryError} When provider type cannot be detected
-   *
-   * @example
-   * ```typescript
-   * // Legacy usage (may be deprecated)
-   * const adapter = AccountAdapterFactory.create(unknownProvider);
-   *
-   * // Preferred: Use explicit methods
-   * const adapter = AccountAdapterFactory.fromEthers5(ethersSigner);
-   * ```
-   */
-  create(provider: unknown): IAccountAdapter;
-}
-
-// =============================================================================
 // ERROR TYPES
 // =============================================================================
 
@@ -520,9 +416,9 @@ export enum SupportedNetwork {
 // =============================================================================
 
 /**
- * Type guard utility for checking if an object is an IAccountAdapter
+ * Type guard utility for checking if an object is an IAccount
  */
-export type AccountAdapterTypeGuard = (obj: unknown) => obj is IAccountAdapter;
+export type AccountAdapterTypeGuard = (obj: unknown) => obj is IAccount;
 
 /**
  * Provider detection utility type

@@ -1,5 +1,4 @@
 import { ethers } from 'ethers';
-import type { PublicClient } from 'viem';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 
 export interface GasEstimationParams {
@@ -64,53 +63,6 @@ export function applyGasBuffer(
 ): ethers.BigNumber {
   const buffer = 100 + bufferPercentage;
   return gasEstimate.mul(buffer).div(100);
-}
-
-/**
- * Check ERC20 token balance
- */
-export async function checkERC20Balance(
-  tokenAddress: string,
-  ownerAddress: string,
-  provider:
-    | ethers.providers.JsonRpcProvider
-    | ethers.providers.Web3Provider
-    | ethers.providers.JsonRpcSigner,
-): Promise<ethers.BigNumber> {
-  const erc20Abi = ['function balanceOf(address owner) view returns (uint256)'];
-
-  const contract = new ethers.Contract(tokenAddress, erc20Abi, provider);
-  const balanceOf = contract.balanceOf as (owner: string) => Promise<ethers.BigNumber>;
-  const balance = await balanceOf(ownerAddress);
-  return balance;
-}
-
-/**
- * Check ERC20 token balance using viem client
- */
-export async function checkERC20BalanceViem(
-  tokenAddress: string,
-  ownerAddress: string,
-  publicClient: Pick<PublicClient, 'readContract'>,
-): Promise<bigint> {
-  const erc20Abi = [
-    {
-      name: 'balanceOf',
-      type: 'function',
-      stateMutability: 'view',
-      inputs: [{ name: 'owner', type: 'address' }],
-      outputs: [{ name: '', type: 'uint256' }],
-    },
-  ] as const;
-
-  const balance = await publicClient.readContract({
-    address: tokenAddress as `0x${string}`,
-    abi: erc20Abi,
-    functionName: 'balanceOf',
-    args: [ownerAddress as `0x${string}`],
-  });
-
-  return balance;
 }
 
 /**

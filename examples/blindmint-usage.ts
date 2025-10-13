@@ -8,7 +8,7 @@
 import { createClient } from '../src/client';
 import { AccountAdapterFactory } from '../src/adapters/account-adapter-factory';
 import type { NetworkId } from '../src/types/common';
-import type { IAccountAdapter } from '../src/types/account-adapter';
+import type { IAccount } from '../src/types/account-adapter';
 
 // Simulated wallet imports (in real usage, these would be actual wallet imports)
 declare const ethers: any; // ethers v5

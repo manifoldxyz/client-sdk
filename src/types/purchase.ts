@@ -1,10 +1,10 @@
 import type { Address, NetworkId } from './common';
 import type { Cost, Money } from './money';
-import type { IAccountAdapter } from './account-adapter';
+import type { IAccount } from './account-adapter';
 
 export interface PreparePurchaseParams<T> {
   address: Address;
-  account?: IAccountAdapter;
+  account?: IAccount;
   recipientAddress?: Address;
   networkId?: NetworkId;
   payload: T;
@@ -149,7 +149,7 @@ export interface TransactionStep {
    * @throws {ClientSDKError} On transaction failure or rejection
    */
   execute: (
-    adapter: IAccountAdapter,
+    adapter: IAccount,
     options?: TransactionStepExecuteOptions,
   ) => Promise<TransactionReceipt>;
 
@@ -173,7 +173,7 @@ export interface TransactionOnProgress {
 }
 
 export interface PurchaseParams {
-  accountAdapter: IAccountAdapter;
+  account: IAccount;
   preparedPurchase: PreparedPurchase;
 }
 

@@ -2,14 +2,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AccountAdapterFactory } from '../src/adapters/account-adapter-factory';
 import { BlindMintProductImpl } from '../src/products/blindmint';
-import type { IAccountAdapter } from '../src/types/account-adapter';
+import type { IAccount } from '../src/types/account-adapter';
 import type { InstanceData } from '../src/types/product';
 
 // Mock implementations for testing
 const createMockAdapter = (
   networkId: number = 1,
   address: string = '0x742d35Cc6634C0532925a3b8D66320d7c2fbd768',
-): IAccountAdapter => ({
+): IAccount => ({
   address,
   adapterType: 'ethers5',
   async sendTransaction(request) {

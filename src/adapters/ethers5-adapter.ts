@@ -1,30 +1,15 @@
 import { ethers } from 'ethers';
 import type {
-  IAccountAdapter,
+  IAccount,
   UniversalTransactionRequest,
   UniversalTransactionResponse,
   AdapterType,
 } from '../types/account-adapter';
 import { Money } from '../libs/money';
 import { ClientSDKError, ErrorCode } from '../types/errors';
-import { checkERC20Balance } from '../utils/gas-estimation';
 import type { ManifoldClient } from '../types';
 import { ensureConnectedNetwork } from '../utils';
 import type { NetworkConfigs } from '../utils/transactions';
-
-// =============================================================================
-// ERC-20 CONSTANTS
-// =============================================================================
-
-/**
- * Standard ERC-20 ABI fragments for balance and metadata queries
- * Note: Currently using utility functions from gas-estimation.ts
- */
-// const ERC20_ABI = [
-//   'function balanceOf(address owner) view returns (uint256)',
-//   'function decimals() view returns (uint8)',
-//   'function symbol() view returns (string)',
-// ] as const;
 
 // =============================================================================
 // ETHERS V5 ADAPTER IMPLEMENTATION
@@ -57,13 +42,13 @@ import type { NetworkConfigs } from '../utils/transactions';
  *
  * @public
  */
-export class Ethers5Adapter implements IAccountAdapter {
+class Ethers5Account implements IAccount {
   readonly adapterType: AdapterType = 'ethers5';
 
   private _signer: ethers.providers.JsonRpcSigner | undefined;
   private _wallet: ethers.Wallet | undefined;
   private _client: ManifoldClient;
-  readonly address: string;
+  _address: string | undefined;
 
   /**
    * Initialize adapter with ethers v5 provider or signer.
@@ -113,47 +98,17 @@ export class Ethers5Adapter implements IAccountAdapter {
     if (signer) {
       this._signer = signer;
     }
-    this.address = this._signer?._address || this._wallet?.address || '';
-  }
-
-  // Optionally specify a networkId to ensure the provider is on the correct network
-  async getProvider(networkId?: number) {
-    if (!networkId) {
-      // We don't care about the networkId of the provider
-      const provider = this._signer || this._wallet;
-      if (!provider)
-        throw new ClientSDKError(
-          ErrorCode.UNKNOWN_ERROR,
-          `Unknown error, could not locate provider`,
-        );
-      return provider;
-    }
-    // We do care about the networkId of the provider, need to ensure we are on the correct network
-    const signer = this._signer;
-    if (signer) {
-      await this.switchNetwork(networkId);
-      return signer;
-    }
-    const wallet = this._wallet;
-    if (!wallet) {
-      throw new ClientSDKError(ErrorCode.UNKNOWN_ERROR, `Unknown error, could not locate wallet`);
-    }
-    // Make sure the wallet is connected to the proper rpc
-    const provider = this._client.providers?.[networkId];
-    if (!provider) {
-      throw new ClientSDKError(
-        ErrorCode.MISSING_RPC_URL,
-        `Missing RPC Url for networkId ${networkId}`,
-      );
-    }
-    return wallet.connect(provider);
   }
 
   /**
    * Get wallet address (cached after first call)
    */
   async getAddress(): Promise<string> {
-    return this._wallet?.address || this._signer!.getAddress();
+    if (this._address) {
+      return this._address;
+    }
+    this._address = this._wallet?.address || (await this._signer!.getAddress());
+    return this._address;
   }
 
   /**
@@ -166,7 +121,7 @@ export class Ethers5Adapter implements IAccountAdapter {
   async sendTransaction(request: UniversalTransactionRequest): Promise<string> {
     const { chainId } = request;
     try {
-      const provider = await this.getProvider(chainId);
+      const provider = await this._getProvider(chainId);
       // Convert universal request to ethers v5 transaction request
       const ethersRequest = this._convertToEthersRequest(request);
 
@@ -187,7 +142,7 @@ export class Ethers5Adapter implements IAccountAdapter {
     const { chainId } = request;
 
     try {
-      const provider = await this.getProvider(chainId);
+      const provider = await this._getProvider(chainId);
       const ethersRequest = this._convertToEthersRequest(request);
       const tx = await provider.sendTransaction(ethersRequest);
       const receipt = await tx.wait(confirmations);
@@ -211,27 +166,11 @@ export class Ethers5Adapter implements IAccountAdapter {
    */
   async getBalance(networkId: number, tokenAddress?: string): Promise<Money> {
     try {
-      let networkProvider:
-        | ethers.providers.JsonRpcSigner
-        | ethers.providers.JsonRpcProvider
-        | undefined = this._client?.providers?.[networkId];
-      if (!networkProvider) {
-        // Try using signer provider
-        await this.switchNetwork(networkId);
-        networkProvider = this._signer;
-      }
-      if (!networkProvider) {
-        throw new ClientSDKError(
-          ErrorCode.UNKNOWN_ERROR,
-          `Missing network provider for networkId ${networkId}`,
-        );
-      }
+      const provider = await this._getProvider(networkId);
+      const address = await this.getAddress();
       if (!tokenAddress || tokenAddress === ethers.constants.AddressZero) {
-        const address = await this.getAddress()
         // Get native token balance
-        const balance = await (
-          networkProvider as ethers.providers.JsonRpcSigner
-        ).provider.getBalance(address);
+        const balance = await provider.provider.getBalance(address);
 
         return Money.create({
           value: balance,
@@ -240,7 +179,7 @@ export class Ethers5Adapter implements IAccountAdapter {
         });
       } else {
         // Get ERC-20 token balance
-        const balance = await checkERC20Balance(tokenAddress, this.address, networkProvider);
+        const balance = await this._checkERC20Balance(tokenAddress, address, provider);
 
         return Money.create({
           value: balance,
@@ -294,7 +233,7 @@ export class Ethers5Adapter implements IAccountAdapter {
    * @throws {ClientSDKError} When signing fails or is rejected
    */
   async signMessage(message: string): Promise<string> {
-    const provider = await this.getProvider();
+    const provider = await this._getProvider();
     try {
       return provider.signMessage(message);
     } catch (error) {
@@ -329,6 +268,55 @@ export class Ethers5Adapter implements IAccountAdapter {
   // =============================================================================
   // PRIVATE HELPER METHODS
   // =============================================================================
+
+  // Optionally specify a networkId to ensure the provider is on the correct network
+  async _getProvider(networkId?: number) {
+    if (!networkId) {
+      // We don't care about the networkId of the provider
+      const provider = this._signer || this._wallet;
+      if (!provider)
+        throw new ClientSDKError(
+          ErrorCode.UNKNOWN_ERROR,
+          `Unknown error, could not locate provider`,
+        );
+      return provider;
+    }
+    // We do care about the networkId of the provider, need to ensure we are on the correct network
+    const signer = this._signer;
+    if (signer) {
+      await this.switchNetwork(networkId);
+      return signer;
+    }
+    const wallet = this._wallet;
+    if (!wallet) {
+      throw new ClientSDKError(ErrorCode.UNKNOWN_ERROR, `Unknown error, could not locate wallet`);
+    }
+    // Make sure the wallet is connected to the proper rpc
+    const provider = this._client.providers?.[networkId];
+    if (!provider) {
+      throw new ClientSDKError(
+        ErrorCode.MISSING_RPC_URL,
+        `Missing RPC Url for networkId ${networkId}`,
+      );
+    }
+    return wallet.connect(provider);
+  }
+
+  /**
+   * Check ERC20 token balance
+   */
+  async _checkERC20Balance(
+    tokenAddress: string,
+    ownerAddress: string,
+    provider: ethers.providers.JsonRpcSigner | ethers.Wallet,
+  ): Promise<ethers.BigNumber> {
+    const erc20Abi = ['function balanceOf(address owner) view returns (uint256)'];
+
+    const contract = new ethers.Contract(tokenAddress, erc20Abi, provider);
+    const balanceOf = contract.balanceOf as (owner: string) => Promise<ethers.BigNumber>;
+    const balance = await balanceOf(ownerAddress);
+    return balance;
+  }
 
   /**
    * Convert universal transaction request to ethers v5 format
@@ -451,16 +439,14 @@ export class Ethers5Adapter implements IAccountAdapter {
   ): UniversalTransactionResponse {
     return {
       hash: receipt.transactionHash,
-      from: receipt.from ?? this.address ?? '',
-      to: receipt.to ?? request.to ?? '',
-      blockNumber: receipt.blockNumber ?? undefined,
-      blockHash: receipt.blockHash ?? undefined,
-      gasUsed: receipt.gasUsed ? receipt.gasUsed.toString() : undefined,
-      effectiveGasPrice: receipt.effectiveGasPrice
-        ? receipt.effectiveGasPrice.toString()
-        : undefined,
+      from: receipt.from,
+      to: receipt.to,
+      blockNumber: receipt.blockNumber,
+      blockHash: receipt.blockHash,
+      gasUsed: receipt.gasUsed.toString(),
+      effectiveGasPrice: receipt.effectiveGasPrice.toString(),
       status: 'pending',
-      confirmations: receipt.confirmations ?? 0,
+      confirmations: receipt.confirmations,
       nonce: request.nonce,
       chainId: networkId,
     };
@@ -646,3 +632,15 @@ export class Ethers5Adapter implements IAccountAdapter {
     });
   }
 }
+
+function createAccount(
+  client: ManifoldClient,
+  provider: {
+    signer?: ethers.providers.JsonRpcSigner;
+    wallet?: ethers.Wallet;
+  },
+) {
+  return new Ethers5Account(client, provider);
+}
+
+export { createAccount };

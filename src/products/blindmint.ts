@@ -9,7 +9,7 @@ import type {
   BlindMintTierProbability,
   BlindMintProduct as IBlindMintProduct,
 } from '../types/blindmint';
-import type { IAccountAdapter, UniversalTransactionRequest } from '../types/account-adapter';
+import type { IAccount, UniversalTransactionRequest } from '../types/account-adapter';
 import type {
   Product,
   AllocationParams,
@@ -349,17 +349,14 @@ export class BlindMintProduct implements IBlindMintProduct {
             name: `Approve ${totalCost.symbol} Spending`,
             type: 'approve',
             description: `Approve ${totalCost.formatted} ${totalCost.symbol}`,
-            execute: async (
-              accountAdapter: IAccountAdapter,
-              options?: TransactionStepExecuteOptions,
-            ) => {
-              await accountAdapter.switchNetwork(networkId);
-
+            execute: async (account: IAccount, options?: TransactionStepExecuteOptions) => {
+              await account.switchNetwork(networkId);
+              const address = await account.getAddress();
               const gasEstimate = await estimateGas({
                 contract: erc20Contract,
                 method: 'approve',
                 args: [this._extensionAddress, totalCost.raw],
-                from: accountAdapter.address,
+                from: address,
                 fallbackGas: ethers.BigNumber.from(200000),
               });
 
@@ -372,7 +369,7 @@ export class BlindMintProduct implements IBlindMintProduct {
                 chainId: networkId,
               };
 
-              const confirmation = await accountAdapter.sendTransactionWithConfirmation(txRequest, {
+              const confirmation = await account.sendTransactionWithConfirmation(txRequest, {
                 confirmations: options?.confirmations || 1,
               });
 
@@ -430,16 +427,16 @@ export class BlindMintProduct implements IBlindMintProduct {
       type: 'mint',
       description: `Mint ${quantity} random NFT(s)`,
       cost: mintCost,
-      execute: async (accountAdapter: IAccountAdapter, options?: TransactionStepExecuteOptions) => {
+      execute: async (account: IAccount, options?: TransactionStepExecuteOptions) => {
         // This will handle network switch and adding custom network to user wallet if needed
-        await accountAdapter.switchNetwork(networkId);
-
+        await account.switchNetwork(networkId);
+        const address = await account.getAddress();
         const blindMintContract = contractFactory.createBlindMintContract(this._extensionAddress);
         const gasEstimate = await estimateGas({
           contract: blindMintContract,
           method: 'mintReserve',
           args: [this._creatorContract, this.id, quantity],
-          from: accountAdapter.address,
+          from: address,
           value: nativePaymentValue,
           fallbackGas: ethers.BigNumber.from(300000),
         });
@@ -451,7 +448,7 @@ export class BlindMintProduct implements IBlindMintProduct {
           gasLimit,
           chainId: networkId,
         };
-        const confirmation = await accountAdapter.sendTransactionWithConfirmation(txRequest, {
+        const confirmation = await account.sendTransactionWithConfirmation(txRequest, {
           confirmations: options?.confirmations || 1,
         });
 
@@ -493,15 +490,15 @@ export class BlindMintProduct implements IBlindMintProduct {
   }
 
   async purchase(params: PurchaseParams): Promise<Order> {
-    const { accountAdapter, preparedPurchase } = params;
-    const walletAddress = accountAdapter.address;
+    const { account, preparedPurchase } = params;
+    const walletAddress = await account.getAddress();
 
     // Execute all steps sequentially
     const receipts: TransactionReceipt[] = [];
 
     for (const step of preparedPurchase.steps) {
       try {
-        const receipt = await step.execute(accountAdapter);
+        const receipt = await step.execute(account);
         receipts.push(receipt);
       } catch (error) {
         // If any step fails, throw error with context

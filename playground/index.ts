@@ -3,9 +3,9 @@ import { ethers } from 'ethers';
 import {
   createClient,
   AppType,
-  Ethers5Adapter,
+  createAccountEthers5,
   isBlindMintProduct,
-  type IAccountAdapter,
+  type IAccount,
   type Product,
 } from '../src/index';
 
@@ -35,13 +35,13 @@ const getNetworkRPCs = (): Record<number, string> => {
 
 interface ProductTestOptions {
   address: string;
-  accountAdapter?: IAccountAdapter;
+  account?: IAccount;
   executePurchase: boolean;
 }
 
-async function testProduct(
+async function testBlindMintProduct(
   product: Product,
-  { address, accountAdapter, executePurchase }: ProductTestOptions,
+  { address, account, executePurchase }: ProductTestOptions,
 ) {
   console.log(`\n📦 Testing ${product.type} Product`);
   console.log(`   Name: ${product.data.appName || 'Unknown'}`);
@@ -69,12 +69,10 @@ async function testProduct(
       console.log(`\n   💰 Preparing purchase for 1 NFT...`);
 
       const quantity = 1;
-      const payload =
-        product.type === AppType.BLIND_MINT
-          ? { quantity }
-          : product.type === AppType.EDITION
-            ? { quantity }
-            : undefined;
+      if (!isBlindMintProduct(product)) {
+        throw new Error('Is not a blind mint instance')
+      }
+      const payload = { quantity }
 
       const prepared = await product.preparePurchase({
         address,
@@ -100,11 +98,11 @@ async function testProduct(
       });
 
       // Execute purchase if adapter provided and execution enabled
-      if (accountAdapter) {
+      if (account) {
         if (executePurchase) {
-          console.log(`\n   🛒 Executing purchase via ${accountAdapter.adapterType} adapter...`);
+          console.log(`\n   🛒 Executing purchase via ${account.adapterType} adapter...`);
           const order = await product.purchase({
-            accountAdapter,
+            account,
             preparedPurchase: prepared,
           });
           const receiptHash = order.receipts[0]?.txHash ?? 'pending';
@@ -165,13 +163,13 @@ async function main() {
     httpRPCs,
   });
 
-  let accountAdapter: IAccountAdapter | undefined;
+  let account: IAccount | undefined;
   try {
-    accountAdapter = new Ethers5Adapter(client,  {
+    account = createAccountEthers5(client,  {
       wallet
     })
     // Prime adapter with balance lookup so address becomes available
-   const balance=  await accountAdapter.getBalance(11155111).catch(() => undefined);
+   const balance=  await account.getBalance(11155111).catch(() => undefined);
    console.log('current balance', balance)
   } catch (adapterError) {
     console.warn('   ⚠️  Unable to initialise ethers5 adapter:', adapterError);
@@ -186,9 +184,9 @@ async function main() {
 
   try {
     const product = await client.getProduct(testInstanceId);
-    await testProduct(product, {
+    await testBlindMintProduct(product, {
       address: testAddress,
-      accountAdapter,
+      account,
       executePurchase,
     });
   } catch (error) {
@@ -211,9 +209,9 @@ async function main() {
       console.log(`\nTesting ${test.type} (Instance: ${test.id})...`);
       try {
         const product = await client.getProduct(test.id);
-        await testProduct(product, {
+        await testBlindMintProduct(product, {
           address: testAddress,
-          accountAdapter,
+          account,
           executePurchase,
         });
       } catch (error) {

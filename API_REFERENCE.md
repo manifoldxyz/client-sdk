@@ -210,7 +210,7 @@ Executes the purchase transaction(s).
 
 | Parameter                 | Type               | Required | Description          |
 | ------------------------- | ------------------ | -------- | -------------------- |
-| `params.account`          | `IAccountAdapter`  | Yes      | Wallet adapter       |
+| `params.account`          | `IAccount`         | Yes      | Wallet adapter       |
 | `params.preparedPurchase` | `PreparedPurchase` | Yes      | From preparePurchase |
 | `params.callbacks`        | `object`           | No       | Progress callbacks   |
 | `params.confirmations`    | `number`           | No       | Block confirmations  |
@@ -406,7 +406,7 @@ Instead of calling `product.purchase()` which executes all steps automatically, 
 import { PreparedPurchase, TransactionStep } from '@manifoldxyz/client-sdk';
 
 // Custom UI component for step-by-step execution
-async function executeWithUI(preparedPurchase: PreparedPurchase, adapter: IAccountAdapter) {
+async function executeWithUI(preparedPurchase: PreparedPurchase, adapter: IAccount) {
   const results = [];
 
   for (const [index, step] of preparedPurchase.steps.entries()) {
@@ -468,7 +468,7 @@ function PurchaseSteps({
   adapter
 }: {
   preparedPurchase: PreparedPurchase;
-  adapter: IAccountAdapter;
+  adapter: IAccount;
 }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
@@ -578,7 +578,7 @@ if (step.type === 'mint') {
 // Retry failed steps with exponential backoff
 async function executeStepWithRetry(
   step: TransactionStep,
-  adapter: IAccountAdapter,
+  adapter: IAccount,
   maxRetries = 3,
 ): Promise<TransactionReceipt> {
   let lastError;
