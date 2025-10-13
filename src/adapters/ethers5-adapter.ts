@@ -397,13 +397,6 @@ class Ethers5Account implements IAccount {
       response.effectiveGasPrice = receipt.effectiveGasPrice.toString();
     }
 
-    // Determine transaction status
-    if (receipt.confirmations === 0) {
-      response.status = 'pending';
-    } else if (receipt.confirmations > 0) {
-      response.status = 'confirmed';
-    }
-
     return response;
   }
 
@@ -445,7 +438,6 @@ class Ethers5Account implements IAccount {
       blockHash: receipt.blockHash,
       gasUsed: receipt.gasUsed.toString(),
       effectiveGasPrice: receipt.effectiveGasPrice.toString(),
-      status: 'pending',
       confirmations: receipt.confirmations,
       nonce: request.nonce,
       chainId: networkId,

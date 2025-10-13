@@ -88,9 +88,6 @@ export interface UniversalTransactionResponse {
   /** Effective gas price paid (as string, only available after mining) */
   effectiveGasPrice?: string;
 
-  /** Transaction status */
-  status?: TransactionStatus;
-
   /** Number of confirmations (0 if pending) */
   confirmations?: number;
 
@@ -103,14 +100,6 @@ export interface UniversalTransactionResponse {
   /** Normalized receipt details when available */
   receipt?: TransactionConfirmationResult;
 }
-
-/**
- * Transaction status enumeration
- */
-export type TransactionStatus =
-  | 'pending' // Transaction submitted but not mined
-  | 'confirmed' // Transaction mined and confirmed
-  | 'failed'; // Transaction reverted or failed
 
 /**
  * Normalized transaction confirmation result returned by adapters
@@ -127,9 +116,6 @@ export interface TransactionConfirmationResult {
 
   /** Effective gas price paid (as string) */
   effectiveGasPrice?: string;
-
-  /** Transaction status */
-  status: TransactionStatus;
 
   /** Network ID where transaction was confirmed */
   networkId: number;

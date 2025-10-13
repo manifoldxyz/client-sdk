@@ -369,7 +369,6 @@ class ViemAccount implements IAccount {
       hash: hashStr,
       from: receipt.from,
       to: (receipt.to as string) || '',
-      status: 'pending', // viem sendTransaction only returns hash, transaction is initially pending
       chainId,
     };
 
