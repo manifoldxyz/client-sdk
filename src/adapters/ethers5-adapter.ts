@@ -187,12 +187,9 @@ export class Ethers5Adapter implements IAccountAdapter {
     const { chainId } = request;
 
     try {
-      console.log('the provider');
       const provider = await this.getProvider(chainId);
       const ethersRequest = this._convertToEthersRequest(request);
-      console.log('covnertigngg');
       const tx = await provider.sendTransaction(ethersRequest);
-      console.log('doneeeee');
       const receipt = await tx.wait(confirmations);
       return this._convertToUniversalResponse(tx, receipt);
     } catch (error) {
@@ -231,8 +228,6 @@ export class Ethers5Adapter implements IAccountAdapter {
       }
       if (!tokenAddress || tokenAddress === ethers.constants.AddressZero) {
         const address = await this.getAddress()
-        console.log('grabbinggg', networkProvider);
-        console.log('the address', address);
         // Get native token balance
         const balance = await (
           networkProvider as ethers.providers.JsonRpcSigner
@@ -478,7 +473,6 @@ export class Ethers5Adapter implements IAccountAdapter {
     // Determine error code based on error type
     let code: ErrorCode = ErrorCode.UNKNOWN_ERROR;
     let message = 'An unexpected error occurred';
-    console.log(error);
     if (error instanceof ClientSDKError) {
       // Re-throw ClientSDK errors directly
       throw error;

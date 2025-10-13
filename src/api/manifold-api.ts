@@ -20,13 +20,21 @@ export class ManifoldApiClient {
   /**
    * Fetch both instance and preview data in parallel
    */
-  async getCompleteInstanceData<T>(instanceId: string): Promise<{
+  async getCompleteInstanceData<T>(
+    instanceId: string,
+    options?: {
+      maxMediaWidth: number;
+    },
+  ): Promise<{
     instanceData: PublicInstance<T>;
     previewData: InstancePreview;
   }> {
     // Fetch both in parallel for performance
     const [instanceData, previewDatas] = (await Promise.all([
-      this.studioClient.public.getInstance({ instanceId: Number(instanceId), maxMediaWidth: 1024 }),
+      this.studioClient.public.getInstance({
+        instanceId: Number(instanceId),
+        maxMediaWidth: options?.maxMediaWidth,
+      }),
       this.studioClient.public.getPreviews({
         instanceIds: [parseInt(instanceId)],
       }),

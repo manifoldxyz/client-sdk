@@ -138,9 +138,11 @@ export function createClient(config?: ClientConfig): ManifoldClient {
       }
 
       try {
-        console.log('grabbing instanceId', instanceId);
         // Fetch both instance and preview data using Studio Apps Client
-        const { instanceData, previewData } = await manifoldApi.getCompleteInstanceData(instanceId);
+        const { instanceData, previewData } = await manifoldApi.getCompleteInstanceData(
+          instanceId,
+          { maxMediaWidth: 1024 },
+        );
 
         // Create BlindMint product if it matches the app ID or name
         if (isBlindMintInstanceData(instanceData)) {
