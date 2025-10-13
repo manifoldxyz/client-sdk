@@ -1,7 +1,8 @@
 {
   "name": "@manifoldxyz/client-sdk",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.0",
   "description": "Manifold Client SDK for headless purchasing and display of Manifold products",
+  "private": true,
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -45,8 +46,7 @@
     "ethers": "^5.7.2"
   },
   "peerDependencies": {
-    "viem": "^2.0.0",
-    "ethers": "^5 || ^6"
+    "viem": "^2.0.0"
   },
   "peerDependenciesMeta": {
     "viem": {
@@ -75,9 +75,5 @@
   },
   "engines": {
     "node": ">=18"
-  },
-  "sideEffects": false,
-  "publishConfig": {
-    "access": "public"
   }
 }
