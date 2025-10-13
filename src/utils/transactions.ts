@@ -90,6 +90,7 @@ export async function ensureConnectedNetwork(
   try {
     await switchNetwork(targetNetworkId);
   } catch (switchError) {
+    console.error(switchError);
     const code = (switchError as { code?: unknown })?.code;
 
     if (code === 4902) {

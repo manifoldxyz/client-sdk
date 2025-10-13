@@ -4,6 +4,7 @@ import {
   createClient,
   AppType,
   Ethers5Adapter,
+  isBlindMintProduct,
   type IAccountAdapter,
   type Product,
 } from '../src/index';

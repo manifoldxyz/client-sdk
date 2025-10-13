@@ -221,6 +221,7 @@ export class BlindMintProduct implements IBlindMintProduct {
    * @param params.payload.quantity - Number of tokens to mint (default: 1)
    * @param params.networkId - Optional network ID for cross-chain purchases
    * @param params.gasBuffer - Optional gas buffer configuration
+   * @params params.account - Optional, if provided will check if account has sufficient balance to purchase
    *
    * @returns PreparedPurchase object with cost breakdown and transaction steps
    *
@@ -250,7 +251,7 @@ export class BlindMintProduct implements IBlindMintProduct {
   async preparePurchase(
     params: PreparePurchaseParams<BlindMintPayload>,
   ): Promise<PreparedPurchase> {
-    const { address, payload } = params;
+    const { address, payload, account } = params;
     const quantity = payload?.quantity || 1;
     const networkId = this.data.publicData.network;
     const walletAddress = address;
@@ -395,13 +396,15 @@ export class BlindMintProduct implements IBlindMintProduct {
         }
       } else {
         // Check native balance using provider
-        const nativeBalance = await provider.getBalance(walletAddress);
+        if (account) {
+          const nativeBalance = await account.getBalance(networkId);
 
-        if (nativeBalance.lt(totalCost.raw)) {
-          throw new ClientSDKError(
-            ErrorCode.INSUFFICIENT_FUNDS,
-            `Insufficient ${totalCost.symbol} balance. Need ${totalCost.formatted} but have ${ethers.utils.formatUnits(nativeBalance, 18)}`,
-          );
+          if (nativeBalance && nativeBalance.isLessThan(totalCost)) {
+            throw new ClientSDKError(
+              ErrorCode.INSUFFICIENT_FUNDS,
+              `Insufficient ${totalCost.symbol} balance. Need ${totalCost.formatted} but have ${nativeBalance.formatted}`,
+            );
+          }
         }
       }
     }
@@ -440,9 +443,7 @@ export class BlindMintProduct implements IBlindMintProduct {
           value: nativePaymentValue,
           fallbackGas: ethers.BigNumber.from(300000),
         });
-
         const gasLimit = this._applyGasBuffer(gasEstimate, params.gasBuffer).toString();
-
         const txRequest: UniversalTransactionRequest = {
           to: this._extensionAddress,
           data: this._buildMintData(this._creatorContract, this.id, quantity),
@@ -450,7 +451,6 @@ export class BlindMintProduct implements IBlindMintProduct {
           gasLimit,
           chainId: networkId,
         };
-
         const confirmation = await accountAdapter.sendTransactionWithConfirmation(txRequest, {
           confirmations: options?.confirmations || 1,
         });
@@ -584,7 +584,7 @@ export class BlindMintProduct implements IBlindMintProduct {
     });
 
     return {
-      totalSupply: claimData.totalMax || Number.MAX_SAFE_INTEGER,
+      totalSupply: claimData.totalMax || 0,
       totalMinted: claimData.total || 0,
       startDate: convertDate(claimData.startDate),
       endDate: convertDate(claimData.endDate),
@@ -627,7 +627,7 @@ export class BlindMintProduct implements IBlindMintProduct {
 
     // Calculate available quantity
     let quantity = Number.MAX_SAFE_INTEGER;
-    if (onchainData.totalSupply !== Number.MAX_SAFE_INTEGER) {
+    if (onchainData.totalSupply) {
       const remaining = onchainData.totalSupply - onchainData.totalMinted;
       quantity = Math.min(quantity, remaining);
     }

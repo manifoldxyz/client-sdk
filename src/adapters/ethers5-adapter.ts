@@ -187,9 +187,12 @@ export class Ethers5Adapter implements IAccountAdapter {
     const { chainId } = request;
 
     try {
+      console.log('the provider');
       const provider = await this.getProvider(chainId);
       const ethersRequest = this._convertToEthersRequest(request);
+      console.log('covnertigngg');
       const tx = await provider.sendTransaction(ethersRequest);
+      console.log('doneeeee');
       const receipt = await tx.wait(confirmations);
       return this._convertToUniversalResponse(tx, receipt);
     } catch (error) {
@@ -227,8 +230,13 @@ export class Ethers5Adapter implements IAccountAdapter {
         );
       }
       if (!tokenAddress || tokenAddress === ethers.constants.AddressZero) {
+        const address = await this.getAddress()
+        console.log('grabbinggg', networkProvider);
+        console.log('the address', address);
         // Get native token balance
-        const balance = await networkProvider.getBalance(this.address);
+        const balance = await (
+          networkProvider as ethers.providers.JsonRpcSigner
+        ).provider.getBalance(address);
 
         return Money.create({
           value: balance,
@@ -248,6 +256,7 @@ export class Ethers5Adapter implements IAccountAdapter {
         });
       }
     } catch (error) {
+      console.error(error);
       throw this._wrapError(error, 'getBalance', { tokenAddress });
     }
   }
@@ -269,7 +278,9 @@ export class Ethers5Adapter implements IAccountAdapter {
         await ensureConnectedNetwork({
           getConnectedNetwork: () => signer.getChainId(),
           switchNetwork: () =>
-            signer.provider.send('eth_switchNetwork', [{ chainId: `0x${chainId.toString(16)}` }]),
+            signer.provider.send('wallet_switchEthereumChain', [
+              { chainId: `0x${chainId.toString(16)}` },
+            ]),
           addNetwork: (networkConfig: NetworkConfigs) =>
             signer.provider.send('wallet_addEthereumChain', [networkConfig]),
           targetNetworkId: chainId,

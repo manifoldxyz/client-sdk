@@ -13,6 +13,7 @@ export type {
   BlindMintTierProbability,
   TokenVariation,
   MintValidation,
+  BlindMintPool,
 } from './blindmint';
 
 // Essential contract types

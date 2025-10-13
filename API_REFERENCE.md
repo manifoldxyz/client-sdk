@@ -1,6 +1,7 @@
 # Manifold Client SDK - API Reference
 
 ## Table of Contents
+
 - [Installation](#installation)
 - [Core Concepts](#core-concepts)
 - [Client API](#client-api)
@@ -31,13 +32,13 @@ The SDK uses a two-step process for safety and transparency:
 
 ### Network Support
 
-| Network | ID | Status |
-|---------|----|----|
-| Ethereum | 1 | ✅ Supported |
-| Base | 8453 | ✅ Supported |
-| Optimism | 10 | ✅ Supported |
-| Shape | 360 | ✅ Supported |
-| Sepolia | 11155111 | ✅ Testnet |
+| Network  | ID       | Status       |
+| -------- | -------- | ------------ |
+| Ethereum | 1        | ✅ Supported |
+| Base     | 8453     | ✅ Supported |
+| Optimism | 10       | ✅ Supported |
+| Shape    | 360      | ✅ Supported |
+| Sepolia  | 11155111 | ✅ Testnet   |
 
 ## Client API
 
@@ -47,11 +48,10 @@ Creates a new Manifold SDK client instance.
 
 #### Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `config` | `ClientConfig` | No | Configuration object |
-| `config.httpRPCs` | `Record<number, string>` | No | RPC URLs by network ID |
-| `config.debug` | `boolean` | No | Enable debug logging |
+| Parameter         | Type                     | Required | Description            |
+| ----------------- | ------------------------ | -------- | ---------------------- |
+| `config`          | `ClientConfig`           | No       | Configuration object   |
+| `config.httpRPCs` | `Record<number, string>` | No       | RPC URLs by network ID |
 
 #### Returns
 
@@ -64,10 +64,9 @@ import { createClient } from '@manifoldxyz/client-sdk';
 
 const client = createClient({
   httpRPCs: {
-    1: "https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY",
-    8453: "https://base-mainnet.infura.io/v3/YOUR_KEY"
+    1: 'https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY',
+    8453: 'https://base-mainnet.infura.io/v3/YOUR_KEY',
   },
-  debug: true
 });
 ```
 
@@ -77,9 +76,9 @@ Fetches detailed product information.
 
 #### Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `instanceIdOrUrl` | `string` | Yes | Instance ID or Manifold URL |
+| Parameter         | Type     | Required | Description                 |
+| ----------------- | -------- | -------- | --------------------------- |
+| `instanceIdOrUrl` | `string` | Yes      | Instance ID or Manifold URL |
 
 #### Returns
 
@@ -87,11 +86,11 @@ Fetches detailed product information.
 
 #### Errors
 
-| Code | Description |
-|------|-------------|
-| `INVALID_INPUT` | Invalid URL format or instance ID |
-| `NOT_FOUND` | Product not found |
-| `UNSUPPORTED_PRODUCT_TYPE` | Product type not supported |
+| Code                       | Description                       |
+| -------------------------- | --------------------------------- |
+| `INVALID_INPUT`            | Invalid URL format or instance ID |
+| `NOT_FOUND`                | Product not found                 |
+| `UNSUPPORTED_PRODUCT_TYPE` | Product type not supported        |
 
 #### Example
 
@@ -109,15 +108,15 @@ Fetches products from a specific workspace.
 
 #### Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `workspaceId` | `string` | Yes | Workspace identifier |
-| `options` | `WorkspaceProductsOptions` | No | Query options |
-| `options.limit` | `number` | No | Results per page (1-100, default: 50) |
-| `options.offset` | `number` | No | Pagination offset |
-| `options.sort` | `'latest' \| 'oldest'` | No | Sort order |
-| `options.networkId` | `number` | No | Filter by network |
-| `options.type` | `string` | No | Filter by product type |
+| Parameter           | Type                       | Required | Description                           |
+| ------------------- | -------------------------- | -------- | ------------------------------------- |
+| `workspaceId`       | `string`                   | Yes      | Workspace identifier                  |
+| `options`           | `WorkspaceProductsOptions` | No       | Query options                         |
+| `options.limit`     | `number`                   | No       | Results per page (1-100, default: 50) |
+| `options.offset`    | `number`                   | No       | Pagination offset                     |
+| `options.sort`      | `'latest' \| 'oldest'`     | No       | Sort order                            |
+| `options.networkId` | `number`                   | No       | Filter by network                     |
+| `options.type`      | `string`                   | No       | Filter by product type                |
 
 #### Example
 
@@ -125,7 +124,7 @@ Fetches products from a specific workspace.
 const products = await client.getProductsByWorkspace('workspace123', {
   limit: 10,
   sort: 'latest',
-  type: 'edition'
+  type: 'edition',
 });
 ```
 
@@ -141,17 +140,18 @@ Prepares a purchase transaction.
 
 ##### Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `params.address` | `string` | Yes | Buyer's wallet address |
-| `params.recipientAddress` | `string` | No | Different recipient |
-| `params.networkId` | `number` | No | Target network |
-| `params.payload` | `object` | Varies | Product-specific data |
-| `params.gasBuffer` | `GasBuffer` | No | Gas adjustment |
+| Parameter                 | Type        | Required | Description            |
+| ------------------------- | ----------- | -------- | ---------------------- |
+| `params.address`          | `string`    | Yes      | Buyer's wallet address |
+| `params.recipientAddress` | `string`    | No       | Different recipient    |
+| `params.networkId`        | `number`    | No       | Target network         |
+| `params.payload`          | `object`    | Varies   | Product-specific data  |
+| `params.gasBuffer`        | `GasBuffer` | No       | Gas adjustment         |
 
 ##### Product-Specific Payloads
 
 **Edition**:
+
 ```typescript
 {
   quantity: number;
@@ -160,6 +160,7 @@ Prepares a purchase transaction.
 ```
 
 **BurnRedeem**:
+
 ```typescript
 {
   tokens: Array<{
@@ -174,6 +175,7 @@ Prepares a purchase transaction.
 ```
 
 **BlindMint**:
+
 ```typescript
 {
   quantity: number;
@@ -183,6 +185,7 @@ Prepares a purchase transaction.
 ##### Returns
 
 `Promise<PreparedPurchase>` with:
+
 - `cost`: Total cost breakdown
 - `steps`: Transaction steps to execute
 - `gasEstimate`: Estimated gas cost
@@ -193,7 +196,7 @@ Prepares a purchase transaction.
 const prepared = await product.preparePurchase({
   address: '0x123...',
   payload: { quantity: 2 },
-  gasBuffer: { multiplier: 0.25 } // 25% buffer
+  gasBuffer: { multiplier: 0.25 }, // 25% buffer
 });
 
 console.log(`Total: ${prepared.cost.total.formatted}`);
@@ -205,12 +208,12 @@ Executes the purchase transaction(s).
 
 ##### Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `params.account` | `IAccountAdapter` | Yes | Wallet adapter |
-| `params.preparedPurchase` | `PreparedPurchase` | Yes | From preparePurchase |
-| `params.callbacks` | `object` | No | Progress callbacks |
-| `params.confirmations` | `number` | No | Block confirmations |
+| Parameter                 | Type               | Required | Description          |
+| ------------------------- | ------------------ | -------- | -------------------- |
+| `params.account`          | `IAccountAdapter`  | Yes      | Wallet adapter       |
+| `params.preparedPurchase` | `PreparedPurchase` | Yes      | From preparePurchase |
+| `params.callbacks`        | `object`           | No       | Progress callbacks   |
+| `params.confirmations`    | `number`           | No       | Block confirmations  |
 
 ##### Example
 
@@ -221,8 +224,8 @@ const order = await product.purchase({
   callbacks: {
     onProgress: (progress) => {
       console.log(`Status: ${progress.status}`);
-    }
-  }
+    },
+  },
 });
 
 console.log(`Success! TX: ${order.receipts[0].txHash}`);
@@ -234,9 +237,9 @@ Checks wallet eligibility and allocation.
 
 ##### Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `params.recipientAddress` | `string` | Yes | Wallet to check |
+| Parameter                 | Type     | Required | Description     |
+| ------------------------- | -------- | -------- | --------------- |
+| `params.recipientAddress` | `string` | Yes      | Wallet to check |
 
 ##### Returns
 
@@ -301,7 +304,7 @@ interface Product {
   type: AppType;
   data: InstanceData;
   previewData: InstancePreview;
-  
+
   // Methods...
 }
 
@@ -359,16 +362,16 @@ try {
 
 ### Common Error Codes
 
-| Code | Description |
-|------|-------------|
-| `NOT_FOUND` | Resource not found |
-| `INVALID_INPUT` | Invalid parameters |
-| `INSUFFICIENT_FUNDS` | Not enough balance |
-| `NOT_ELIGIBLE` | Not eligible to purchase |
-| `SOLD_OUT` | Product sold out |
-| `LIMIT_REACHED` | Wallet limit reached |
-| `NOT_STARTED` | Sale hasn't started |
-| `ENDED` | Sale has ended |
+| Code                   | Description               |
+| ---------------------- | ------------------------- |
+| `NOT_FOUND`            | Resource not found        |
+| `INVALID_INPUT`        | Invalid parameters        |
+| `INSUFFICIENT_FUNDS`   | Not enough balance        |
+| `NOT_ELIGIBLE`         | Not eligible to purchase  |
+| `SOLD_OUT`             | Product sold out          |
+| `LIMIT_REACHED`        | Wallet limit reached      |
+| `NOT_STARTED`          | Sale hasn't started       |
+| `ENDED`                | Sale has ended            |
 | `TRANSACTION_REJECTED` | User rejected transaction |
 
 ## Transaction Steps - Best Practices
@@ -385,12 +388,14 @@ When you call `preparePurchase()`, the SDK returns a `PreparedPurchase` object c
 ### Common Step Patterns
 
 #### ERC20 Payment Flow (2 steps)
+
 1. **Approve** - Grant permission for contract to spend tokens
 2. **Mint** - Execute the actual purchase
 
 #### Burn/Redeem Flow (multiple steps)
+
 1. **Burn Token 1** - Burn first required token
-2. **Burn Token 2** - Burn second required token  
+2. **Burn Token 2** - Burn second required token
 3. **Redeem** - Mint the new token
 
 ### Manual Step Execution
@@ -401,12 +406,9 @@ Instead of calling `product.purchase()` which executes all steps automatically, 
 import { PreparedPurchase, TransactionStep } from '@manifoldxyz/client-sdk';
 
 // Custom UI component for step-by-step execution
-async function executeWithUI(
-  preparedPurchase: PreparedPurchase,
-  adapter: IAccountAdapter
-) {
+async function executeWithUI(preparedPurchase: PreparedPurchase, adapter: IAccountAdapter) {
   const results = [];
-  
+
   for (const [index, step] of preparedPurchase.steps.entries()) {
     // Show step details to user
     await showStepModal({
@@ -414,9 +416,9 @@ async function executeWithUI(
       name: step.name,
       type: step.type,
       description: step.description,
-      cost: step.cost
+      cost: step.cost,
     });
-    
+
     try {
       // Execute the step
       console.log(`Executing: ${step.name}`);
@@ -425,33 +427,32 @@ async function executeWithUI(
         callbacks: {
           onProgress: (progress) => {
             updateUI(`${step.name}: ${progress.status}`);
-          }
-        }
+          },
+        },
       });
-      
+
       results.push(receipt);
       console.log(`✅ ${step.name} complete: ${receipt.txHash}`);
-      
+
       // Update UI to show completion
       await showSuccessToast(`${step.name} completed!`);
-      
     } catch (error) {
       // Handle step failure
       console.error(`Failed at step: ${step.name}`, error);
-      
+
       const retry = await showRetryModal({
         step: step.name,
-        error: error.message
+        error: error.message,
       });
-      
+
       if (!retry) {
         throw new Error(`Purchase cancelled at step: ${step.name}`);
       }
-      
+
       // Retry logic here...
     }
   }
-  
+
   return results;
 }
 ```
@@ -462,9 +463,9 @@ async function executeWithUI(
 import React, { useState } from 'react';
 import { TransactionStep } from '@manifoldxyz/client-sdk';
 
-function PurchaseSteps({ 
+function PurchaseSteps({
   preparedPurchase,
-  adapter 
+  adapter
 }: {
   preparedPurchase: PreparedPurchase;
   adapter: IAccountAdapter;
@@ -473,11 +474,11 @@ function PurchaseSteps({
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
-  
+
   const executeStep = async (step: TransactionStep) => {
     setLoading(true);
     setError(undefined);
-    
+
     try {
       const receipt = await step.execute(adapter);
       setCompletedSteps([...completedSteps, step.id]);
@@ -489,11 +490,11 @@ function PurchaseSteps({
       setLoading(false);
     }
   };
-  
+
   return (
     <div className="purchase-steps">
       <h3>Transaction Steps</h3>
-      
+
       {preparedPurchase.steps.map((step, index) => (
         <div key={step.id} className="step">
           <div className="step-header">
@@ -503,32 +504,32 @@ function PurchaseSteps({
               <span className="step-status">✅</span>
             )}
           </div>
-          
+
           {step.description && (
             <p className="step-description">{step.description}</p>
           )}
-          
+
           {step.type === 'approve' && (
             <div className="approval-info">
               ⚠️ This step will approve the contract to spend your tokens
             </div>
           )}
-          
+
           {currentStep === index && (
-            <button 
+            <button
               onClick={() => executeStep(step)}
               disabled={loading}
             >
               {loading ? 'Processing...' : `Execute ${step.name}`}
             </button>
           )}
-          
+
           {error && currentStep === index && (
             <div className="error">{error}</div>
           )}
         </div>
       ))}
-      
+
       <div className="total-cost">
         Total Cost: {preparedPurchase.cost.total.formatted}
       </div>
@@ -540,6 +541,7 @@ function PurchaseSteps({
 ### Step Types and User Messaging
 
 #### Approve Steps
+
 ```typescript
 if (step.type === 'approve') {
   // Show specific messaging for approval
@@ -549,12 +551,13 @@ if (step.type === 'approve') {
     details: `Amount: ${step.cost?.erc20s?.[0]?.formatted}`,
     warning: 'This is a one-time approval for this purchase.',
     confirmText: 'Approve Spending',
-    cancelText: 'Cancel Purchase'
+    cancelText: 'Cancel Purchase',
   });
 }
 ```
 
 #### Mint Steps
+
 ```typescript
 if (step.type === 'mint') {
   // Show specific messaging for minting
@@ -564,7 +567,7 @@ if (step.type === 'mint') {
     details: `Quantity: ${quantity}`,
     gasEstimate: step.cost?.native?.formatted,
     confirmText: 'Mint Now',
-    cancelText: 'Cancel'
+    cancelText: 'Cancel',
   });
 }
 ```
@@ -576,29 +579,29 @@ if (step.type === 'mint') {
 async function executeStepWithRetry(
   step: TransactionStep,
   adapter: IAccountAdapter,
-  maxRetries = 3
+  maxRetries = 3,
 ): Promise<TransactionReceipt> {
   let lastError;
-  
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await step.execute(adapter);
     } catch (error) {
       lastError = error;
-      
+
       // Don't retry user rejections
       if (error.code === 'TRANSACTION_REJECTED') {
         throw error;
       }
-      
+
       // Wait before retry with exponential backoff
       const delay = Math.pow(2, attempt) * 1000;
-      await new Promise(resolve => setTimeout(resolve, delay));
-      
+      await new Promise((resolve) => setTimeout(resolve, delay));
+
       console.log(`Retrying step ${step.name}, attempt ${attempt + 1}`);
     }
   }
-  
+
   throw lastError;
 }
 ```
@@ -616,42 +619,42 @@ async function purchaseNFT() {
   // 1. Initialize client
   const client = createClient({
     httpRPCs: {
-      1: "https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY"
-    }
+      1: 'https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY',
+    },
   });
 
   // 2. Get product
   const product = await client.getProduct('4150231280');
-  
+
   // 3. Setup wallet
   const provider = new ethers.providers.Web3Provider(window.ethereum);
   const signer = provider.getSigner();
   const adapter = new Ethers5Adapter(client, { signer });
-  
+
   // 4. Check eligibility
   const allocations = await product.getAllocations({
-    recipientAddress: adapter.address
+    recipientAddress: adapter.address,
   });
-  
+
   if (!allocations.isEligible) {
     console.log('Not eligible:', allocations.reason);
     return;
   }
-  
+
   // 5. Prepare purchase
   const prepared = await product.preparePurchase({
     address: adapter.address,
-    payload: { quantity: 1 }
+    payload: { quantity: 1 },
   });
-  
+
   console.log(`Cost: ${prepared.cost.total.formatted}`);
-  
+
   // 6. Execute purchase
   const order = await product.purchase({
     account: adapter,
-    preparedPurchase: prepared
+    preparedPurchase: prepared,
   });
-  
+
   console.log(`Success! TX: ${order.receipts[0].txHash}`);
 }
 ```
@@ -659,39 +662,39 @@ async function purchaseNFT() {
 ### Multi-Product Support
 
 ```typescript
+import { isBlindMintProduct, isEditionProduct, isBurnRedeemProduct } from '@manifoldxyz/client-sdk';
+
 async function handleAnyProduct(instanceId: string) {
   const client = createClient();
   const product = await client.getProduct(instanceId);
-  
+
   let payload;
-  switch (product.type) {
-    case AppType.EDITION:
-      payload = { quantity: 1 };
-      break;
-      
-    case AppType.BURN_REDEEM:
-      payload = {
-        tokens: [{
+  if (isBlindMintProduct(product)) {
+    payload = { quantity: 1 };
+  } else if (isEditionProduct(product)) {
+    payload = { quantity: 1 };
+  } else if (isBurnRedeemProduct(product)) {
+    payload = {
+      tokens: [
+        {
           contract: {
             networkId: 1,
             address: '0x...',
-            spec: 'erc721'
+            spec: 'erc721',
           },
-          tokenId: '123'
-        }]
-      };
-      break;
-      
-    case AppType.BLIND_MINT:
-      payload = { quantity: 1 };
-      break;
+          tokenId: '123',
+        },
+      ],
+    };
+  } else {
+    throw new Error('Unsupported product type');
   }
-  
+
   const prepared = await product.preparePurchase({
     address: walletAddress,
-    payload
+    payload,
   });
-  
+
   // Continue with purchase...
 }
 ```
@@ -706,29 +709,29 @@ import { ethers } from 'ethers';
 async function serverMint() {
   const client = createClient({
     httpRPCs: {
-      1: process.env.ETH_RPC_URL
-    }
+      1: process.env.ETH_RPC_URL,
+    },
   });
-  
+
   const wallet = new ethers.Wallet(
     process.env.PRIVATE_KEY,
-    new ethers.providers.JsonRpcProvider(process.env.ETH_RPC_URL)
+    new ethers.providers.JsonRpcProvider(process.env.ETH_RPC_URL),
   );
-  
+
   const adapter = new Ethers5Adapter(client, { wallet });
-  
+
   const product = await client.getProduct('4150231280');
-  
+
   const prepared = await product.preparePurchase({
     address: wallet.address,
-    payload: { quantity: 1 }
+    payload: { quantity: 1 },
   });
-  
+
   const order = await product.purchase({
     account: adapter,
-    preparedPurchase: prepared
+    preparedPurchase: prepared,
   });
-  
+
   return order;
 }
 ```

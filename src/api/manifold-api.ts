@@ -26,7 +26,7 @@ export class ManifoldApiClient {
   }> {
     // Fetch both in parallel for performance
     const [instanceData, previewDatas] = (await Promise.all([
-      this.studioClient.public.getInstance({ instanceId: Number(instanceId) }),
+      this.studioClient.public.getInstance({ instanceId: Number(instanceId), maxMediaWidth: 1024 }),
       this.studioClient.public.getPreviews({
         instanceIds: [parseInt(instanceId)],
       }),

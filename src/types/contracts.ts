@@ -204,7 +204,7 @@ export interface TransactionContext {
 
 /**
  * Raw on-chain claim data from contract
- * Based on gachapon-widgets OnChainGachaData structure
+ * Based on gachapon-widgets Gachapon structure
  */
 export interface OnChainClaimData {
   /** Total tokens minted */

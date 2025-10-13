@@ -162,10 +162,11 @@ export interface Asset {
    */
   attributes?: object;
 
-  /**
-   * Media files associated with the asset.
-   */
-  media?: Media;
+  image?: string;
+  image_url?: string;
+  image_preview?: string;
+  animation?: string;
+  animation_preview: string;
 }
 
 /**

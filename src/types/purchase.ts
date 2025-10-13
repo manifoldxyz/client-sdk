@@ -4,9 +4,10 @@ import type { IAccountAdapter } from './account-adapter';
 
 export interface PreparePurchaseParams<T> {
   address: Address;
+  account?: IAccountAdapter;
   recipientAddress?: Address;
   networkId?: NetworkId;
-  payload?: T;
+  payload: T;
   gasBuffer?: GasBuffer;
 }
 
