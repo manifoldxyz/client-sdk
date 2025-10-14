@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ErrorCode } from '../../src/types/errors';
 
 // Mock createContract function
 const createContract = (address: string, abi: any[], provider: any) => {

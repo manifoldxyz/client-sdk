@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BlindMintProduct, createBlindMintProduct, isBlindMintProduct } from '../../src/products/blindmint';
+import { BlindMintProduct, isBlindMintProduct } from '../../src/products/blindmint';
 import { AppId, AppType } from '../../src/types/common';
 import { ClientSDKError } from '../../src/types/errors';
 import type { InstanceData } from '../../src/types/product';
@@ -101,15 +101,6 @@ describe('BlindMintProduct', () => {
           basePreviewData as unknown as any,
         ),
     ).toThrow(ClientSDKError);
-  });
-
-  it('createBlindMintProduct returns a BlindMintProduct instance', () => {
-    const product = createBlindMintProduct(
-      baseInstanceData,
-      basePreviewData as unknown as any,
-    );
-    expect(product).toBeInstanceOf(BlindMintProduct);
-    expect(product.type).toBe(AppType.BLIND_MINT);
   });
 
   it('isBlindMintProduct identifies blind mint products', () => {

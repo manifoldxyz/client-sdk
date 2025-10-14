@@ -837,18 +837,6 @@ export class BlindMintProduct implements IBlindMintProduct {
    */
 }
 
-// Export the implementation class as BlindMintProductImpl for tests
-export { BlindMintProduct as BlindMintProductImpl };
-
-// Factory function
-export function createBlindMintProduct(
-  instanceData: InstanceData<BlindMintPublicData>,
-  previewData: InstancePreview = {} as InstancePreview,
-  options: { httpRPCs?: Record<number, string> } = {},
-): BlindMintProduct {
-  return new BlindMintProduct(instanceData, previewData, options);
-}
-
 // Type guard
 export function isBlindMintProduct(product: Product): product is IBlindMintProduct {
   return product?.type === AppType.BLIND_MINT;
