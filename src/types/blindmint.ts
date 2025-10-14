@@ -6,16 +6,18 @@ import type {
   Media,
   AllocationParams,
   AllocationResponse,
-  PreparePurchaseParams,
-  PreparedPurchase,
-  PurchaseParams,
-  Order,
   ProductMetadata,
   ProductRule,
   ProductProvenance,
   ProductInventory,
 } from './product';
-import type { BlindMintPayload } from './purchase';
+import type {
+  BlindMintPayload,
+  PreparePurchaseParams,
+  PreparedPurchase,
+  PurchaseParams,
+  Order,
+} from './purchase';
 import type { Money } from '../libs/money';
 import type { Cost } from './money';
 
@@ -202,19 +204,6 @@ export interface BlindMintInventory {
   totalSupply: number;
   totalPurchased: number; // Required by ProductInventory
 }
-
-// Import shared types for consistency
-export type {
-  AllocationParams,
-  AllocationResponse,
-  PreparePurchaseParams,
-  PreparedPurchase,
-  PurchaseParams,
-  Order,
-  ProductMetadata,
-  ProductRule,
-  ProductProvenance,
-} from './product';
 
 export type BlindMintStatus = ProductStatus;
 

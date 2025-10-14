@@ -1,6 +1,6 @@
 import * as ethers from 'ethers';
-import type { NetworkId, Address } from '../types/common';
-import { GachaExtensionERC1155ABIv2, CreatorContractABI, ERC20ABI } from '../abis';
+import type { Address } from '../types/common';
+import { GachaExtensionERC1155ABIv2, ERC20ABI } from '../abis';
 
 // =============================================================================
 // CONTRACT TYPES
@@ -122,7 +122,7 @@ export type ERC20Contract = ethers.Contract & {
 
 export interface ContractFactoryOptions {
   provider: ethers.providers.JsonRpcProvider;
-  networkId: NetworkId;
+  networkId: number;
   signer?: ethers.Signer;
 }
 
@@ -153,15 +153,6 @@ export class ContractFactory {
   }
 
   /**
-   * Create Creator (ERC721) contract instance
-   */
-  createCreatorContract(address: Address): CreatorContract {
-    const provider = this.provider;
-
-    return new ethers.Contract(address, CreatorContractABI, provider) as CreatorContract;
-  }
-
-  /**
    * Create ERC20 token contract instance
    */
   createERC20Contract(address: Address): ERC20Contract {
@@ -174,142 +165,6 @@ export class ContractFactory {
 // =============================================================================
 // CONTRACT UTILITIES
 // =============================================================================
-
-/**
- * Estimate gas for a contract call with fallback
- */
-type EstimateGasFunction = (...fnArgs: unknown[]) => Promise<ethers.BigNumber>;
-
-export async function estimateGasWithFallback(
-  contract: ethers.Contract,
-  methodName: string,
-  args: ReadonlyArray<unknown>,
-  fallbackGas: ethers.BigNumberish = 200000,
-): Promise<ethers.BigNumber> {
-  try {
-    const estimateMethod = contract.estimateGas[methodName as keyof typeof contract.estimateGas];
-    if (typeof estimateMethod === 'function') {
-      return await (estimateMethod as EstimateGasFunction)(...args);
-    }
-    return ethers.BigNumber.from(fallbackGas);
-  } catch (error) {
-    return ethers.BigNumber.from(fallbackGas);
-  }
-}
-
-/**
- * Call contract method with retry logic
- */
-export async function callWithRetry<T>(
-  contractCall: () => Promise<T>,
-  maxRetries: number = 3,
-  delay: number = 1000,
-): Promise<T> {
-  let lastError: Error;
-
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await contractCall();
-    } catch (error) {
-      lastError = error as Error;
-
-      if (i < maxRetries - 1) {
-        await new Promise((resolve) => setTimeout(resolve, delay * (i + 1)));
-      }
-    }
-  }
-
-  throw lastError!;
-}
-
-/**
- * Batch multiple contract calls efficiently
- */
-export async function batchContractCalls<T>(
-  calls: Array<() => Promise<T>>,
-  maxConcurrent: number = 5,
-): Promise<T[]> {
-  const results: T[] = [];
-
-  for (let i = 0; i < calls.length; i += maxConcurrent) {
-    const batch = calls.slice(i, i + maxConcurrent);
-    const batchResults = await Promise.all(batch.map((call) => call()));
-
-    results.push(...batchResults);
-  }
-
-  return results;
-}
-
-/**
- * Validate contract address and ABI compatibility
- */
-export async function validateContract(
-  provider: ethers.providers.Provider,
-  address: Address,
-  expectedMethods: string[],
-): Promise<{
-  isValid: boolean;
-  hasCode: boolean;
-  supportedMethods: string[];
-  missingMethods: string[];
-}> {
-  try {
-    // Check if contract has code
-    const code = await provider.getCode(address);
-    const hasCode = code !== '0x';
-
-    if (!hasCode) {
-      return {
-        isValid: false,
-        hasCode: false,
-        supportedMethods: [],
-        missingMethods: expectedMethods,
-      };
-    }
-
-    // Create temporary contract to test method calls
-    const tempContract = new ethers.Contract(
-      address,
-      ['function supportsInterface(bytes4 interfaceId) external view returns (bool)'],
-      provider,
-    );
-
-    const supportedMethods: string[] = [];
-    const missingMethods: string[] = [];
-
-    // Test each expected method
-    for (const method of expectedMethods) {
-      try {
-        // Try to call the method with empty parameters
-        const staticMethod = tempContract.callStatic[method];
-        if (staticMethod) {
-          await staticMethod();
-          supportedMethods.push(method);
-        } else {
-          missingMethods.push(method);
-        }
-      } catch (error) {
-        // Method might not exist or might require parameters
-        missingMethods.push(method);
-      }
-    }
-
-    return {
-      isValid: missingMethods.length === 0,
-      hasCode: true,
-      supportedMethods,
-      missingMethods,
-    };
-  } catch (error) {
-    return {
-      isValid: false,
-      hasCode: false,
-      supportedMethods: [],
-      missingMethods: expectedMethods,
-    };
-  }
-}
 
 /**
  * Parse contract events from transaction receipt
@@ -331,7 +186,3 @@ export function parseContractEvents(
 
   return events;
 }
-
-// =============================================================================
-// DEVELOPMENT AND TESTING UTILITIES
-// =============================================================================

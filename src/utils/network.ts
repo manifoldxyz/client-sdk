@@ -1,5 +1,3 @@
-import type { NetworkId } from '../types/common';
-import { NETWORK_CONFIGS } from '../config/networks';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import { Network } from '@manifoldxyz/js-ts-utils';
 
@@ -37,28 +35,11 @@ export async function poll<T>(options: PollOptions<T>): Promise<T> {
   throw new ClientSDKError(ErrorCode.TIMEOUT, errorMessage);
 }
 
-function getNetworkDisplayName(networkId: NetworkId): string {
-  const config = NETWORK_CONFIGS[networkId];
-  return config?.name ?? `Chain ${networkId}`;
-}
-
-export interface NetworkConfigs {
-  chainId: string;
-  chainName: string;
-  nativeCurrency: {
-    name: string;
-    symbol: string;
-    decimals: number;
-  };
-  rpcUrls: string[];
-  blockExplorerUrls: string[];
-}
-
 export interface EnsureConnectedNetworkOptions {
   getConnectedNetwork: () => Promise<number>;
   switchNetwork: (networkId: number) => Promise<void>;
-  addNetwork: (networkConfig: NetworkConfigs) => Promise<void>;
-  targetNetworkId: NetworkId;
+  addNetwork: (networkConfig: Omit<Network.NetworkConfig, 'displayName'>) => Promise<void>;
+  targetNetworkId: number;
   pollIntervalMs?: number;
   maxAttempts?: number;
 }
@@ -75,7 +56,7 @@ export async function ensureConnectedNetwork(
     maxAttempts = 20,
   } = options;
 
-  const networkName = getNetworkDisplayName(targetNetworkId);
+  const networkName = Network.getDisplayNameForNetworkId(targetNetworkId, true);
 
   const throwEnsureError = async (message: string, originalError?: unknown): Promise<never> => {
     const actualNetworkId = await getConnectedNetwork();
@@ -105,7 +86,6 @@ export async function ensureConnectedNetwork(
             blockExplorerUrls: networkConfigs.blockExplorerUrls,
           };
           await addNetwork(params);
-          // await accountAdapter.sendCalls?.('wallet_addEthereumChain', [params]);
         }
         // try switching network again
         await switchNetwork(targetNetworkId);
@@ -124,7 +104,7 @@ export async function ensureConnectedNetwork(
       await throwEnsureError(message, switchError);
     }
   }
-
+  // Need to check again to make sure the provider is now on the correct network
   try {
     await poll<number>({
       fetch: () => getConnectedNetwork(),

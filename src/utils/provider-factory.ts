@@ -1,20 +1,16 @@
 import * as ethers from 'ethers';
 import { ManifoldBridgeProvider } from '@manifoldxyz/manifold-provider-client';
-import type { NetworkId } from '../types/common';
 import { getNetworkConfig } from '../config/networks';
-
-/**
- * Provider factory for dual-provider architecture
- * Based on CONTRACT_PATTERNS.md dual-provider implementation
- */
+import { ClientSDKError, ErrorCode } from '../types';
 
 // =============================================================================
 // PROVIDER TYPES
 // =============================================================================
 
 export interface ProviderFactoryOptions {
-  networkId: NetworkId;
-  customRpcUrls?: Record<NetworkId, string>;
+  networkId: number;
+  customRpcUrls?: Record<number, string>;
+  useBridge?: boolean;
 }
 
 // =============================================================================
@@ -25,14 +21,21 @@ export interface ProviderFactoryOptions {
  * Create dual provider instance with primary and bridge providers as fallback
  */
 export function createProvider(options: ProviderFactoryOptions): ethers.providers.JsonRpcProvider {
-  const { networkId, customRpcUrls } = options;
-
-  // Create bridge provider using ManifoldBridgeProvider
-  const bridge = new ManifoldBridgeProvider(networkId);
+  const { networkId, customRpcUrls, useBridge = true } = options;
 
   // Create primary provider from custom RPC URLs if available
   const primary = createPrimaryProvider(networkId, customRpcUrls);
-  return primary || bridge; // fallback to bridge if primary is not available
+  if (primary) {
+    return primary;
+  }
+  if (!useBridge) {
+    throw new ClientSDKError(
+      ErrorCode.MISSING_RPC_URL,
+      `No RPC URL available for networkId ${networkId}`,
+    );
+  }
+  const bridgeProvider = new ManifoldBridgeProvider(networkId);
+  return bridgeProvider; // fallback to bridge if primary is not available
 }
 
 // =============================================================================
@@ -43,16 +46,16 @@ export function createProvider(options: ProviderFactoryOptions): ethers.provider
  * Create primary provider from custom RPC URLs
  */
 function createPrimaryProvider(
-  networkId: NetworkId,
-  customRpcUrls?: Record<NetworkId, string>,
+  networkId: number,
+  customRpcUrls?: Record<number, string>,
 ): ethers.providers.JsonRpcProvider | null {
   try {
     // Create JSON-RPC provider from custom URLs if available
     if (customRpcUrls?.[networkId]) {
       const networkConfig = getNetworkConfig(networkId);
       return new ethers.providers.JsonRpcProvider(customRpcUrls[networkId], {
-        name: networkConfig?.name ?? `network-${networkId}`,
-        chainId: networkConfig?.chainId ?? networkId,
+        name: networkConfig.chainName,
+        chainId: parseInt(networkConfig?.chainId),
       });
     }
 

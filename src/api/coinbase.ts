@@ -104,33 +104,18 @@ export async function getERC20ToUSDRate(
 }
 
 /**
- * Get network-specific native currency symbol
- * @param networkId - The network ID
- * @returns The native currency symbol for the network
- */
-export function getNativeCurrencySymbol(networkId: number): string {
-  switch (networkId) {
-    case 137: // Polygon
-      return 'MATIC';
-    case 10: // Optimism
-      return 'ETH'; // Optimism uses ETH
-    case 8453: // Base
-      return 'ETH'; // Base uses ETH
-    case 42161: // Arbitrum
-      return 'ETH'; // Arbitrum uses ETH
-    default:
-      return 'ETH';
-  }
-}
-
-/**
  * Calculate USD value for a given amount and rate
  * @param amount - The amount in wei or token units
  * @param decimals - The token decimals
  * @param rate - The USD exchange rate
  * @returns Formatted USD string
  */
-export function calculateUSDValue(amount: bigint, decimals: number, rate: number): string {
+export function calculateUSDValue(
+  amount: bigint,
+  decimals: number,
+  rate: number,
+  decimalPlaces = 2,
+): string {
   if (!rate || rate === 0) return '0';
 
   // Convert from smallest unit to decimal
@@ -142,8 +127,8 @@ export function calculateUSDValue(amount: bigint, decimals: number, rate: number
   const decimalValue = Number(wholePart) + Number(fractionalPart) / Number(divisor);
   const usdValue = decimalValue * rate;
 
-  // Format to 2 decimal places
-  return usdValue.toFixed(2);
+  // Format to decimal places
+  return usdValue.toFixed(decimalPlaces);
 }
 
 // Helper function to check if token is commonly traded on Coinbase

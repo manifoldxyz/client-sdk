@@ -1,13 +1,12 @@
 import type { ClientConfig, ManifoldClient, WorkspaceProductsOptions } from '../types/client';
-import type { Product, InstanceData, BlindMintPublicData } from '../types/product';
-import type { NetworkId } from '../types/common';
+import type { Product, InstanceData, BlindMintPublicData } from '../types/';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import { AppId } from '../types/common';
 import { BlindMintProduct } from '../products/blindmint';
 import { validateInstanceId, parseManifoldUrl } from '../utils/validation';
 import { createManifoldApiClient } from '../api/manifold-api';
-import * as ethers from 'ethers';
-import { getNetworkConfig } from '../config/networks';
+import type * as ethers from 'ethers';
+import { createProvider } from '../utils';
 
 /**
  * Type guard to check if instanceData is for BlindMint product type.
@@ -70,14 +69,14 @@ export function createClient(config?: ClientConfig): ManifoldClient {
   const httpRPCs = config?.httpRPCs ?? {};
 
   // Create JsonRpcProvider instances if httpRPCs is defined
-  const providers: Record<NetworkId, ethers.providers.JsonRpcProvider> = {};
+  const providers: Record<number, ethers.providers.JsonRpcProvider> = {};
   if (httpRPCs && Object.keys(httpRPCs).length > 0) {
-    for (const [networkIdStr, rpcUrl] of Object.entries(httpRPCs)) {
+    for (const [networkIdStr] of Object.entries(httpRPCs)) {
       const networkId = Number(networkIdStr);
-      const networkConfig = getNetworkConfig(networkId);
-      providers[networkId] = new ethers.providers.JsonRpcProvider(rpcUrl as string, {
-        name: networkConfig?.name ?? `network-${networkId}`,
-        chainId: networkConfig?.chainId ?? networkId,
+      providers[networkId] = createProvider({
+        networkId,
+        customRpcUrls: httpRPCs,
+        useBridge: false,
       });
     }
   }
@@ -148,7 +147,6 @@ export function createClient(config?: ClientConfig): ManifoldClient {
         if (isBlindMintInstanceData(instanceData)) {
           // TypeScript now knows instanceData is InstanceData<BlindMintPublicData>
           // Create BlindMintProduct with both instance and preview data
-          // Following technical spec pattern
           return new BlindMintProduct(instanceData, previewData, {
             httpRPCs,
           });

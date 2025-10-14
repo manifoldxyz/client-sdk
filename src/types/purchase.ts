@@ -1,4 +1,4 @@
-import type { Address, NetworkId } from './common';
+import type { Address } from './common';
 import type { Cost, Money } from './money';
 import type { IAccount } from './account-adapter';
 
@@ -6,7 +6,7 @@ export interface PreparePurchaseParams<T> {
   address: Address;
   account?: IAccount;
   recipientAddress?: Address;
-  networkId?: NetworkId;
+  networkId?: number;
   payload: T;
   gasBuffer?: GasBuffer;
 }

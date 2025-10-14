@@ -1,10 +1,8 @@
 // No imports needed - all types defined here
 export type Address = string;
 
-export type NetworkId = number;
-
 export interface HttpRPCs {
-  [networkId: NetworkId]: string;
+  [networkId: number]: string;
 }
 
 export enum AppType {

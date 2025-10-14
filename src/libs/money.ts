@@ -1,12 +1,7 @@
 import { ethers } from 'ethers';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import { Currency } from '@manifoldxyz/js-ts-utils';
-import {
-  getEthToUsdRate,
-  getERC20ToUSDRate,
-  getNativeCurrencySymbol,
-  calculateUSDValue,
-} from '../api/coinbase';
+import { getEthToUsdRate, getERC20ToUSDRate, calculateUSDValue } from '../api/coinbase';
 import type { MoneyData } from '../types/money';
 
 /**
@@ -45,10 +40,7 @@ export class Money implements MoneyData {
     value: ethers.BigNumber | string | number;
     networkId: number;
     erc20?: string;
-    provider?:
-      | ethers.providers.JsonRpcProvider
-      | ethers.providers.Web3Provider
-      | ethers.providers.JsonRpcSigner;
+    provider?: ethers.providers.JsonRpcProvider | ethers.providers.Web3Provider;
     fetchUSD?: boolean;
   }): Promise<Money> {
     const {
@@ -68,7 +60,7 @@ export class Money implements MoneyData {
 
     if (isNative) {
       // Native token
-      symbol = getNativeCurrencySymbol(networkId);
+      symbol = Currency.ethCurrencyNameForNetwork(networkId);
       decimals = 18; // Native tokens always have 18 decimals
 
       if (fetchUSD) {

@@ -58,29 +58,9 @@ export class ManifoldApiClient {
   }
 }
 
-// Global client instance for testing
-let globalClient: ManifoldApiClient | null = null;
-
 /**
  * Factory function to create Manifold API client
  */
 export function createManifoldApiClient(): ManifoldApiClient {
   return new ManifoldApiClient();
-}
-
-/**
- * Get or create global API client instance
- */
-export function getManifoldApiClient(): ManifoldApiClient {
-  if (!globalClient) {
-    globalClient = createManifoldApiClient();
-  }
-  return globalClient;
-}
-
-/**
- * Reset global API client instance (for testing)
- */
-export function resetManifoldApiClient(): void {
-  globalClient = null;
 }

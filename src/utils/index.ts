@@ -6,12 +6,7 @@
 // Re-export existing utilities
 // Note: logger utility not yet implemented
 
-export {
-  validateInstanceId,
-  parseManifoldUrl,
-  validateAddress,
-  validateNetworkId,
-} from './validation';
+export { validateInstanceId, parseManifoldUrl, validateAddress } from './validation';
 
 // Provider utilities
 export { createProvider } from './provider-factory';
@@ -19,14 +14,7 @@ export { createProvider } from './provider-factory';
 export type { ProviderFactoryOptions } from './provider-factory';
 
 // Contract utilities
-export {
-  ContractFactory,
-  estimateGasWithFallback,
-  callWithRetry,
-  batchContractCalls,
-  validateContract,
-  parseContractEvents,
-} from './contract-factory';
+export { ContractFactory, parseContractEvents } from './contract-factory';
 
 export type {
   ContractFactoryOptions,
@@ -36,19 +24,14 @@ export type {
 } from './contract-factory';
 
 // Gas estimation utilities
-export {
-  estimateGas,
-  applyGasBuffer,
-  checkERC20Allowance,
-  createERC20ApprovalTx,
-} from './gas-estimation';
+export { estimateGas, applyGasBuffer } from './gas-estimation';
 
 export type { GasEstimationParams } from './gas-estimation';
 
 // Transaction helpers
-export { poll, ensureConnectedNetwork } from './transactions';
+export { poll, ensureConnectedNetwork } from './network';
 
-export type { EnsureConnectedNetworkOptions } from './transactions';
+export type { EnsureConnectedNetworkOptions } from './network';
 
 // =============================================================================
 // ADDITIONAL UTILITY FUNCTIONS
@@ -72,21 +55,6 @@ export function formatBigNumber(
  */
 export function parseBigNumber(value: string, decimals: number = 18): ethers.BigNumber {
   return ethers.utils.parseUnits(value, decimals);
-}
-
-/**
- * Format Ethereum address for display
- */
-export function formatAddress(
-  address: string,
-  startLength: number = 6,
-  endLength: number = 4,
-): string {
-  if (!address || address.length < startLength + endLength) {
-    return address;
-  }
-
-  return `${address.slice(0, startLength)}...${address.slice(-endLength)}`;
 }
 
 /**
@@ -314,7 +282,6 @@ export function throttle<T extends (...args: unknown[]) => unknown>(
 export default {
   formatBigNumber,
   parseBigNumber,
-  formatAddress,
   isValidAddress,
   normalizeAddress,
   randomBytes,

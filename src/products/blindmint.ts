@@ -1,16 +1,4 @@
 import type {
-  BlindMintPublicData,
-  BlindMintOnchainData,
-  BlindMintStatus,
-  BlindMintInventory,
-  TokenVariation,
-  GachaTier,
-  ClaimableToken,
-  BlindMintTierProbability,
-  BlindMintProduct as IBlindMintProduct,
-} from '../types/blindmint';
-import type { IAccount, UniversalTransactionRequest } from '../types/account-adapter';
-import type {
   Product,
   AllocationParams,
   AllocationResponse,
@@ -23,14 +11,23 @@ import type {
   Media,
   InstanceData,
   AudienceRestriction,
-} from '../types/product';
-import type {
   BlindMintPayload,
   PreparedPurchase,
   TransactionStep,
   TransactionStepExecuteOptions,
   GasBuffer,
-} from '../types/purchase';
+  IAccount,
+  UniversalTransactionRequest,
+  BlindMintPublicData,
+  BlindMintOnchainData,
+  BlindMintStatus,
+  BlindMintInventory,
+  TokenVariation,
+  GachaTier,
+  ClaimableToken,
+  BlindMintTierProbability,
+  BlindMintProduct as IBlindMintProduct,
+} from '../types';
 import type { Address } from '../types/common';
 import { AppType, AppId } from '../types/common';
 import type { BlindMintClaimContract } from '../utils/contract-factory';
@@ -376,7 +373,6 @@ export class BlindMintProduct implements IBlindMintProduct {
               const receiptInfo = confirmation.receipt;
               const blockNumber = receiptInfo?.blockNumber ?? confirmation.blockNumber;
               const gasUsedValue = receiptInfo?.gasUsed ?? confirmation.gasUsed;
-              const status = receiptInfo?.status ?? confirmation.status ?? 'confirmed';
 
               return {
                 networkId,
@@ -384,7 +380,6 @@ export class BlindMintProduct implements IBlindMintProduct {
                 txHash: confirmation.hash,
                 blockNumber,
                 gasUsed: gasUsedValue ? BigInt(gasUsedValue) : undefined,
-                status,
               };
             },
           };
@@ -455,7 +450,6 @@ export class BlindMintProduct implements IBlindMintProduct {
         const receiptInfo = confirmation.receipt;
         const blockNumber = receiptInfo?.blockNumber ?? confirmation.blockNumber;
         const gasUsedValue = receiptInfo?.gasUsed ?? confirmation.gasUsed;
-        const status = receiptInfo?.status ?? confirmation.status ?? 'confirmed';
 
         return {
           networkId,
@@ -463,7 +457,6 @@ export class BlindMintProduct implements IBlindMintProduct {
           txHash: confirmation.hash,
           blockNumber,
           gasUsed: gasUsedValue ? BigInt(gasUsedValue) : undefined,
-          status,
         };
       },
     };

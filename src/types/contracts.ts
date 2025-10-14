@@ -1,5 +1,5 @@
 import type { BigNumber, ContractTransaction, ContractReceipt } from 'ethers';
-import type { Address, NetworkId } from './common';
+import type { Address } from './common';
 
 // =============================================================================
 // CONTRACT INTERFACES
@@ -11,7 +11,7 @@ import type { Address, NetworkId } from './common';
  */
 export interface ClaimExtensionContract {
   /** Network ID where contract is deployed */
-  readonly networkId: NetworkId;
+  readonly networkId: number;
   /** Contract address */
   readonly contractAddress: Address;
   /** Creator contract address */
@@ -62,7 +62,7 @@ export interface ClaimExtensionContract {
  */
 export interface ERC20Contract {
   /** Network ID where contract is deployed */
-  readonly networkId: NetworkId;
+  readonly networkId: number;
   /** ERC20 contract address */
   readonly contractAddress: Address;
 
@@ -106,42 +106,6 @@ export interface ContractCallOptions {
   timeout?: number;
   /** Number of retry attempts on failure */
   retries?: number;
-}
-
-/**
- * Gas configuration settings
- */
-export interface GasConfig {
-  /** Base gas limit for mint operations */
-  baseMintGas: number;
-  /** Gas buffer as percentage (e.g., 0.25 for 25%) */
-  bufferPercentage: number;
-  /** Maximum gas limit to prevent runaway transactions */
-  maxGasLimit: BigNumber;
-  /** Minimum gas limit for simple operations */
-  minGasLimit: BigNumber;
-  /** Gas estimation timeout in milliseconds */
-  estimationTimeout: number;
-}
-
-/**
- * Provider configuration for dual-provider setup
- */
-export interface ProviderConfig {
-  /** Primary provider (user's wallet) */
-  primary: {
-    available: boolean;
-    chainId?: number;
-    address?: Address;
-  };
-  /** Fallback bridge provider */
-  bridge: {
-    endpoint: string;
-    timeout: number;
-    retries: number;
-  };
-  /** Network-specific RPC endpoints */
-  networks: Record<NetworkId, NetworkProviderConfig>;
 }
 
 export interface NetworkProviderConfig {

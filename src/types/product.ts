@@ -494,18 +494,5 @@ export interface TokenItemRequirement {
 // Union type for Product
 export type Product = EditionProduct | BurnRedeemProduct | BlindMintProduct;
 
-// Export from blindmint.ts
-export type { BlindMintPublicData, BlindMintOnchainData, BlindMintProduct } from './blindmint';
-
 // PreviewData type (from InstancePreview)
 export type PreviewData = InstancePreview;
-
-// Re-export purchase-related types
-export type {
-  PreparePurchaseParams,
-  PreparedPurchase,
-  PurchaseParams,
-  Order,
-  TransactionStep,
-  TransactionReceipt,
-} from './purchase';

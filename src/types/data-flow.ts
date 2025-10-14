@@ -1,30 +1,6 @@
-import type { Address } from './common';
-
 // =============================================================================
 // ESSENTIAL API RESPONSE TYPES
 // =============================================================================
-
-/**
- * Basic API response metadata
- */
-export interface ApiResponseMetadata {
-  /** Response timestamp */
-  timestamp: Date;
-  /** Request ID for tracing */
-  requestId: string;
-}
-
-// =============================================================================
-// BASIC ALLOCATION TYPES (matching product.ts)
-// =============================================================================
-
-/**
- * Simplified allocation request
- */
-export interface AllocationRequest {
-  /** Recipient wallet address */
-  recipientAddress: Address;
-}
 
 /**
  * Simplified allocation response

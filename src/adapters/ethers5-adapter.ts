@@ -9,7 +9,7 @@ import { Money } from '../libs/money';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import type { ManifoldClient } from '../types';
 import { ensureConnectedNetwork } from '../utils';
-import type { NetworkConfigs } from '../utils/transactions';
+import type { Network } from '@manifoldxyz/js-ts-utils';
 
 // =============================================================================
 // ETHERS V5 ADAPTER IMPLEMENTATION
@@ -185,7 +185,7 @@ class Ethers5Account implements IAccount {
           value: balance,
           networkId,
           erc20: tokenAddress,
-          provider: this._signer,
+          provider: this._signer?.provider,
           fetchUSD: true,
         });
       }
@@ -215,7 +215,7 @@ class Ethers5Account implements IAccount {
             signer.provider.send('wallet_switchEthereumChain', [
               { chainId: `0x${chainId.toString(16)}` },
             ]),
-          addNetwork: (networkConfig: NetworkConfigs) =>
+          addNetwork: (networkConfig: Omit<Network.NetworkConfig, 'displayName'>) =>
             signer.provider.send('wallet_addEthereumChain', [networkConfig]),
           targetNetworkId: chainId,
         });

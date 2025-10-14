@@ -1,4 +1,4 @@
-import type { Address, NetworkId } from '../types/common';
+import type { Address } from '../types/common';
 
 /**
  * Validates an Ethereum address format.
@@ -17,30 +17,6 @@ import type { Address, NetworkId } from '../types/common';
  */
 export function validateAddress(address: string): address is Address {
   return /^0x[a-fA-F0-9]{40}$/.test(address);
-}
-
-/**
- * Validates a network ID against supported networks.
- *
- * @param networkId - The network ID to validate
- * @returns True if the network is supported
- *
- * Supported networks:
- * - 1: Ethereum Mainnet
- * - 5: Goerli (deprecated)
- * - 10: Optimism
- * - 56: BSC
- * - 137: Polygon
- * - 8453: Base
- * - 42161: Arbitrum
- * - 11155111: Sepolia
- *
- * @public
- */
-export function validateNetworkId(networkId: number): networkId is NetworkId {
-  // Validate common Ethereum network IDs
-  const validNetworks = [1, 5, 10, 56, 137, 8453, 42161, 11155111];
-  return validNetworks.includes(networkId);
 }
 
 /**
@@ -86,53 +62,4 @@ export function parseManifoldUrl(url: string): { instanceId: string } | null {
     return { instanceId: match[1] };
   }
   return null;
-}
-
-/**
- * Formats an Ethereum address for display (shortened version).
- *
- * @param address - The address to format
- * @returns Shortened address (e.g., "0x742d...bEb7")
- *
- * @example
- * ```typescript
- * formatAddress('0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb7')
- * // Returns: "0x742d...bEb7"
- * ```
- *
- * @public
- */
-export function formatAddress(address: Address): string {
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
-
-/**
- * Formats a BigInt value with decimals for human-readable display.
- *
- * @param value - The BigInt value to format (in smallest unit, e.g., wei)
- * @param decimals - Number of decimal places (default: 18 for ETH)
- * @returns Formatted string with decimal notation
- *
- * @example
- * ```typescript
- * formatMoney(BigInt('1000000000000000000'), 18) // "1"
- * formatMoney(BigInt('1500000000000000000'), 18) // "1.5"
- * formatMoney(BigInt('123456789000000000'), 18) // "0.123456789"
- * ```
- *
- * @public
- */
-export function formatMoney(value: bigint, decimals = 18): string {
-  const divisor = BigInt(10) ** BigInt(decimals);
-  const wholePart = value / divisor;
-  const fractionalPart = value % divisor;
-
-  const fractionalStr = fractionalPart.toString().padStart(decimals, '0');
-  const trimmedFractional = fractionalStr.replace(/0+$/, '');
-
-  if (trimmedFractional.length === 0) {
-    return wholePart.toString();
-  }
-
-  return `${wholePart}.${trimmedFractional}`;
 }
