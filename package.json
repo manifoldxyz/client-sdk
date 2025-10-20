@@ -41,16 +41,16 @@
   "dependencies": {
     "@manifoldxyz/js-ts-utils": "^7.4.2",
     "@manifoldxyz/manifold-provider-client": "^0.2.0",
-    "@manifoldxyz/studio-apps-client": "^3.5.2"
+    "@manifoldxyz/studio-apps-client": "^3.5.2",
+    "ethers": "^5 || ^6"
   },
   "peerDependencies": {
-    "viem": "^2.0.0",
-    "ethers": "^5 || ^6"
+    "viem": "^2.0.0"
   },
   "peerDependenciesMeta": {
     "viem": {
       "optional": true
-    }, 
+    },
     "ethers": {
       "optional": true
     }

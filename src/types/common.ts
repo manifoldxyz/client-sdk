@@ -20,4 +20,5 @@ export enum AppId {
   BURN_REDEEM = 2520944311,
 }
 
+// TO DOCUMENT EXAMPLES OF THESE
 export type ProductStatus = 'active' | 'paused' | 'completed' | 'upcoming' | 'sold-out' | 'ended';
