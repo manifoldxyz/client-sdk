@@ -166,7 +166,7 @@ export default function MintButton({ instanceId, quantity = 1 }: MintButtonButto
           onExecuteStep={handleExecuteStep}
           currentStepIndex={currentStepIndex}
           stepStatuses={stepStatuses}
-          totalCost={BigInt(preparedPurchase.cost.total.native.value.toString())}
+          formattedCost={preparedPurchase.cost.total.native.formatted}
         />
       )}
     </>

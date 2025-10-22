@@ -11,7 +11,7 @@ interface StepModalProps {
   onExecuteStep: (stepIndex: number) => Promise<void>
   currentStepIndex: number
   stepStatuses: string[]
-  totalCost: bigint
+  formattedCost: string
 }
 
 export default function StepModal({
@@ -21,7 +21,7 @@ export default function StepModal({
   onExecuteStep,
   currentStepIndex,
   stepStatuses,
-  totalCost
+  formattedCost
 }: StepModalProps) {
   const [isExecuting, setIsExecuting] = useState(false)
 
@@ -101,7 +101,7 @@ export default function StepModal({
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-gray-700">Total Cost</span>
               <span className="text-lg font-bold text-gray-900">
-                {formatEther(totalCost)} ETH
+                {formattedCost} ETH
               </span>
             </div>
           </div>
