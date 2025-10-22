@@ -1,16 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
+import { useAccount, useWalletClient } from 'wagmi';
 import { createClient, createAccountViem } from '@manifoldxyz/client-sdk';
-import { PublicClient } from 'viem';
 
 const INSTANCE_ID = process.env.NEXT_PUBLIC_INSTANCE_ID || '4149776624';
 
 export function MintButton() {
   const { address, isConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
-  const publicClient: PublicClient | undefined = usePublicClient();
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string>('');
   const [error, setError] = useState<string>('');
@@ -33,11 +31,10 @@ export function MintButton() {
           8453: process.env.NEXT_PUBLIC_RPC_URL_BASE || 'https://base-mainnet.infura.io/v3/demo',
         }
       });
-
+      const viemClient = walletClient;
       // Create viem adapter from wallet client
       const account = createAccountViem({
-        walletClient,
-        publicClient: publicClient!
+        walletClient: viemClient!,
       })
 
       // Get product details

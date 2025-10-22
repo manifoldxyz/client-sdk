@@ -12,7 +12,8 @@ import { ethers } from 'ethers';
 // VIEM TYPE IMPORTS
 // =============================================================================
 
-import type { WalletClient, PublicClient, TransactionReceipt } from 'viem';
+import type { TransactionReceipt, WalletClient, Account, Chain, Transport } from 'viem';
+import { waitForTransactionReceipt, getBalance, readContract } from 'viem/actions';
 
 // =============================================================================
 // VIEM ADAPTER IMPLEMENTATION
@@ -46,8 +47,7 @@ class ViemAccount implements IAccount {
   readonly adapterType: AdapterType = 'viem';
   _address: string;
 
-  private _walletClient: WalletClient;
-  private _publicClient: PublicClient;
+  private _walletClient: WalletClient<Transport, Chain, Account>;
 
   /**
    * Initialize adapter with viem WalletClient or PublicClient
@@ -56,8 +56,8 @@ class ViemAccount implements IAccount {
    * @param provider - Object containing viem wallet or public client
    * @throws {ClientSDKError} When client is invalid or viem is not installed
    */
-  constructor(provider: { walletClient: WalletClient; publicClient: PublicClient }) {
-    const { walletClient, publicClient } = provider;
+  constructor(provider: { walletClient: WalletClient<Transport, Chain, Account> }) {
+    const { walletClient } = provider;
     this._walletClient = walletClient;
     const account = this._walletClient.account;
     if (!account) {
@@ -66,7 +66,6 @@ class ViemAccount implements IAccount {
         'Account not foud, please pass Account explicitly when creating viem client.',
       );
     }
-    this._publicClient = publicClient;
     this._address = account.address;
   }
 
@@ -108,7 +107,7 @@ class ViemAccount implements IAccount {
       const hash = (await this.sendTransaction(request)) as `0x${string}`;
 
       // waitForViemReceipt handles TransactionReplaced internally
-      const receipt = await this._publicClient.waitForTransactionReceipt({
+      const receipt = await waitForTransactionReceipt(this._walletClient, {
         hash,
         confirmations,
       });
@@ -138,7 +137,7 @@ class ViemAccount implements IAccount {
 
       if (!tokenAddress || tokenAddress === '0x0000000000000000000000000000000000000000') {
         // Get native token balance using viem
-        const balance = await this._publicClient.getBalance({
+        const balance = await getBalance(this._walletClient, {
           address: this._address as `0x${string}`,
         });
 
@@ -152,11 +151,22 @@ class ViemAccount implements IAccount {
         });
       } else {
         // Get ERC-20 token balance using viem
-        const balance = await this._checkERC20BalanceViem(
-          tokenAddress,
-          this._address,
-          this._publicClient,
-        );
+        const erc20Abi = [
+          {
+            name: 'balanceOf',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [{ name: 'owner', type: 'address' }],
+            outputs: [{ name: '', type: 'uint256' }],
+          },
+        ] as const;
+
+        const balance = await readContract(this._walletClient, {
+          address: tokenAddress as `0x${string}`,
+          abi: erc20Abi,
+          functionName: 'balanceOf',
+          args: [this._address as `0x${string}`],
+        });
 
         // Convert viem bigint to ethers BigNumber
         const ethersBN = ethers.BigNumber.from(balance.toString());
@@ -235,7 +245,7 @@ class ViemAccount implements IAccount {
    */
   async sendCalls(method: string, params?: unknown[]): Promise<unknown> {
     try {
-      const client = this._walletClient || this._publicClient;
+      const client = this._walletClient;
 
       if (!client) {
         throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'No client available to send RPC calls');
@@ -275,34 +285,6 @@ class ViemAccount implements IAccount {
   // =============================================================================
   // PRIVATE HELPER METHODS
   // =============================================================================
-
-  /**
-   * Check ERC20 token balance using viem client
-   */
-  private async _checkERC20BalanceViem(
-    tokenAddress: string,
-    ownerAddress: string,
-    publicClient: Pick<PublicClient, 'readContract'>,
-  ): Promise<bigint> {
-    const erc20Abi = [
-      {
-        name: 'balanceOf',
-        type: 'function',
-        stateMutability: 'view',
-        inputs: [{ name: 'owner', type: 'address' }],
-        outputs: [{ name: '', type: 'uint256' }],
-      },
-    ] as const;
-
-    const balance = await publicClient.readContract({
-      address: tokenAddress as `0x${string}`,
-      abi: erc20Abi,
-      functionName: 'balanceOf',
-      args: [ownerAddress as `0x${string}`],
-    });
-
-    return balance;
-  }
 
   /**
    * Convert universal transaction request to viem format
@@ -595,8 +577,11 @@ class ViemAccount implements IAccount {
   }
 }
 
-function createAccount(provider: { walletClient: WalletClient; publicClient: PublicClient }) {
+function createAccount(provider: { walletClient: WalletClient<Transport, Chain, Account> }) {
   return new ViemAccount(provider);
 }
+
+// Convenience export with more intuitive name
+export const viemAdapter = createAccount;
 
 export { createAccount };

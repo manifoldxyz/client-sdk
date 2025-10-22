@@ -40,4 +40,4 @@
 
 // Main adapter implementations
 export { createAccount as createAccountEthers5 } from './ethers5-adapter';
-export { createAccount as createAccountViem } from './viem-adapter';
+export { createAccount as createAccountViem, viemAdapter } from './viem-adapter';

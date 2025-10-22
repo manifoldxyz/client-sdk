@@ -144,13 +144,8 @@ async function main() {
   ) {
     const networkRpc = httpRPCs[testNetworkId];
     if (networkRpc) {
-      const provider = new ethers.providers.JsonRpcProvider(networkRpc);
-      wallet = new ethers.Wallet(privateKey, provider);
+      wallet = new ethers.Wallet(privateKey);
       console.log(`   Wallet: ${wallet.address.slice(0, 10)}...`);
-
-
-      const balance = await wallet.getBalance();
-      console.log(`   Balance: ${ethers.utils.formatEther(balance)} ETH`);
     }
   } else {
     console.log('   Wallet: Not configured (using read-only mode)');

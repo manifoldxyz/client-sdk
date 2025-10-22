@@ -59,10 +59,11 @@ Open [http://localhost:3000](http://localhost:3000) to see the app.
    - Located in `src/components/MintButton.tsx`
    - Steps:
      1. Create Manifold SDK client
-     2. Create viem adapter from wagmi's wallet client
+     2. Create account from wagmi's wallet client and public client
      3. Fetch product details using instance ID
-     4. Prepare purchase (simulate transaction)
-     5. Execute purchase with wallet signing
+     4. Check product status is active
+     5. Prepare purchase (simulate transaction)
+     6. Execute purchase with wallet signing
 
 ### 3. **Key Components**
 
@@ -100,14 +101,18 @@ const client = createClient({
 });
 ```
 
-### Using viem Adapter with wagmi
+### Creating an Account with wagmi
 
 ```typescript
-import { viemAdapter } from '@manifoldxyz/client-sdk/adapters';
-import { useWalletClient } from 'wagmi';
+import { createAccountViem } from '@manifoldxyz/client-sdk';
+import { useWalletClient, usePublicClient } from 'wagmi';
 
 const { data: walletClient } = useWalletClient();
-const account = viemAdapter.signer.fromViem(walletClient);
+const publicClient = usePublicClient();
+const account = createAccountViem({
+  walletClient,
+  publicClient: publicClient!
+});
 ```
 
 ### Minting Flow
@@ -116,13 +121,19 @@ const account = viemAdapter.signer.fromViem(walletClient);
 // 1. Get product
 const product = await client.getProduct(INSTANCE_ID);
 
-// 2. Prepare purchase
+// 2. Check product status
+const productStatus = await product.getStatus();
+if (productStatus !== 'active') {
+  throw new Error(`Product is ${productStatus}`);
+}
+
+// 3. Prepare purchase
 const preparedPurchase = await product.preparePurchase({
   address: address,
   payload: { quantity: 1 }
 });
 
-// 3. Execute purchase
+// 4. Execute purchase
 const order = await product.purchase({
   account,
   preparedPurchase,
@@ -137,13 +148,19 @@ Update `NEXT_PUBLIC_INSTANCE_ID` in your `.env.local` file to mint from a differ
 
 ### Add More Networks
 
-Edit `src/app/providers.tsx` to add more chains:
+Edit `src/app/providers.tsx` to add more chains. Currently configured chains include:
+- Ethereum Mainnet
+- Base
+- Optimism
+- Arbitrum
+- Sepolia (testnet)
 
+To add more chains:
 ```typescript
 import { polygon, avalanche } from 'wagmi/chains';
 
 const config = getDefaultConfig({
-  chains: [mainnet, base, optimism, arbitrum, polygon, avalanche],
+  chains: [mainnet, base, optimism, arbitrum, sepolia, polygon, avalanche],
   // ...
 });
 ```
