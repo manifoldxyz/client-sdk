@@ -16,11 +16,13 @@ This example demonstrates how to implement a transparent, step-by-step transacti
 ### Transaction Steps
 
 The Manifold SDK's `preparePurchase` method returns a `PreparedPurchase` object containing:
+
 - **steps**: An array of `TransactionStep` objects, each representing a blockchain transaction
 - **cost**: Breakdown of costs (item price, gas, total)
 - **eligibility**: Verification of user's ability to mint
 
 Each step includes:
+
 - `type`: The type of transaction (e.g., "approval", "mint")
 - `description`: Human-readable description
 - `data`: Transaction parameters (to, value, data)
@@ -47,21 +49,24 @@ Each step includes:
 ### Installation
 
 1. Install dependencies:
+
 ```bash
 cd examples/step-by-step-mint
 npm install
 ```
 
 2. Copy the environment file:
+
 ```bash
 cp .env.example .env
 ```
 
 3. Configure environment variables:
+
 ```env
 NEXT_PUBLIC_ALCHEMY_API_KEY=your_alchemy_api_key
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
-NEXT_PUBLIC_BLIND_MINT_INSTANCE_ID=your_blind_mint_instance_id
+NEXT_PUBLIC_INSTANCE_ID=your_blind_mint_instance_id
 ```
 
 ### Finding Your Instance ID
@@ -73,6 +78,7 @@ NEXT_PUBLIC_BLIND_MINT_INSTANCE_ID=your_blind_mint_instance_id
 ## Running the Example
 
 Start the development server:
+
 ```bash
 npm run dev
 ```
@@ -108,12 +114,12 @@ The main component that handles the minting process:
 // Prepare purchase and get steps
 const prepared = await product.preparePurchase({
   address,
-  payload: { quantity }
-})
+  payload: { quantity },
+});
 
 // Store steps for modal display
-setPreparedPurchase(prepared)
-setIsModalOpen(true)
+setPreparedPurchase(prepared);
+setIsModalOpen(true);
 ```
 
 ### StepModal Component
@@ -123,15 +129,16 @@ Displays transaction steps with execution controls:
 ```typescript
 // Execute individual step
 const handleExecuteStep = async (stepIndex: number) => {
-  const step = preparedPurchase.steps[stepIndex]
-  const result = await step.execute(account)
+  const step = preparedPurchase.steps[stepIndex];
+  const result = await step.execute(account);
   // Update status and move to next step
-}
+};
 ```
 
 ### Step Status Management
 
 Track the status of each step:
+
 - `idle`: Step not yet reached
 - `pending`: Current step ready for execution
 - `executing`: Transaction in progress
@@ -143,6 +150,7 @@ Track the status of each step:
 ### Styling
 
 The modal uses Tailwind CSS classes. Customize the appearance by modifying:
+
 - Colors: Update the color scheme in `StepModal.tsx`
 - Layout: Adjust spacing and sizes
 - Icons: Replace status icons with custom ones
@@ -153,15 +161,15 @@ Enhance step descriptions for better UX:
 
 ```typescript
 const getStepDescription = (step: TransactionStep) => {
-  switch(step.type) {
+  switch (step.type) {
     case 'approval':
-      return 'Approve the contract to spend tokens'
+      return 'Approve the contract to spend tokens';
     case 'mint':
-      return 'Execute the blind mint transaction'
+      return 'Execute the blind mint transaction';
     default:
-      return step.description
+      return step.description;
   }
-}
+};
 ```
 
 ### Error Handling
@@ -190,19 +198,21 @@ catch (error) {
 ## Comparison with Standard Flow
 
 ### Standard Purchase Flow
+
 ```typescript
 // One-click purchase
 const order = await product.purchase({
   account,
-  preparedPurchase
-})
+  preparedPurchase,
+});
 ```
 
 ### Step-by-Step Flow
+
 ```typescript
 // Manual step execution
 for (const step of preparedPurchase.steps) {
-  await step.execute(account)
+  await step.execute(account);
   // Update UI between steps
 }
 ```
@@ -247,8 +257,8 @@ const validateStep = (step: TransactionStep) => {
   // Check gas price
   // Verify contract state
   // Confirm user balance
-  return isValid
-}
+  return isValid;
+};
 ```
 
 ### Analytics Integration
@@ -260,9 +270,9 @@ const trackStepExecution = (step, status) => {
   analytics.track('step_executed', {
     step_type: step.type,
     status,
-    product_id: instanceId
-  })
-}
+    product_id: instanceId,
+  });
+};
 ```
 
 ## Resources

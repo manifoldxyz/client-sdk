@@ -6,7 +6,7 @@ import { useState } from 'react'
 
 export default function Home() {
   const [instanceId, setInstanceId] = useState(
-    process.env.NEXT_PUBLIC_BLIND_MINT_INSTANCE_ID || ''
+    process.env.NEXT_PUBLIC_INSTANCE_ID || ''
   )
   const [quantity, setQuantity] = useState(1)
 
