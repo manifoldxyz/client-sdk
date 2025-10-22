@@ -96,7 +96,7 @@ step-by-step-mint/
 │   │   ├── providers.tsx     # RainbowKit and Wagmi setup
 │   │   └── globals.css       # Tailwind CSS styles
 │   └── components/
-│       ├── BlindMintButton.tsx  # Main minting logic
+│       ├── MintButton.tsx  # Main minting logic
 │       └── StepModal.tsx        # Transaction step modal
 ├── package.json
 ├── tsconfig.json
@@ -106,7 +106,7 @@ step-by-step-mint/
 
 ## Code Walkthrough
 
-### BlindMintButton Component
+### MintButton Component
 
 The main component that handles the minting process:
 

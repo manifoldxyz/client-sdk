@@ -2,16 +2,16 @@
 
 import { useState } from 'react'
 import { useAccount } from 'wagmi'
-import { createClient, BlindMintProduct, PreparedPurchase, TransactionStep, viemAdapter } from '@manifoldxyz/client-sdk'
+import { createClient, BlindMintProduct, PreparedPurchase, viemAdapter } from '@manifoldxyz/client-sdk'
 import { useWalletClient, usePublicClient } from 'wagmi'
 import StepModal from './StepModal'
 
-interface BlindMintButtonProps {
+interface MintButtonButtonProps {
   instanceId: string
   quantity?: number
 }
 
-export default function BlindMintButton({ instanceId, quantity = 1 }: BlindMintButtonProps) {
+export default function MintButton({ instanceId, quantity = 1 }: MintButtonButtonProps) {
   const { address, isConnected } = useAccount()
   const { data: walletClient } = useWalletClient()
   const publicClient = usePublicClient()

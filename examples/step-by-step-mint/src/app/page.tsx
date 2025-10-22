@@ -1,7 +1,7 @@
 'use client'
 
 import { ConnectButton } from '@rainbow-me/rainbowkit'
-import BlindMintButton from '@/components/BlindMintButton'
+import MintButton from '@/components/MintButton'
 import { useState } from 'react'
 
 export default function Home() {
@@ -63,7 +63,7 @@ export default function Home() {
             </div>
 
             {instanceId && (
-              <BlindMintButton instanceId={instanceId} quantity={quantity} />
+              <MintButton instanceId={instanceId} quantity={quantity} />
             )}
           </div>
 
