@@ -17,9 +17,13 @@ import { mainnet, base, sepolia } from 'wagmi/chains'
 
 const { wallets } = getDefaultWallets()
 
+if (!process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID) {
+  throw new Error('Missing NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID env variable')
+}
+
 const config = getDefaultConfig({
   appName: 'Step-by-Step Blind Mint Example',
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_PROJECT_ID',
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
   wallets: [
     ...wallets,
     {

@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import { useAccount } from 'wagmi'
-import { createClient, BlindMintProduct, PreparedPurchase, viemAdapter } from '@manifoldxyz/client-sdk'
-import { useWalletClient, usePublicClient } from 'wagmi'
+import { createClient, BlindMintProduct, PreparedPurchase, createAccountViem } from '@manifoldxyz/client-sdk'
+import { useWalletClient } from 'wagmi'
 import StepModal from './StepModal'
+import { client } from '@/utils/SDKClient'
 
 interface MintButtonButtonProps {
   instanceId: string
@@ -14,7 +15,6 @@ interface MintButtonButtonProps {
 export default function MintButton({ instanceId, quantity = 1 }: MintButtonButtonProps) {
   const { address, isConnected } = useAccount()
   const { data: walletClient } = useWalletClient()
-  const publicClient = usePublicClient()
   
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -26,7 +26,7 @@ export default function MintButton({ instanceId, quantity = 1 }: MintButtonButto
   const [purchaseComplete, setPurchaseComplete] = useState(false)
 
   const handlePreparePurchase = async () => {
-    if (!address || !walletClient || !publicClient) {
+    if (!address || !walletClient) {
       setError('Please connect your wallet first')
       return
     }
@@ -36,13 +36,6 @@ export default function MintButton({ instanceId, quantity = 1 }: MintButtonButto
     setPurchaseComplete(false)
 
     try {
-      const httpRPCs: Record<number, string> = {}
-      if (process.env.NEXT_PUBLIC_ALCHEMY_API_KEY) {
-        httpRPCs[1] = `https://eth-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
-        httpRPCs[8453] = `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
-      }
-      
-      const client = createClient({ httpRPCs })
 
       const fetchedProduct = await client.getProduct(instanceId) as BlindMintProduct
       setProduct(fetchedProduct)
@@ -75,7 +68,7 @@ export default function MintButton({ instanceId, quantity = 1 }: MintButtonButto
   }
 
   const handleExecuteStep = async (stepIndex: number) => {
-    if (!walletClient || !publicClient || !preparedPurchase || !product) {
+    if (!walletClient || !preparedPurchase || !product) {
       setError('Missing required data')
       return
     }
@@ -93,7 +86,7 @@ export default function MintButton({ instanceId, quantity = 1 }: MintButtonButto
     })
 
     try {
-      const account = viemAdapter({
+      const account = createAccountViem({
         walletClient: walletClient as any
       })
 
