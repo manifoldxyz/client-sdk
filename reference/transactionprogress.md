@@ -1,0 +1,9 @@
+# TransactionProgress
+
+| Field           | Type                                     | Required | Description                                                                                                                                                                                              |
+| --------------- | ---------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| status          | enum                                     | ✅        | `pending-approval`                                                                                                                                                                                       |
+| steps           | [TransactionStep](transactionstep.md)\[] | ✅        | This is the full steps object as it’s returned by the api and enhanced with some additional properties on the client. Notably the step status has been updated as well as any errors have been attached. |
+| **currentStep** | [TransactionStep](transactionstep.md)    | ✅        | We’ve conveniently pinpointed the current step that’s being processed and made it accessible in this callback.                                                                                           |
+| receipts        | [Receipt](receipt.md)\[]                 | ❌        | A full list of all the transaction hashes that have been processed so far during execution.                                                                                                              |
+| data            | object                                   | ❌        | Additional context data                                                                                                                                                                                  |

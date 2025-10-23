@@ -1,0 +1,4 @@
+# BlindMintPublicData
+
+<table><thead><tr><th>Field</th><th width="212.953125">Type</th><th>Required</th><th>Description</th></tr></thead><tbody><tr><td><strong>title</strong></td><td>string</td><td>✅</td><td>Title of the product</td></tr><tr><td>description</td><td>string</td><td>❌</td><td>Description of the product</td></tr><tr><td>network</td><td>number</td><td>✅</td><td>The network the product is on</td></tr><tr><td>contract</td><td><a href="contract.md">Contract</a></td><td>✅</td><td>The contract of the token</td></tr><tr><td>extensionAddress</td><td>string</td><td>✅</td><td>Extension address of the product</td></tr><tr><td>tierProbabilities</td><td><a href="blindminttierprobability.md">BlindMintTierProbability</a></td><td>✅</td><td>Tier and probability of each group</td></tr><tr><td>pool</td><td><a href="blindmintpool.md">BlindMintPool</a></td><td>✅</td><td>Pool of assets</td></tr></tbody></table>
+
