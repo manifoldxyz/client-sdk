@@ -39,6 +39,7 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
+    "@manifoldxyz/claim-contracts": "^3.3.0",
     "@manifoldxyz/js-ts-utils": "^7.5.0",
     "@manifoldxyz/manifold-provider-client": "^0.2.0",
     "@manifoldxyz/studio-apps-client": "^3.5.2",
