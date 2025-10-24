@@ -3,6 +3,7 @@ import type { Product, InstanceData, BlindMintPublicData, EditionPublicData } fr
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import { AppId } from '../types/common';
 import { BlindMintProduct } from '../products/blindmint';
+import { EditionProduct } from '../products/edition';
 import { validateInstanceId, parseManifoldUrl } from '../utils/validation';
 import { createManifoldApiClient } from '../api/manifold-api';
 import type * as ethers from 'ethers';
@@ -173,13 +174,13 @@ export function createClient(config?: ClientConfig): ManifoldClient {
           });
         }
 
-        // Handle Edition products with specific message until implemented
+        // Create Edition product if it matches the app ID
         if (isEditionInstanceData(instanceData)) {
           // TypeScript now knows instanceData is InstanceData<EditionPublicData>
-          throw new ClientSDKError(
-            ErrorCode.UNSUPPORTED_PRODUCT_TYPE,
-            'Edition products are not yet implemented. EditionProduct class is in development.',
-          );
+          // Create EditionProduct with both instance and preview data
+          return new EditionProduct(instanceData, previewData, {
+            httpRPCs,
+          });
         }
 
         // For other product types, throw an error until implemented

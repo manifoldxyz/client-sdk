@@ -139,7 +139,7 @@ describe('createClient', () => {
     expect(product).toHaveProperty('type', 'blind-mint');
   });
 
-  it('handles Edition products with specific error message', async () => {
+  it('creates edition products when instance data matches', async () => {
     const instanceData = {
       id: 2522713783,
       appId: 2522713783, // AppId.EDITION
@@ -150,6 +150,7 @@ describe('createClient', () => {
         extensionAddress: '0x456',
         asset: { name: 'Test Asset', animation_preview: '' }
       },
+      creator: { id: 1, name: 'Test Creator' }
     };
     const previewData = { title: 'Edition Preview' };
 
@@ -159,10 +160,10 @@ describe('createClient', () => {
     });
 
     const client = createClient();
-    await expect(client.getProduct('https://manifold.xyz/@creator/id/2522713783')).rejects.toMatchObject({
-      code: ErrorCode.UNSUPPORTED_PRODUCT_TYPE,
-      message: 'Edition products are not yet implemented. EditionProduct class is in development.',
-    });
+    const product = await client.getProduct('https://manifold.xyz/@creator/id/2522713783');
+
+    expect(product).toHaveProperty('type', 'edition');
+    expect(product).toHaveProperty('id', 2522713783);
     expect(getCompleteInstanceDataMock).toHaveBeenCalledWith('2522713783', {
       maxMediaWidth: 1024,
     });

@@ -1,12 +1,12 @@
 /**
  * Edition Claim Contract ABIs for ERC721 and ERC1155
- * 
+ *
  * These ABIs are extracted from @manifoldxyz/claim-contracts v3.3.0
  * and represent the latest V7 versions of the claim contracts.
- * 
+ *
  * Key contract methods for Edition minting:
  * - getClaim: Retrieves claim configuration and parameters
- * - mintProxy: Executes proxy minting with merkle proofs 
+ * - mintProxy: Executes proxy minting with merkle proofs
  * - MINT_FEE: Returns the platform minting fee
  * - mintBatch: Batch minting functionality
  * - getTotalMints: Get user's total mints for a claim

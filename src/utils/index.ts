@@ -33,6 +33,11 @@ export { poll, ensureConnectedNetwork } from './network';
 
 export type { EnsureConnectedNetworkOptions } from './network';
 
+// Merkle proof utilities
+export { merkleProofService, MerkleTree } from './merkle-proof';
+
+export type { AllowlistEntry, AllowlistProof } from './merkle-proof';
+
 // =============================================================================
 // ADDITIONAL UTILITY FUNCTIONS
 // =============================================================================

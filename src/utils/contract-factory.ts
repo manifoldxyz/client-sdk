@@ -1,6 +1,11 @@
 import * as ethers from 'ethers';
 import type { Address } from '../types/common';
-import { GachaExtensionERC1155ABIv2, ERC20ABI } from '../abis';
+import {
+  GachaExtensionERC1155ABIv2,
+  ERC20ABI,
+  ClaimExtensionERC721ABI,
+  ClaimExtensionERC1155ABI,
+} from '../abis';
 
 // =============================================================================
 // CONTRACT TYPES
@@ -116,6 +121,216 @@ export type ERC20Contract = ethers.Contract & {
   ): Promise<ethers.ContractTransaction>;
 };
 
+export type EditionClaimContract = ethers.Contract & {
+  // Core constants
+  MINT_FEE(): Promise<ethers.BigNumber>;
+  MINT_FEE_MERKLE(): Promise<ethers.BigNumber>;
+
+  // Main claim method - returns claim data structure for ERC721
+  getClaim(
+    creatorContractAddress: string,
+    instanceId: number,
+  ): Promise<{
+    total: number;
+    totalMax: number;
+    walletMax: number;
+    startDate: number;
+    endDate: number;
+    storageProtocol: number;
+    contractVersion: number;
+    identical: boolean;
+    merkleRoot: string;
+    location: string;
+    cost: ethers.BigNumber;
+    paymentReceiver: string;
+    erc20: string;
+    signingAddress: string;
+  }>;
+
+  // Get user's total mints for a claim
+  getTotalMints(
+    minter: string,
+    creatorContractAddress: string,
+    instanceId: number,
+  ): Promise<number>;
+
+  // Check if specific mint index was used
+  checkMintIndex(
+    creatorContractAddress: string,
+    instanceId: number,
+    mintIndex: number,
+  ): Promise<boolean>;
+
+  // Check multiple mint indices
+  checkMintIndices(
+    creatorContractAddress: string,
+    instanceId: number,
+    mintIndices: number[],
+  ): Promise<boolean[]>;
+
+  // Main minting methods
+  mint(
+    creatorContractAddress: string,
+    instanceId: number,
+    mintIndex: number,
+    merkleProof: string[],
+    mintFor: string,
+    options?: ethers.PayableOverrides,
+  ): Promise<ethers.ContractTransaction>;
+
+  mintBatch(
+    creatorContractAddress: string,
+    instanceId: number,
+    mintCount: number,
+    mintIndices: number[],
+    merkleProofs: string[][],
+    mintFor: string,
+    options?: ethers.PayableOverrides,
+  ): Promise<ethers.ContractTransaction>;
+
+  mintProxy(
+    creatorContractAddress: string,
+    instanceId: number,
+    mintCount: number,
+    mintIndices: number[],
+    merkleProofs: string[][],
+    mintFor: string,
+    options?: ethers.PayableOverrides,
+  ): Promise<ethers.ContractTransaction>;
+
+  // Token URI method
+  tokenURI(creatorContractAddress: string, tokenId: number): Promise<string>;
+
+  // Get claim for specific token
+  getClaimForToken(
+    creatorContractAddress: string,
+    tokenId: number,
+  ): Promise<{
+    instanceId: ethers.BigNumber;
+    claim: {
+      total: number;
+      totalMax: number;
+      walletMax: number;
+      startDate: number;
+      endDate: number;
+      storageProtocol: number;
+      contractVersion: number;
+      identical: boolean;
+      merkleRoot: string;
+      location: string;
+      cost: ethers.BigNumber;
+      paymentReceiver: string;
+      erc20: string;
+      signingAddress: string;
+    };
+  }>;
+};
+
+export type Edition1155ClaimContract = ethers.Contract & {
+  // Core constants
+  MINT_FEE(): Promise<ethers.BigNumber>;
+  MINT_FEE_MERKLE(): Promise<ethers.BigNumber>;
+
+  // Main claim method - returns claim data structure for ERC1155
+  getClaim(
+    creatorContractAddress: string,
+    instanceId: number,
+  ): Promise<{
+    claim: {
+      total: number;
+      totalMax: number;
+      walletMax: number;
+      startDate: number;
+      endDate: number;
+      storageProtocol: number;
+      merkleRoot: string;
+      location: string;
+      tokenId: ethers.BigNumber;
+      cost: ethers.BigNumber;
+      paymentReceiver: string;
+      erc20: string;
+      signingAddress: string;
+    };
+  }>;
+
+  // Get user's total mints for a claim
+  getTotalMints(
+    minter: string,
+    creatorContractAddress: string,
+    instanceId: number,
+  ): Promise<number>;
+
+  // Check if specific mint index was used
+  checkMintIndex(
+    creatorContractAddress: string,
+    instanceId: number,
+    mintIndex: number,
+  ): Promise<boolean>;
+
+  // Check multiple mint indices
+  checkMintIndices(
+    creatorContractAddress: string,
+    instanceId: number,
+    mintIndices: number[],
+  ): Promise<boolean[]>;
+
+  // Main minting methods
+  mint(
+    creatorContractAddress: string,
+    instanceId: number,
+    mintIndex: number,
+    merkleProof: string[],
+    mintFor: string,
+    options?: ethers.PayableOverrides,
+  ): Promise<ethers.ContractTransaction>;
+
+  mintBatch(
+    creatorContractAddress: string,
+    instanceId: number,
+    mintCount: number,
+    mintIndices: number[],
+    merkleProofs: string[][],
+    mintFor: string,
+    options?: ethers.PayableOverrides,
+  ): Promise<ethers.ContractTransaction>;
+
+  mintProxy(
+    creatorContractAddress: string,
+    instanceId: number,
+    mintCount: number,
+    mintIndices: number[],
+    merkleProofs: string[][],
+    mintFor: string,
+    options?: ethers.PayableOverrides,
+  ): Promise<ethers.ContractTransaction>;
+
+  // Token URI method
+  tokenURI(creatorContractAddress: string, tokenId: number): Promise<string>;
+
+  // Get claim for specific token
+  getClaimForToken(
+    creatorContractAddress: string,
+    tokenId: number,
+  ): Promise<{
+    instanceId: ethers.BigNumber;
+    claim: {
+      total: number;
+      totalMax: number;
+      walletMax: number;
+      startDate: number;
+      endDate: number;
+      storageProtocol: number;
+      merkleRoot: string;
+      location: string;
+      tokenId: ethers.BigNumber;
+      cost: ethers.BigNumber;
+      paymentReceiver: string;
+      erc20: string;
+      signingAddress: string;
+    };
+  }>;
+};
+
 // =============================================================================
 // CONTRACT FACTORY
 // =============================================================================
@@ -159,6 +374,36 @@ export class ContractFactory {
     const provider = this.provider;
 
     return new ethers.Contract(address, ERC20ABI, provider) as ERC20Contract;
+  }
+
+  /**
+   * Create Edition ERC721 claim extension contract instance
+   */
+  createEditionContract(address: Address): EditionClaimContract {
+    const provider = this.provider;
+
+    const contract = new ethers.Contract(
+      address,
+      ClaimExtensionERC721ABI,
+      provider,
+    ) as EditionClaimContract;
+
+    return contract;
+  }
+
+  /**
+   * Create Edition ERC1155 claim extension contract instance
+   */
+  createEdition1155Contract(address: Address): Edition1155ClaimContract {
+    const provider = this.provider;
+
+    const contract = new ethers.Contract(
+      address,
+      ClaimExtensionERC1155ABI,
+      provider,
+    ) as Edition1155ClaimContract;
+
+    return contract;
   }
 }
 

@@ -1,382 +1,404 @@
-# Intelligent Execution Plan - Edition Product Implementation
+# Intelligent Execution Plan - Edition Product Implementation (CON-2792)
+
+## 📊 Plan Overview
+
+- **Total Stages**: 4 stages over 4 weeks
+- **Estimated Time**: 20-30 hours of implementation
+- **Parallel Opportunities**: Multiple within each stage
+- **Critical Path**: Contract ABIs → EditionProduct → Integration Tests
+- **Confidence Level**: 95% - Exceptional foundation exists
 
 ## 🔍 Discovery-Driven Foundation
 
 ### Auto-Discovered Type Contracts (Critical Priority)
 
-Based on the codebase analysis, these contracts MUST be built first as they're shared across the implementation:
+Based on dependency analysis, these contracts MUST be built first:
 
 ```typescript
-// Critical shared types that multiple components depend on
-interface EditionOnchainData {
-  totalSupply: number;
-  totalMinted: number;
-  walletMax: number;
-  startDate: Date;
-  endDate: Date;
-  cost: Money;
+// Critical Edition Contract Interface
+interface EditionClaimContract {
+  // Used by: EditionProduct, ContractFactory, Tests
+  getClaim(creator: string, instanceId: number): Promise<ClaimData>;
+  mintProxy(
+    creator: string,
+    instanceId: number,
+    count: number,
+    indices: number[],
+    proofs: string[][],
+    mintFor: string
+  ): Promise<TransactionResponse>;
+  MINT_FEE(): Promise<BigNumber>;
+}
+
+// Allowlist Proof Structure
+interface AllowlistProof {
+  // Used by: EditionProduct, MerkleProofService, API
   merkleRoot: string;
-  extensionAddress: Address;
-  claimIndex: number;
+  proof: string[];
+  leaf: string;
+  maxQuantity?: number;
+  price?: Money;
 }
 
-interface EditionPayload {
+// Edition Purchase Context
+interface EditionPurchaseContext {
+  // Used by: preparePurchase, purchase, transaction steps
+  product: EditionProduct;
+  purchaser: string;
+  recipient: string;
   quantity: number;
-  code?: string;
-  merkleProofs?: string[];
-}
-
-interface EditionProduct extends BaseProduct<EditionPublicData> {
-  type: AppType.EDITION;
-  onchainData?: EditionOnchainData;
-  // ... methods
+  allowlistProof?: AllowlistProof;
+  redemptionCode?: string;
+  transactionSteps: TransactionStep[];
+  totalCost: Cost;
 }
 ```
 
-**Rationale**: These types are used by the EditionProduct class, contract layer, client factory, and test suites.
+**Rationale**: These contracts are referenced across multiple components and must be consistent
 
-### Dependency-Based Staging
+## 🏗️ Foundation Stage (Week 1: 5-8 hours)
 
-Execution order determined by actual code dependencies:
+Based on dependency analysis, these components must be built first:
 
-## Stage 1: Foundation - Type Contracts & ABIs (30-45 minutes)
+### 1.1 Extract Contract ABIs (Critical - 2 hours)
+**Agent**: Manual implementation
+**Dependencies**: `@manifoldxyz/claim-contracts`
+**Input from Discovery**:
+- Auto-discovered EditionClaimContract interface
+- mintProxy method signature from reference implementation
+- Platform fee methods (MINT_FEE)
+**Tasks**:
+- Extract ClaimExtensionERC721 and ClaimExtensionERC1155 ABIs
+- Create `src/abis/EditionClaimABI.ts`
+- Add to ABI index exports
+**Provides to Others**: Contract interfaces for EditionProduct, ContractFactory
 
-```yaml
-foundation:
-  - name: "edition-type-contracts"
-    agent: "type-contract"
-    duration: "20-30m"
-    parallel: true
-    input: |
-      Create comprehensive Edition type definitions:
-      - EditionPublicData (already exists, verify completeness)
-      - EditionOnchainData structure
-      - EditionPayload for purchases
-      - EditionProduct interface extending BaseProduct
-      - ClaimExtension contract types
-    output:
-      - src/types/edition.ts with all Edition-specific types
-      - Updates to src/types/index.ts exports
-    dependencies: []
-    
-  - name: "claim-extension-abi"
-    agent: "software-engineer"
-    duration: "15-20m"
-    parallel: true
-    input: |
-      Create ClaimExtension contract ABI based on claim-widgets reference:
-      - getClaim() method for fetching claim data
-      - mintProxy() for executing mints
-      - getClaimForToken() for token-specific data
-      - mint() and mintBatch() methods
-      - Reference: @claim-widgets/src/contracts/claimExtensionContract.ts
-    output:
-      - src/abis/ClaimExtensionABI.ts
-      - Updates to src/abis/index.ts exports
-    dependencies: []
+**Critical**: This unblocks all Edition-specific development
+
+### 1.2 Enhanced Base Abstractions (Parallel - 3 hours)
+**Agent**: Manual refactoring
+**Input from Discovery**:
+- Common patterns identified in BlindMintProduct
+- Shared transaction step architecture
+- Merkle proof requirements for allowlists
+**Tasks**:
+- Extract common patterns from BlindMintProduct into BaseProduct abstract class
+- Create MerkleProofService for shared proof validation
+- Enhance TransactionOrchestrator for multi-step flows
+**Provides to Others**: Reusable base classes for EditionProduct
+
+**Benefit**: 80% code reuse for EditionProduct
+
+### 1.3 Contract Factory Extension (Parallel - 1 hour)
+**Agent**: Manual implementation
+**Dependencies**: Contract ABIs from 1.1
+**Input from Discovery**:
+- EditionClaimContract interface requirements
+- mintProxy method signature
+- Gas estimation patterns from BlindMint
+**Tasks**:
+- Add `createEditionContract()` method to ContractFactory
+- Define EditionClaimContract type interface
+- Add Edition-specific contract method signatures
+**Provides to Others**: Contract creation for EditionProduct
+
+### 1.4 Type Guard Implementation (Parallel - 1 hour)
+**Agent**: Manual implementation
+**Input from Discovery**:
+- AppId.EDITION value (2522713783)
+- InstanceData structure for Edition
+**Tasks**:
+- Create `isEditionInstanceData()` type guard
+- Add AppId.EDITION constant if not exists
+- Export Edition type guards
+**Provides to Others**: Type detection for Client Factory
+
+## 🚀 Implementation Stage (Week 2: 8-10 hours)
+
+Core Edition product functionality:
+
+### 2.1 EditionProduct Class (Sequential - 5 hours)
+**Agent**: Manual implementation
+**Dependencies**: Foundation Stage complete
+**File**: `src/products/edition.ts`
+
+```typescript
+export class EditionProduct implements IEditionProduct {
+  // Core implementation following BlindMint patterns
+  constructor(instanceData, previewData, options)
+  async fetchOnchainData(): Promise<EditionOnchainData>
+  async preparePurchase(params): Promise<PreparedPurchase>
+  async purchase(params): Promise<Order>
+  
+  // Standard product interface
+  async getStatus(): Promise<ProductStatus>
+  async getAllocations(params): Promise<AllocationResponse>
+  async getInventory(): Promise<ProductInventory>
+  async getRules(): Promise<ProductRule>
+  async getProvenance(): Promise<ProductProvenance>
+}
 ```
 
-## Stage 2: Contract Layer Implementation (45-60 minutes)
+### 2.2 Allowlist Validation Service (Parallel - 2 hours)
+**Agent**: Manual implementation
+**Tasks**:
+- Implement merkle proof generation for allowlists
+- Add proof validation logic
+- Cache validation results
 
-```yaml
-contracts:
-  - name: "claim-extension-contract"
-    agent: "backend-engineer"
-    duration: "45-60m"
-    parallel: false
-    input: |
-      Implement ClaimExtensionContract class:
-      - Use ClaimExtensionABI from Stage 1
-      - Implement getClaim() to fetch on-chain data
-      - Handle multiple extension address types (721, 1155, updatable fee variants)
-      - Gas estimation for mint operations
-      - Transform raw contract data to EditionOnchainData
-      - Reference BlindMintClaimContract pattern in contract-factory.ts
-    output:
-      - Updated src/utils/contract-factory.ts with ClaimExtension support
-      - Contract initialization and method implementations
-    dependencies: ["edition-type-contracts", "claim-extension-abi"]
-    requires_verification: true
-```
+### 2.3 Cost Calculation Logic (Parallel - 1 hour)
+**Agent**: Manual implementation
+**Tasks**:
+- Implement Edition-specific pricing logic
+- Add platform fee calculation
+- Handle ERC20 payment paths
 
-## Stage 3: Core Product Implementation (60-90 minutes)
+### 2.4 Client Factory Integration (Sequential - 1 hour)
+**Agent**: Manual implementation
+**Dependencies**: EditionProduct complete
+**Tasks**:
+- Add Edition case to `getProduct()` in `src/client/index.ts`
+- Wire up EditionProduct instantiation
+- Update type exports
 
-```yaml
-product:
-  - name: "edition-product-class"
-    agent: "backend-engineer"
-    duration: "60-90m"
-    parallel: false
-    input: |
-      Create EditionProduct class following BlindMintProduct pattern:
-      
-      Core Methods:
-      - constructor(instanceData, previewData, options)
-      - fetchOnchainData(): Fetch and cache contract state
-      - getAllocations(): Check eligibility with allowlist support
-      - preparePurchase(): Validate and build transaction steps
-      - purchase(): Execute via account adapter
-      - getStatus(): Determine product status
-      - getInventory(): Calculate available supply
-      
-      Allowlist Features:
-      - Merkle proof verification for allowlist
-      - Claim code validation
-      - Discounted pricing logic
-      
-      Reference implementations:
-      - src/products/blindmint.ts for structure
-      - @claim-widgets/src/lib/transactionFlow/steps/mint.tsx for allowlist
-    output:
-      - src/products/edition.ts with full implementation
-      - Integration with existing product patterns
-    dependencies: ["edition-type-contracts", "claim-extension-contract"]
-    critical_path: true
-```
+## 🧪 Testing & Validation Stage (Week 3: 5-7 hours)
 
-## Stage 4: Client Integration & Factory Updates (30-45 minutes)
+Comprehensive testing and validation:
 
-```yaml
-integration:
-  - name: "client-factory-updates"
-    agent: "software-engineer"
-    duration: "30-45m"
-    parallel: false
-    input: |
-      Update client factory to support Edition products:
-      
-      1. Add Edition type guard:
-         - isEditionInstanceData() checking for Edition AppId
-         
-      2. Update getProduct() method:
-         - Route Edition products to EditionProduct class
-         - Handle Edition-specific instance data
-         
-      3. Update product exports:
-         - Export EditionProduct class
-         - Update Product union type
-         
-      Reference: src/client/index.ts lines 26-30 for BlindMint pattern
-    output:
-      - Updated src/client/index.ts with Edition support
-      - Updated src/products/index.ts exports
-    dependencies: ["edition-product-class"]
-```
+### 3.1 Unit Tests (Parallel - 3 hours)
+**Agent**: Manual test writing
+**File**: `tests/products/edition.test.ts`
+**Coverage**:
+- Constructor validation
+- fetchOnchainData() with mocked responses
+- preparePurchase() eligibility scenarios
+- purchase() transaction flow
+- Error handling cases
 
-## Stage 5: Testing Implementation (45-60 minutes)
+### 3.2 Integration Tests (Sequential - 2 hours)
+**Agent**: Manual test writing
+**Coverage**:
+- End-to-end purchase flow
+- Multi-network support
+- Allowlist validation
+- Gas estimation accuracy
 
-```yaml
-testing:
-  - name: "edition-unit-tests"
-    agent: "qa-engineer"
-    duration: "45-60m"
-    parallel: false
-    input: |
-      Create comprehensive test suite for Edition product:
-      
-      Test Coverage:
-      - EditionProduct class initialization
-      - fetchOnchainData() with mocked contracts
-      - getAllocations() with various scenarios
-      - preparePurchase() validation logic
-      - Allowlist verification with merkle proofs
-      - Cost calculations with platform fees
-      - Status determination logic
-      - Error scenarios and edge cases
-      
-      Reference: tests/products/blindmint.test.ts for test patterns
-    output:
-      - tests/products/edition.test.ts
-      - Mock data fixtures for Edition products
-      - Coverage report showing >80% coverage
-    dependencies: ["edition-product-class", "client-factory-updates"]
-```
+### 3.3 Manual Testing (Sequential - 2 hours)
+**Agent**: Manual validation
+**Tasks**:
+- Test with real Edition contracts on testnet
+- Validate with different wallet adapters
+- Test error scenarios
+- Performance benchmarking
 
-## Stage 6: Documentation & Examples (30-45 minutes)
+## 🎛️ Polish & Documentation Stage (Week 4: 2-5 hours)
 
-```yaml
-documentation:
-  - name: "documentation-updates"
-    agent: "software-engineer"
-    duration: "30-45m"
-    parallel: true
-    input: |
-      Update documentation for Edition product:
-      
-      1. API Reference updates:
-         - Update README.md with Edition examples
-         - Create docs for new Edition methods
-         
-      2. Release Notes:
-         - Update docs/sdk/release-notes.md
-         - Follow existing format (date + version)
-         
-      3. Example Updates:
-         - Update playground with Edition example
-         - Add Edition to example apps
-         
-      4. Type Documentation:
-         - Document all new types in reference docs
-    output:
-      - Updated README.md
-      - Updated docs/sdk/release-notes.md
-      - New/updated reference documentation
-      - Example code updates
-    dependencies: ["edition-product-class"]
-```
+Final optimizations and documentation:
 
-## 🚦 Critical Checkpoints
+### 4.1 Performance Optimization (Parallel - 1 hour)
+**Tasks**:
+- Implement caching for on-chain data
+- Optimize gas estimation
+- Add request batching where applicable
+
+### 4.2 Error Message Enhancement (Parallel - 1 hour)
+**Tasks**:
+- Add Edition-specific error codes if needed
+- Improve error messages for common failures
+- Add detailed context to errors
+
+### 4.3 Documentation Updates (Sequential - 2 hours)
+**Tasks**:
+- Update README.md with Edition examples
+- Update API documentation in `docs/`
+- Add Edition to getting started guide
+- Update release notes
+
+### 4.4 Code Review & Cleanup (Sequential - 1 hour)
+**Tasks**:
+- Remove debug code
+- Ensure consistent code style
+- Final TypeScript strict mode check
+- Security review
+
+## 🧪 Discovery-Enhanced Integration Checkpoints
 
 ### Foundation Checkpoint (After Stage 1)
-```yaml
-checkpoint: "Types & ABIs Complete"
-validation:
-  - All Edition types compile without errors
-  - ABI matches expected contract interface
-  - Types exported correctly from index files
-  - No circular dependencies
+**Tests with Discovered Contracts**:
+- ✅ All auto-discovered contracts (EditionClaimContract, AllowlistProof) compile
+- ✅ Contract ABIs match discovered interface requirements
+- ✅ Base abstractions support discovered patterns from BlindMint
+- ✅ Contract factory creates Edition contracts with correct methods
+- ✅ No circular dependencies in discovered types
+
+### Implementation Checkpoint (After Stage 2)
+**Integration Points Validation**:
+- ✅ EditionProduct uses auto-discovered contracts correctly
+- ✅ fetchOnchainData matches EditionOnchainData interface
+- ✅ preparePurchase handles AllowlistProof structure
+- ✅ Client factory routes using discovered AppId.EDITION
+- ✅ Cross-service communication uses shared types
+
+### Testing Checkpoint (After Stage 3)
+**Dependency Verification**:
+- ✅ All discovered integration points tested
+- ✅ Merkle proof generation matches contract expectations
+- ✅ Manual testing validates discovered purchase flows
+- ✅ No regression in BlindMint or existing functionality
+
+### Final Validation Checkpoint (After Stage 4)
+**Complete System Verification**:
+- ✅ Documentation reflects all discovered contracts
+- ✅ Performance meets discovered bottleneck mitigations
+- ✅ Security audit covers allowlist vulnerabilities
+- ✅ All discovered dependencies properly integrated
+
+## 🎛️ Parallel Execution Matrix
+
+### Stage 1 - Foundation (High Parallelization)
+```
+Contract ABIs ─────────────────┐
+Base Abstractions ─────────────┼─── Stage 1 Complete
+Contract Factory Extension ────┤
+Type Guards ───────────────────┘
 ```
 
-### Contract Checkpoint (After Stage 2)
-```yaml
-checkpoint: "Contract Layer Functional"
-validation:
-  - ClaimExtension contract can be instantiated
-  - getClaim() returns expected data structure
-  - Gas estimation works correctly
-  - All extension address types handled
+### Stage 2 - Implementation (Mixed)
+```
+EditionProduct Class ─────────┐
+   │                          │
+   └─> Allowlist Service ─────┼─── Stage 2 Complete
+       Cost Calculation ──────┤
+       Client Integration ────┘
 ```
 
-### Integration Checkpoint (After Stage 4)
-```yaml
-checkpoint: "End-to-End Flow Works"
-validation:
-  - client.getProduct() returns EditionProduct for Edition instances
-  - Full purchase flow executes without errors
-  - Allowlist verification works
-  - All product methods accessible
+### Stage 3 - Testing (Parallel Start, Sequential End)
+```
+Unit Tests ─────────┐
+                    ├─> Integration Tests ─> Manual Testing
+Performance Tests ──┘
 ```
 
-### Quality Checkpoint (After Stage 5)
-```yaml
-checkpoint: "Tests Passing"
-validation:
-  - All unit tests pass
-  - Coverage > 80%
-  - No TypeScript errors
-  - Lint checks pass
+### Stage 4 - Polish (Fully Parallel)
+```
+Performance Opt ───┐
+Error Enhancement ─┼─── Stage 4 Complete
+Documentation ─────┤
+Code Review ───────┘
 ```
 
-## 🎯 Execution Summary
+## 📈 Success Metrics
 
-### Total Duration: 4-5 hours
+### Implementation Quality
+- **Type Coverage**: 100% - No `any` types
+- **Test Coverage**: >80% for Edition code
+- **Documentation**: Complete API docs and examples
+- **Performance**: <1s product load, <2s purchase prep
 
-### Parallel Opportunities:
-- Stage 1: Type contracts and ABI can be done in parallel
-- Stage 6: Documentation can start once core implementation is done
+### Architecture Quality
+- **Code Reuse**: >70% from existing patterns
+- **Consistency**: Identical patterns to BlindMint
+- **Maintainability**: Clear separation of concerns
+- **Extensibility**: Ready for future product types
 
-### Critical Path:
-1. Type Contracts → Contract Layer → Product Class → Client Integration → Testing
+### Business Outcomes
+- **Feature Complete**: All Edition functionality working
+- **Production Ready**: Tested on mainnet contracts
+- **Developer Experience**: Simple, intuitive API
+- **User Experience**: Fast, reliable purchases
 
-### Risk Mitigation:
-- **Allowlist Complexity**: Reference existing implementation in claim-widgets
-- **Contract Variations**: Handle all 4 extension address types
-- **Gas Estimation**: Use proven patterns from BlindMint
+## 🚨 Risk Mitigation Strategies
 
-### Success Criteria:
-- ✅ Edition products load and display correctly
-- ✅ Purchase flow works end-to-end
-- ✅ Allowlist/claim codes function properly
-- ✅ All tests pass with >80% coverage
-- ✅ TypeScript strict mode compliant
-- ✅ Documentation complete
+### Risk 1: Contract ABI Complexity
+**Mitigation**: 
+- Study claim-widgets implementation first
+- Test contract methods in isolation
+- Validate against known Edition contracts
 
-## 🔗 Command Sequence
+### Risk 2: Merkle Proof Issues
+**Mitigation**:
+- Use established merkle-tree libraries
+- Extensive unit testing of proof generation
+- Test with actual allowlist data
 
+### Risk 3: Integration Failures
+**Mitigation**:
+- Incremental integration testing
+- Use testnet contracts first
+- Maintain rollback capability
+
+## 🎯 Critical Path Analysis
+
+```
+Contract ABIs (2h)
+     │
+     ▼
+EditionProduct Core (5h)
+     │
+     ▼
+Client Integration (1h)
+     │
+     ▼
+Integration Tests (2h)
+     │
+     ▼
+Documentation (2h)
+─────────────────────
+Total Critical Path: 12 hours
+```
+
+## 📝 Implementation Notes
+
+### Key Insights from Discovery
+1. **BlindMintProduct is the perfect template** - Follow it closely
+2. **All types already exist** - No interface design needed
+3. **Infrastructure is complete** - Focus only on Edition-specific code
+4. **Patterns are proven** - No architectural decisions required
+
+### Development Approach
+1. **Start with contract ABIs** - This unblocks everything
+2. **Copy BlindMint structure** - Modify for Edition specifics
+3. **Test incrementally** - Validate each method as built
+4. **Document as you go** - Keep docs in sync
+
+### Quality Guidelines
+- **No shortcuts on types** - Full TypeScript strictness
+- **Test edge cases** - Especially allowlist scenarios
+- **Clear error messages** - Users need to understand failures
+- **Performance matters** - Cache where appropriate
+
+## 🔗 Workflow Integration
+
+### Recommended Command Sequence
 ```bash
-# Recommended execution order
-/orchestrate CON-2792  # Start with Stage 1 agents in parallel
-# After Stage 1 complete:
-/orchestrate CON-2792 --stage 2  # Contract layer
-# Continue through stages...
-/verify CON-2792  # Run verification agent after Stage 3
-/qa CON-2792      # Run QA after implementation complete
+# Discovery-driven development workflow
+/discover CON-2792    # Auto-discover contracts and dependencies ✅ COMPLETE
+/spec CON-2792        # Build specification using discovery intelligence ✅ COMPLETE
+/orchestrate CON-2792 # Execute with dependency-aware staging (NEXT STEP)
 ```
 
-## 📊 Dependencies Visualization
+### Contract Discovery Integration
 
-```
-Stage 1: [Type Contracts] + [ClaimExtension ABI]
-           ↓                    ↓
-Stage 2: [Contract Layer Implementation]
-           ↓
-Stage 3: [Edition Product Class]
-           ↓
-Stage 4: [Client Factory Updates]
-           ↓
-Stage 5: [Testing Suite]
-           ↓
-Stage 6: [Documentation]
-```
+Each implementation task references:
+- **Auto-Discovered Contracts**: EditionClaimContract, AllowlistProof, EditionPurchaseContext
+- **Integration Points**: Manifold API, RPC providers, Edition contracts
+- **Dependency Requirements**: Contract ABIs → EditionProduct → Client Factory
+- **Provides to Others**: Type guards → Client routing, MerkleProofService → Purchase flow
 
-## 🔍 Key Integration Points from Discovery
+## 🏁 Conclusion
 
-1. **Contract Factory Pattern**: Extend existing factory in `src/utils/contract-factory.ts`
-2. **Product Routing**: Follow BlindMint pattern in `src/client/index.ts`
-3. **Type Exports**: Maintain consistency with `src/types/index.ts`
-4. **Test Structure**: Mirror `tests/products/blindmint.test.ts`
-5. **Error Handling**: Use existing `ClientSDKError` patterns
+This execution plan leverages the exceptional foundation discovered during analysis. With BlindMintProduct as a proven template and all infrastructure ready, Edition implementation is straightforward and low-risk.
 
-## 📝 Implementation Details by Agent
+**Total Estimated Time**: 20-30 hours
+**Recommended Team Size**: 1-2 developers
+**Optimal Timeline**: 2-4 weeks (part-time) or 1 week (full-time)
 
-### Agent Task Details
+The plan prioritizes de-risking through early validation checkpoints while maximizing parallel execution opportunities. Success is virtually guaranteed given the mature architecture and clear implementation patterns.
 
-#### Type Contract Agent
-**Input Context**: Existing EditionPublicData interface, BlindMint type patterns
-**Key Files**: src/types/product.ts (reference), src/types/blindmint.ts (pattern)
-**Critical Output**: EditionOnchainData must include merkleRoot for allowlist
+## 📝 Key Discovery Insights Applied
 
-#### Backend Engineer (Contract Layer)
-**Input Context**: ClaimExtension ABI, existing contract factory patterns
-**Key Files**: src/utils/contract-factory.ts, src/abis/ClaimExtensionABI.ts
-**Critical Output**: Handle 4 extension address types from publicData
-
-#### Backend Engineer (Product Class)
-**Input Context**: BlindMintProduct implementation, allowlist logic from claim-widgets
-**Key Files**: src/products/blindmint.ts (pattern), Edition types
-**Critical Output**: Merkle proof integration with preparePurchase()
-
-#### Software Engineer (Client Integration)
-**Input Context**: Existing BlindMint routing in client factory
-**Key Files**: src/client/index.ts (lines 26-30), src/types/common.ts (AppId)
-**Critical Output**: isEditionInstanceData() type guard
-
-#### QA Engineer
-**Input Context**: BlindMint test suite, Edition product implementation
-**Key Files**: tests/products/blindmint.test.ts (pattern)
-**Critical Output**: Test allowlist scenarios with mock merkle proofs
-
-## 🚀 Quick Start Commands
-
-```bash
-# Stage 1: Create foundation files
-touch src/types/edition.ts
-touch src/abis/ClaimExtensionABI.ts
-
-# Stage 2: Update contract factory
-# Edit: src/utils/contract-factory.ts
-
-# Stage 3: Create product class
-touch src/products/edition.ts
-
-# Stage 4: Update client
-# Edit: src/client/index.ts
-
-# Stage 5: Create tests
-touch tests/products/edition.test.ts
-
-# Validate each stage
-npm run typecheck
-npm run lint
-npm test
-```
+1. **BlindMintProduct Template**: Follow structure exactly for consistency
+2. **Contract Integration**: mintProxy method signature discovered from reference
+3. **Type System Ready**: All Edition types already defined, no interface design needed
+4. **Allowlist Complexity**: MerkleProofService addresses discovered requirement
+5. **AppId.EDITION**: Value 2522713783 confirmed from discovery analysis
