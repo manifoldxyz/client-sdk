@@ -4,7 +4,7 @@
 This example uses [RainbowKit](https://rainbowkit.com/) and [Viem adapter](../../sdk/account-adapters/viem.md). The SDK also works with Ethers v5 via the [EthersV5 adapter](../../sdk/account-adapters/ethersv5.md).
 {% endhint %}
 
-The repository includes a complete example at [examples/rainbowkit-mint](https://github.com/manifoldxyz/client-sdk/tree/main/examples/rainbowkit-mint), demonstrating how to implement minting with a [Blind Mint Product](../../reference/blindmintproduct.md)
+The repository includes a complete example at [examples/rainbowkit-mint](https://github.com/manifoldxyz/client-sdk/tree/main/examples/rainbowkit-mint), demonstrating how to implement minting with Manifold products including [Edition Products](../../reference/editionproduct.md) and [Blind Mint Products](../../reference/blindmintproduct.md)
 
 **Install dependencies**
 
@@ -16,7 +16,7 @@ npm install
 **Configure environment** – Copy `.env.example` to `.env` and set the following:
 
 ```bash
-NEXT_PUBLIC_INSTANCE_ID= # Your Blind Mint instance ID from Manifold Studio 
+NEXT_PUBLIC_INSTANCE_ID= # Your product instance ID from Manifold Studio (Edition or Blind Mint) 
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID= # Obtain one at https://dashboard.reown.com/sign-in
 ```
 

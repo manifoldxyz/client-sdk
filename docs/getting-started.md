@@ -27,7 +27,7 @@ npm install @manifoldxyz/client-sdk
 {% tabs %}
 {% tab title="index.ts" %}
 ```typescript
-import { createClient, isBlindMintProduct, createAccountViem } from '@manifoldxyz/client-sdk';
+import { createClient, isBlindMintProduct, isEditionProduct, createAccountViem } from '@manifoldxyz/client-sdk';
 import { walletClient } from './client.ts';
 
 const client = createClient({
@@ -36,26 +36,44 @@ const client = createClient({
     8453: 'https://base-mainnet.infura.io/v3/YOUR_KEY',
   },
 });
+
 // Fetch product
 const product = await client.getProduct('4150231280');
-// Verify product type
-if (!isBlindMintProduct(product)) {
-  throw new Error('Is not a blind mint instance')
-}
-const prepared = await product.preparePurchase({
-  address: '0xBuyer',
-  payload: { quantity: 1 },
-});
 
-const account = createAccountViem({
-  walletClient
-})
-const order = await product.purchase({
-  account,
-  preparedPurchase: prepared,
-});
-const txHash = order.receipts[0]?.txHash;
-console.log(`Transaction submitted ${txHash}`)
+// Handle different product types
+if (isEditionProduct(product)) {
+  // Edition product - NFT drops with fixed/open editions
+  const prepared = await product.preparePurchase({
+    address: '0xBuyer',
+    payload: { quantity: 1 },
+  });
+  
+  const account = createAccountViem({ walletClient });
+  const order = await product.purchase({
+    account,
+    preparedPurchase: prepared,
+  });
+  const txHash = order.receipts[0]?.txHash;
+  console.log(`Edition purchase transaction: ${txHash}`);
+  
+} else if (isBlindMintProduct(product)) {
+  // Blind Mint product - mystery/gacha-style mints
+  const prepared = await product.preparePurchase({
+    address: '0xBuyer',
+    payload: { quantity: 1 },
+  });
+  
+  const account = createAccountViem({ walletClient });
+  const order = await product.purchase({
+    account,
+    preparedPurchase: prepared,
+  });
+  const txHash = order.receipts[0]?.txHash;
+  console.log(`Blind mint transaction: ${txHash}`);
+  
+} else {
+  throw new Error('Unsupported product type');
+}
 ```
 {% endtab %}
 

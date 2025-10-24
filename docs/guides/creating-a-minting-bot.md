@@ -3,7 +3,7 @@
 The SDK can be used on the server side, enabling use cases such as running a [minting bot ](https://help.manifold.xyz/en/articles/11509060-bankrbot)
 
 ```ts
-import { createClient, createAccountEthers5, isBlindMintProduct } from '@manifoldxyz/client-sdk';
+import { createClient, createAccountEthers5, isBlindMintProduct, isEditionProduct } from '@manifoldxyz/client-sdk';
 import { ethers } from "ethers";
 
 const client = createClient({
@@ -11,13 +11,20 @@ const client = createClient({
 });
 
 const product = await client.getProduct('INSTANCE_ID');
-// Check for product type
-if (!isBlindMintProduct(product)) {
-  throw new Error('Is not a blind mint instance')
-}
-// Check product status
+
+// Check product status first
+const productStatus = await product.getStatus();
 if (productStatus !== 'active') {
   throw new Error(`Product is ${productStatus}`);
+}
+
+// Handle different product types
+if (isEditionProduct(product)) {
+  console.log('Edition product detected - NFT drop with fixed/open editions');
+} else if (isBlindMintProduct(product)) {
+  console.log('Blind Mint product detected - mystery/gacha-style mint');
+} else {
+  throw new Error('Unsupported product type');
 }
 
 const wallet = new ethers.Wallet(<wallet-private-key>)
