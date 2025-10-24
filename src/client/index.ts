@@ -1,5 +1,5 @@
 import type { ClientConfig, ManifoldClient, WorkspaceProductsOptions } from '../types/client';
-import type { Product, InstanceData, BlindMintPublicData } from '../types/';
+import type { Product, InstanceData, BlindMintPublicData, EditionPublicData } from '../types/';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import { AppId } from '../types/common';
 import { BlindMintProduct } from '../products/blindmint';
@@ -27,6 +27,27 @@ function isBlindMintInstanceData(
   instanceData: InstanceData<unknown>,
 ): instanceData is InstanceData<BlindMintPublicData> {
   return (instanceData.appId as AppId) === AppId.BLIND_MINT_1155;
+}
+
+/**
+ * Type guard to check if instanceData is for Edition product type.
+ *
+ * @internal
+ * @param instanceData - The instance data to check
+ * @returns True if the instance data is for an Edition product
+ *
+ * @example
+ * ```typescript
+ * if (isEditionInstanceData(instanceData)) {
+ *   // TypeScript now knows this is InstanceData<EditionPublicData>
+ *   const editionData = instanceData.publicData;
+ * }
+ * ```
+ */
+function isEditionInstanceData(
+  instanceData: InstanceData<unknown>,
+): instanceData is InstanceData<EditionPublicData> {
+  return (instanceData.appId as AppId) === AppId.EDITION;
 }
 
 /**
@@ -150,6 +171,15 @@ export function createClient(config?: ClientConfig): ManifoldClient {
           return new BlindMintProduct(instanceData, previewData, {
             httpRPCs,
           });
+        }
+
+        // Handle Edition products with specific message until implemented
+        if (isEditionInstanceData(instanceData)) {
+          // TypeScript now knows instanceData is InstanceData<EditionPublicData>
+          throw new ClientSDKError(
+            ErrorCode.UNSUPPORTED_PRODUCT_TYPE,
+            'Edition products are not yet implemented. EditionProduct class is in development.',
+          );
         }
 
         // For other product types, throw an error until implemented

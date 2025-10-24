@@ -139,6 +139,35 @@ describe('createClient', () => {
     expect(product).toHaveProperty('type', 'blind-mint');
   });
 
+  it('handles Edition products with specific error message', async () => {
+    const instanceData = {
+      id: 2522713783,
+      appId: 2522713783, // AppId.EDITION
+      publicData: { 
+        title: 'Test Edition',
+        network: 1,
+        contract: { id: 1, name: 'Test', symbol: 'TEST', contractAddress: '0x123', networkId: 1, spec: 'erc721' },
+        extensionAddress: '0x456',
+        asset: { name: 'Test Asset', animation_preview: '' }
+      },
+    };
+    const previewData = { title: 'Edition Preview' };
+
+    getCompleteInstanceDataMock.mockResolvedValueOnce({
+      instanceData,
+      previewData,
+    });
+
+    const client = createClient();
+    await expect(client.getProduct('https://manifold.xyz/@creator/id/2522713783')).rejects.toMatchObject({
+      code: ErrorCode.UNSUPPORTED_PRODUCT_TYPE,
+      message: 'Edition products are not yet implemented. EditionProduct class is in development.',
+    });
+    expect(getCompleteInstanceDataMock).toHaveBeenCalledWith('2522713783', {
+      maxMediaWidth: 1024,
+    });
+  });
+
   it('validates workspace limit bounds', async () => {
     const client = createClient();
 
