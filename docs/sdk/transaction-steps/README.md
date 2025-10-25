@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Some product purchases may require more than one transaction to complete. For example, Edition products configurd with ERC20 payments require:
+Some product purchases may require more than one transaction to complete. For example, Edition products configured with ERC20 payments require:
 
 1. **ERC20 spend approval**: Grant contract permission to spend user tokens
 2. **Mint**: Execute the actual purchase transaction
