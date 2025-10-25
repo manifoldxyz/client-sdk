@@ -1,11 +1,21 @@
 # Transaction Steps
 
-When purchasing a [product](../product/), an [account](../../reference/account.md) may need to execute multiple transactions (e.g., approving tokens, then minting).
+## Introduction
 
-For [JSON-RPC accounts](https://viem.sh/docs/accounts/jsonRpc) (e.g., browser extension wallets, WalletConnect, etc.), it is recommended that transactions be executed explicitly (e.g., via button clicks).\
-The [preparePurchase](../product/blind-mint/preparepurchase.md) function returns a list of [TransactionStep](./) objects for this purpose. Each step represents an on-chain transaction that can be executed by calling the [execute](execute.md) function.\
-Each [execute](execute.md) call performs the necessary on-chain checks to determine whether the transaction is still required; if it is not, the step is skipped.
+Some product purchases may require more than one transaction to complete. For example, Edition products configurd with ERC20 payments require:
 
-{% hint style="info" %}
-If your application is server-side only, you can call [preparePurchase](../product/blind-mint/preparepurchase.md)  and then [purchase](../product/common/purchase.md) and not worry about the transaction steps. The SDK will execute the necessary transactions sequentially.
-{% endhint %}
+1. **ERC20 spend approval**: Grant contract permission to spend user tokens
+2. **Mint**: Execute the actual purchase transaction
+
+Other scenarios include cross-chain purchases (bridge, then mint) or batch operations.
+
+## Explicit vs. Automatic Execution
+
+For **user-facing apps**, the SDK separates transactions into explicit steps. This gives you:
+- Progress tracking for multi-step flows
+- Fine-grained error handling per transaction
+- Safer UX - users approve each step individually
+
+The [preparePurchase](../product/blind-mint/preparepurchase.md) function returns [TransactionStep](./) objects. Call [execute](execute.md) on each step to submit the transaction. The SDK automatically skips unnecessary steps (e.g., if approval is already granted).
+
+For **server-side apps** or **agentic flows**, call [purchase](../product/common/purchase.md) directly and the SDK handles all transactions sequentially without explicit step management.
