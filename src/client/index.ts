@@ -1,10 +1,11 @@
 import type { ClientConfig, ManifoldClient, WorkspaceProductsOptions } from '../types/client';
-import type { Product, InstanceData, BlindMintPublicData } from '../types/';
+import type { Product, InstanceData, BlindMintPublicData, EditionPublicData } from '../types/';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import { AppId } from '../types/common';
 import { BlindMintProduct } from '../products/blindmint';
+import { EditionProduct } from '../products/edition';
 import { validateInstanceId, parseManifoldUrl } from '../utils/validation';
-import { createManifoldApiClient } from '../api/manifold-api';
+import manifoldApiClient from '../api/manifold-api';
 import type * as ethers from 'ethers';
 import { createProvider } from '../utils';
 
@@ -27,6 +28,27 @@ function isBlindMintInstanceData(
   instanceData: InstanceData<unknown>,
 ): instanceData is InstanceData<BlindMintPublicData> {
   return (instanceData.appId as AppId) === AppId.BLIND_MINT_1155;
+}
+
+/**
+ * Type guard to check if instanceData is for Edition product type.
+ *
+ * @internal
+ * @param instanceData - The instance data to check
+ * @returns True if the instance data is for an Edition product
+ *
+ * @example
+ * ```typescript
+ * if (isEditionInstanceData(instanceData)) {
+ *   // TypeScript now knows this is InstanceData<EditionPublicData>
+ *   const editionData = instanceData.publicData;
+ * }
+ * ```
+ */
+function isEditionInstanceData(
+  instanceData: InstanceData<unknown>,
+): instanceData is InstanceData<EditionPublicData> {
+  return (instanceData.appId as AppId) === AppId.EDITION;
 }
 
 /**
@@ -80,9 +102,6 @@ export function createClient(config?: ClientConfig): ManifoldClient {
       });
     }
   }
-
-  // Initialize Manifold API client with Studio Apps Client
-  const manifoldApi = createManifoldApiClient();
 
   return {
     providers,
@@ -138,7 +157,7 @@ export function createClient(config?: ClientConfig): ManifoldClient {
 
       try {
         // Fetch both instance and preview data using Studio Apps Client
-        const { instanceData, previewData } = await manifoldApi.getCompleteInstanceData(
+        const { instanceData, previewData } = await manifoldApiClient.getCompleteInstanceData(
           instanceId,
           { maxMediaWidth: 1024 },
         );
@@ -148,6 +167,15 @@ export function createClient(config?: ClientConfig): ManifoldClient {
           // TypeScript now knows instanceData is InstanceData<BlindMintPublicData>
           // Create BlindMintProduct with both instance and preview data
           return new BlindMintProduct(instanceData, previewData, {
+            httpRPCs,
+          });
+        }
+
+        // Create Edition product if it matches the app ID
+        if (isEditionInstanceData(instanceData)) {
+          // TypeScript now knows instanceData is InstanceData<EditionPublicData>
+          // Create EditionProduct with both instance and preview data
+          return new EditionProduct(instanceData, previewData, {
             httpRPCs,
           });
         }

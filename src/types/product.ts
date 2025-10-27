@@ -1,15 +1,14 @@
-import type { InstancePreview, PublicInstance } from '@manifoldxyz/studio-apps-client';
+import type { InstancePreview, PublicInstance } from '@manifoldxyz/studio-apps-client-public';
 import type { Address, AppId, AppType, ProductStatus } from './common';
-import type { Money } from '../libs/money';
 import type {
   PreparedPurchase,
   PurchaseParams,
   PreparePurchaseParams,
   Order,
   EditionPayload,
-  BurnRedeemPayload,
 } from './purchase';
 import type { BlindMintProduct } from './blindmint';
+import type { EditionOnchainData } from './edition';
 
 /**
  * Base interface for all Manifold product types.
@@ -106,37 +105,21 @@ export interface EditionPublicData {
    */
   contract: Contract;
 
-  /**
-   * Extension contract address for minting logic.
-   */
-  extensionAddress: string;
-}
-
-/**
- * Public configuration data for Burn/Redeem products.
- *
- * @public
- */
-export interface BurnRedeemPublicData {
-  /**
-   * Asset that will be received after burning.
-   */
-  redeemAsset: Asset;
+  extensionAddress721: {
+    value: string;
+    version: number;
+  };
+  extensionAddress1155: {
+    value: string;
+    version: number;
+  };
 
   /**
-   * Network ID where the product is deployed.
+   * Allowlist configuration for the Edition.
    */
-  network: number;
-
-  /**
-   * Smart contract details for the redeemed NFT.
-   */
-  redeemContract: Contract;
-
-  /**
-   * Extension contract address for burn/redeem logic.
-   */
-  extensionAddress: string;
+  instanceAllowlist?: {
+    merkleTreeId?: number;
+  };
 }
 
 // BlindMintPublicData moved to blindmint.ts
@@ -343,86 +326,8 @@ export interface EditionProduct extends BaseProduct<EditionPublicData> {
   fetchOnchainData(): Promise<EditionOnchainData>;
 }
 
-export interface BurnRedeemProduct extends BaseProduct<BurnRedeemPublicData> {
-  type: AppType.BURN_REDEEM;
-  data: PublicInstance<BurnRedeemPublicData> & { publicData: BurnRedeemPublicData };
-
-  onchainData?: BurnRedeemOnchainData;
-
-  // Methods
-  getAllocations(params: AllocationParams): Promise<AllocationResponse>;
-  preparePurchase(params: PreparePurchaseParams<BurnRedeemPayload>): Promise<PreparedPurchase>;
-  purchase(params: PurchaseParams): Promise<Order>;
-  getStatus(): Promise<ProductStatus>;
-  getPreviewMedia(): Promise<Media | undefined>;
-  getMetadata(): Promise<ProductMetadata>;
-  getInventory(): Promise<ProductInventory>;
-  getRules(): Promise<ProductRule>;
-  getProvenance(): Promise<ProductProvenance>;
-  fetchOnchainData(): Promise<BurnRedeemOnchainData>;
-}
-
 // Audience type enum
 export type AudienceType = 'None' | 'Allowlist' | 'RedemptionCode';
-
-/**
- * On-chain data for Edition products.
- *
- * @public
- */
-export interface EditionOnchainData {
-  /**
-   * Total supply available (0 = unlimited).
-   */
-  totalSupply: number;
-
-  /**
-   * Total number of tokens minted.
-   */
-  totalMinted: number;
-
-  /**
-   * Maximum tokens per wallet.
-   */
-  walletMax: number;
-
-  /**
-   * Sale start date.
-   */
-  startDate: Date;
-
-  /**
-   * Sale end date.
-   */
-  endDate: Date;
-
-  /**
-   * Audience restriction type.
-   */
-  audienceType: AudienceType;
-
-  /**
-   * Cost per token.
-   */
-  cost: Money;
-
-  /**
-   * Address receiving payments.
-   */
-  paymentReceiver: string;
-}
-
-export interface BurnRedeemOnchainData {
-  totalSupply: number;
-  totalMinted: number;
-  walletMax: number;
-  startDate: Date;
-  endDate: Date;
-  audienceType: AudienceType;
-  cost: Money;
-  paymentReceiver: string;
-  burnSet: BurnSetData;
-}
 
 // Additional types from documentation
 export interface ProductMetadata {
@@ -468,31 +373,23 @@ export interface AllocationParams {
 export interface AllocationResponse {
   isEligible: boolean;
   reason?: string;
-  quantity: number;
-}
-
-// Burn/Redeem specific types
-export interface BurnSetData {
-  items: TokenItemRequirement[];
-  requiredCount: number;
-}
-
-export interface TokenItemRequirement {
-  quantity: number;
-  burnSpec: 'manifold' | 'openZeppelin' | 'none';
-  tokenSpec: 'erc721' | 'erc1155';
-  tokenIds?: string[];
-  maxTokenId?: string;
-  minTokenId?: string;
-  contractAddress: string;
-  merkleRoot?: string;
-  validationType: 'contract' | 'range' | 'merkleTree' | 'any';
+  quantity: number | null; // null indicates no limit
 }
 
 // BlindMint specific types moved to blindmint.ts
 
 // Union type for Product
-export type Product = EditionProduct | BurnRedeemProduct | BlindMintProduct;
+export type Product = EditionProduct | BlindMintProduct;
 
 // PreviewData type (from InstancePreview)
 export type PreviewData = InstancePreview;
+
+/**
+ * Storage protocol for NFT metadata
+ */
+export enum StorageProtocol {
+  INVALID = 0,
+  NONE = 1,
+  ARWEAVE = 2,
+  IPFS = 3,
+}

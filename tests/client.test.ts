@@ -12,9 +12,9 @@ vi.mock('../src/utils', () => {
 vi.mock('../src/api/manifold-api', () => {
   const getCompleteInstanceDataMock = vi.fn();
   return {
-    createManifoldApiClient: vi.fn(() => ({
+    default: {
       getCompleteInstanceData: getCompleteInstanceDataMock,
-    })),
+    },
   };
 });
 
@@ -44,9 +44,9 @@ import { createClient } from '../src/client';
 
 // Get references to mocked functions
 const { createProvider: createProviderMock } = await import('../src/utils');
-const { createManifoldApiClient } = await import('../src/api/manifold-api');
+const manifoldApiClient = (await import('../src/api/manifold-api')).default as any;
 const { BlindMintProduct: BlindMintProductMock } = await import('../src/products/blindmint');
-const getCompleteInstanceDataMock = (createManifoldApiClient as any)().getCompleteInstanceData;
+const getCompleteInstanceDataMock = manifoldApiClient.getCompleteInstanceData;
 
 describe('createClient', () => {
   beforeEach(() => {
@@ -137,6 +137,36 @@ describe('createClient', () => {
       maxMediaWidth: 1024,
     });
     expect(product).toHaveProperty('type', 'blind-mint');
+  });
+
+  it('creates edition products when instance data matches', async () => {
+    const instanceData = {
+      id: 2522713783,
+      appId: 2522713783, // AppId.EDITION
+      publicData: { 
+        title: 'Test Edition',
+        network: 1,
+        contract: { id: 1, name: 'Test', symbol: 'TEST', contractAddress: '0x123', networkId: 1, spec: 'erc721' },
+        extensionAddress: '0x456',
+        asset: { name: 'Test Asset', animation_preview: '' }
+      },
+      creator: { id: 1, name: 'Test Creator' }
+    };
+    const previewData = { title: 'Edition Preview' };
+
+    getCompleteInstanceDataMock.mockResolvedValueOnce({
+      instanceData,
+      previewData,
+    });
+
+    const client = createClient();
+    const product = await client.getProduct('https://manifold.xyz/@creator/id/2522713783');
+
+    expect(product).toHaveProperty('type', 'edition');
+    expect(product).toHaveProperty('id', 2522713783);
+    expect(getCompleteInstanceDataMock).toHaveBeenCalledWith('2522713783', {
+      maxMediaWidth: 1024,
+    });
   });
 
   it('validates workspace limit bounds', async () => {

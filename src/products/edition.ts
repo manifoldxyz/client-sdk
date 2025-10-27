@@ -11,26 +11,29 @@ import type {
   Media,
   InstanceData,
   AudienceRestriction,
-  BlindMintPayload,
+  EditionPayload,
   PreparedPurchase,
   TransactionStep,
   TransactionStepExecuteOptions,
   GasBuffer,
   IAccount,
   UniversalTransactionRequest,
-  BlindMintPublicData,
-  BlindMintOnchainData,
-  BlindMintStatus,
-  BlindMintInventory,
-  TokenVariation,
-  GachaTier,
-  ClaimableToken,
-  BlindMintTierProbability,
-  BlindMintProduct as IBlindMintProduct,
+  EditionPublicData,
+  EditionOnchainData,
+  ProductStatus,
+  ProductInventory,
+  AudienceType,
+  EditionProduct as IEditionProduct,
+  Contract,
 } from '../types';
-import type { Address } from '../types/common';
 import { AppType, AppId } from '../types/common';
-import type { BlindMintClaimContract } from '../utils/contract-factory';
+import type {
+  ClaimableMerkleInfo,
+  EditionClaimData,
+  EditionClaimContract,
+  ERC721ClaimData,
+  ERC1155ClaimData,
+} from '../types/edition';
 import * as ethers from 'ethers';
 
 import { createProvider } from '../utils/provider-factory';
@@ -38,42 +41,44 @@ import { ContractFactory as ContractFactoryClass } from '../utils/contract-facto
 import { validateAddress } from '../utils/validation';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import type { InstancePreview } from '@manifoldxyz/studio-apps-client-public';
+import manifoldApiClient from '../api/manifold-api';
 import { estimateGas } from '../utils/gas-estimation';
 import { Money } from '../libs/money';
 import type { Cost } from '../types/money';
 import type { TransactionReceipt } from '../types/purchase';
 
+// EditionSpec import removed - not needed after refactoring
+
 /**
- * BlindMint product implementation for mystery/gacha-style NFT mints.
+ * Edition product implementation for standard NFT mints.
  *
- * BlindMint products allow creators to offer randomized NFTs with different
- * rarity tiers and probabilities. Buyers receive a random NFT from the pool
- * when they mint, with the actual reveal happening either immediately or
- * at a specified time.
+ * Edition products allow creators to sell fixed or open edition NFTs
+ * with optional allowlists, redemption codes, and pricing tiers.
+ * Supports both ERC721 and ERC1155 token standards.
  *
  * @remarks
- * - Follows technical spec CON-2729
- * - Uses gachapon-widgets pattern for getClaim parsing
- * - Supports tier-based probability systems
- * - Handles both immediate and delayed reveals
+ * - Follows technical spec CON-2792
+ * - Uses Edition claim contracts for minting
+ * - Supports allowlist validation with merkle proofs
+ * - Handles both public and allowlist sales
  *
  * @public
  */
-export class BlindMintProduct implements IBlindMintProduct {
+export class EditionProduct implements IEditionProduct {
   /**
    * Unique instance ID for this product.
    */
   readonly id: number;
 
   /**
-   * Product type identifier (always BLIND_MINT).
+   * Product type identifier (always EDITION).
    */
-  readonly type = AppType.BLIND_MINT;
+  readonly type = AppType.EDITION;
 
   /**
    * Off-chain product data including metadata and configuration.
    */
-  readonly data: InstanceData<BlindMintPublicData>;
+  readonly data: InstanceData<EditionPublicData>;
 
   /**
    * Preview data for display purposes.
@@ -83,28 +88,25 @@ export class BlindMintProduct implements IBlindMintProduct {
   /**
    * On-chain data (pricing, supply, etc.). Populated after calling fetchOnchainData().
    */
-  onchainData?: BlindMintOnchainData;
+  onchainData?: EditionOnchainData;
 
   // Internal state
-  private _creatorContract: Address;
-  private _extensionAddress: Address;
-  private _platformFee?: Money;
   private _httpRPCs?: Record<number, string>;
 
   /**
-   * Creates a new BlindMintProduct instance.
+   * Creates a new EditionProduct instance.
    *
    * @param instanceData - Product instance data from the API
    * @param previewData - Preview data for the product
    * @param options - Configuration options
    * @param options.httpRPCs - Custom RPC endpoints by network ID
    *
-   * @throws {ClientSDKError} If the app ID doesn't match BLIND_MINT_1155
+   * @throws {ClientSDKError} If the app ID doesn't match EDITION
    *
    * @internal
    */
   constructor(
-    instanceData: InstanceData<BlindMintPublicData>,
+    instanceData: InstanceData<EditionPublicData>,
     previewData: InstancePreview,
     options: {
       httpRPCs?: Record<number, string>;
@@ -114,24 +116,19 @@ export class BlindMintProduct implements IBlindMintProduct {
     this._httpRPCs = httpRPCs;
 
     // Validate app ID
-    if (instanceData.appId !== AppId.BLIND_MINT_1155) {
+    if (instanceData.appId !== AppId.EDITION) {
       throw new ClientSDKError(
         ErrorCode.INVALID_INPUT,
-        `Invalid app ID for BlindMint. Expected ${AppId.BLIND_MINT_1155}, received ${instanceData.appId}`,
+        `Invalid app ID for Edition. Expected ${AppId.EDITION}, received ${instanceData.appId}`,
         { instanceId: String(instanceData.id) },
       );
     }
-
-    const publicData = instanceData.publicData;
 
     // Store instance data with properly typed publicData
     this.data = instanceData;
     this.previewData = previewData;
 
     this.id = instanceData.id;
-
-    this._creatorContract = publicData.contract.contractAddress;
-    this._extensionAddress = publicData.extensionAddress1155.value;
   }
 
   // =============================================================================
@@ -139,14 +136,14 @@ export class BlindMintProduct implements IBlindMintProduct {
   // =============================================================================
 
   /**
-   * Fetches and caches on-chain data for the BlindMint product.
+   * Fetches and caches on-chain data for the Edition product.
    *
    * Retrieves information including:
    * - Total supply and minted count
-   * - Pricing information
    * - Wallet limits
+   * - Pricing information
    * - Start and end dates
-   * - Token variations and probabilities
+   * - Allowlist configuration
    *
    * @param force - Force refresh even if data is already cached (default: false)
    * @returns Promise resolving to on-chain data
@@ -162,35 +159,44 @@ export class BlindMintProduct implements IBlindMintProduct {
    *
    * @public
    */
-  async fetchOnchainData(force = false): Promise<BlindMintOnchainData> {
+  async fetchOnchainData(force = false): Promise<EditionOnchainData> {
     if (this.onchainData && !force) {
       return this.onchainData;
     }
 
-    const contract = this._getClaimContract();
-
     try {
-      // Use getClaim method like gachapon-widgets
-      // Using id as claimIndex
+      const contract = this._getClaimContract();
+
+      // Use getClaim method to fetch claim data
       const claimData = await contract.getClaim(this._creatorContract, this.id);
 
-      // Process into BlindMintOnchainData format
-      const onchainData = await this._processClaimData(claimData);
-
-      // Fetch platform fee from contract and create Money object
-      const mintFee = await contract.MINT_FEE();
+      // Fetch platform fees from contract first
       const networkId = this.data.publicData.network;
       const provider = createProvider({
         networkId,
         customRpcUrls: this._httpRPCs,
       });
 
-      this._platformFee = await Money.create({
+      // Fetch standard mint fee
+      const mintFee = await contract.MINT_FEE();
+      const platformFee = await Money.create({
         value: mintFee,
         networkId,
         provider,
         fetchUSD: true,
       });
+
+      // Fetch merkle mint fee (for allowlist mints)
+      const merkleMintFee = await contract.MINT_FEE_MERKLE();
+      const merklePlatformFee = await Money.create({
+        value: merkleMintFee,
+        networkId,
+        provider,
+        fetchUSD: true,
+      });
+
+      // Process into EditionOnchainData format with platform fees
+      const onchainData = await this._processClaimData(claimData, platformFee, merklePlatformFee);
 
       // Cache the result
       this.onchainData = onchainData;
@@ -203,12 +209,12 @@ export class BlindMintProduct implements IBlindMintProduct {
   }
 
   /**
-   * Prepares a purchase transaction for the BlindMint product.
+   * Prepares a purchase transaction for the Edition product.
    *
    * This method:
-   * - Validates eligibility (wallet limits, supply, dates)
+   * - Validates eligibility (wallet limits, supply, dates, allowlist)
    * - Calculates total cost including gas
-   * - Generates transaction data
+   * - Generates transaction data with merkle proofs if needed
    * - Returns prepared transaction steps
    *
    * @param params - Purchase preparation parameters
@@ -216,9 +222,10 @@ export class BlindMintProduct implements IBlindMintProduct {
    * @param params.recipientAddress - Optional different recipient address
    * @param params.payload - Purchase payload
    * @param params.payload.quantity - Number of tokens to mint (default: 1)
+   * @param params.payload.redemptionCode - Optional redemption code
    * @param params.networkId - Optional network ID for cross-chain purchases
    * @param params.gasBuffer - Optional gas buffer configuration
-   * @params params.account - Optional, if provided will check if account has sufficient balance to purchase
+   * @param params.account - Optional, if provided will check if account has sufficient balance to purchase
    *
    * @returns PreparedPurchase object with cost breakdown and transaction steps
    *
@@ -245,9 +252,7 @@ export class BlindMintProduct implements IBlindMintProduct {
    *
    * @public
    */
-  async preparePurchase(
-    params: PreparePurchaseParams<BlindMintPayload>,
-  ): Promise<PreparedPurchase> {
+  async preparePurchase(params: PreparePurchaseParams<EditionPayload>): Promise<PreparedPurchase> {
     const { address, payload, account } = params;
     const quantity = payload?.quantity || 1;
     const networkId = this.data.publicData.network;
@@ -297,9 +302,12 @@ export class BlindMintProduct implements IBlindMintProduct {
 
     // Calculate costs
     const productCost = onchainData.cost.multiplyInt(quantity);
-    const platformFee = this._platformFee
-      ? this._platformFee.multiplyInt(quantity)
-      : await Money.zero({ networkId, provider });
+
+    // Use merkle platform fee for allowlist mints, standard fee otherwise
+    const isAllowlistMint = onchainData.audienceType === 'Allowlist';
+    const feePerMint = isAllowlistMint ? onchainData.merklePlatformFee : onchainData.platformFee;
+
+    const platformFee = feePerMint.multiplyInt(quantity);
 
     // Aggregate costs by currency type
     const costsByToken = new Map<string, Money>();
@@ -387,16 +395,33 @@ export class BlindMintProduct implements IBlindMintProduct {
           steps.push(approvalStep);
         }
       } else {
+        let nativeBalance;
+        /**
+         * If account is provided, use it to check native balance. (Optimal for cases where account a browser wallet)
+         * Otherwise, try fetching from the provider directly. (Either from provided JSON-RPC or Manifold Bridge)
+         */
         // Check native balance using provider
         if (account) {
-          const nativeBalance = await account.getBalance(networkId);
-
-          if (nativeBalance && nativeBalance.isLessThan(totalCost)) {
-            throw new ClientSDKError(
-              ErrorCode.INSUFFICIENT_FUNDS,
-              `Insufficient ${totalCost.symbol} balance. Need ${totalCost.formatted} but have ${nativeBalance.formatted}`,
-            );
+          nativeBalance = await account.getBalance(networkId);
+        } else {
+          // Try getting from available provider
+          try {
+            const rawBalance = await provider.getBalance(walletAddress);
+            nativeBalance = await Money.create({
+              value: rawBalance,
+              networkId,
+              provider,
+              fetchUSD: true,
+            });
+          } catch (e) {
+            console.warn('Unable to fetch native balance from provider, skipping balance check.');
           }
+        }
+        if (nativeBalance && nativeBalance.isLessThan(totalCost)) {
+          throw new ClientSDKError(
+            ErrorCode.INSUFFICIENT_FUNDS,
+            `Insufficient ${totalCost.symbol} balance. Need ${totalCost.formatted} but have ${nativeBalance.formatted}`,
+          );
         }
       }
     }
@@ -416,33 +441,45 @@ export class BlindMintProduct implements IBlindMintProduct {
     if (nativeCost) mintCost.native = nativeCost;
     if (erc20Costs.length > 0) mintCost.erc20s = erc20Costs;
 
+    // Generate merkle proofs if needed for allowlist
+    const { mintIndices, merkleProofs } = await this._generateMintProofs(walletAddress, quantity);
+
     const mintStep: TransactionStep = {
       id: 'mint',
-      name: 'Mint BlindMint NFTs',
+      name: 'Mint Edition NFTs',
       type: 'mint',
-      description: `Mint ${quantity} random NFT(s)`,
+      description: `Mint ${quantity} NFT(s)`,
       cost: mintCost,
       execute: async (account: IAccount, options?: TransactionStepExecuteOptions) => {
         // This will handle network switch and adding custom network to user wallet if needed
         await account.switchNetwork(networkId);
         const address = await account.getAddress();
-        const blindMintContract = contractFactory.createBlindMintContract(this._extensionAddress);
+        const editionContract = this._getClaimContract();
+
         const gasEstimate = await estimateGas({
-          contract: blindMintContract,
-          method: 'mintReserve',
-          args: [this._creatorContract, this.id, quantity],
+          contract: editionContract,
+          method: 'mintProxy',
+          args: [this._creatorContract, this.id, quantity, mintIndices, merkleProofs, address],
           from: address,
           value: nativePaymentValue,
-          fallbackGas: ethers.BigNumber.from(300000),
         });
+
         const gasLimit = this._applyGasBuffer(gasEstimate, params.gasBuffer).toString();
         const txRequest: UniversalTransactionRequest = {
           to: this._extensionAddress,
-          data: this._buildMintData(this._creatorContract, this.id, quantity),
+          data: this._buildMintData(
+            this._creatorContract,
+            this.id,
+            quantity,
+            mintIndices,
+            merkleProofs,
+            address,
+          ),
           value: nativePaymentValue.toString(),
           gasLimit,
           chainId: networkId,
         };
+
         const confirmation = await account.sendTransactionWithConfirmation(txRequest, {
           confirmations: options?.confirmations || 1,
         });
@@ -520,7 +557,37 @@ export class BlindMintProduct implements IBlindMintProduct {
   // HELPER METHODS
   // =============================================================================
 
-  private _getClaimContract(): BlindMintClaimContract {
+  /**
+   * Get the contract information
+   */
+  private get contract(): Contract {
+    return this.data.publicData.contract;
+  }
+
+  /**
+   * Get the creator contract address
+   */
+  private get _creatorContract(): string {
+    return this.data.publicData.contract.contractAddress;
+  }
+
+  /**
+   * Get the extension address (alias for consistency)
+   */
+  private get _extensionAddress(): string {
+    if (this.contract.spec.toLowerCase() === 'erc721') {
+      return this.data.publicData.extensionAddress721.value;
+    }
+    if (this.contract.spec.toLowerCase() === 'erc1155') {
+      return this.data.publicData.extensionAddress1155.value;
+    }
+    throw new ClientSDKError(
+      ErrorCode.INVALID_INPUT,
+      `Unsupported contract spec: ${this.contract.spec}`,
+    );
+  }
+
+  private _getClaimContract() {
     const networkId = this.data.publicData.network || 1;
 
     // Use configured providers (READ operations)
@@ -533,29 +600,20 @@ export class BlindMintProduct implements IBlindMintProduct {
       provider,
       networkId,
     });
-    return factory.createBlindMintContract(this._extensionAddress);
+
+    return this.data.publicData.contract.spec.toLowerCase() === 'erc721'
+      ? factory.createEditionContract(this._extensionAddress)
+      : factory.createEdition1155Contract(this._extensionAddress);
   }
 
-  private async _processClaimData(claimData: {
-    storageProtocol: number;
-    total: number;
-    totalMax: number;
-    startDate: number;
-    endDate: number;
-    startingTokenId: ethers.BigNumber;
-    tokenVariations: number;
-    location: string;
-    paymentReceiver: string;
-    cost: ethers.BigNumber;
-    erc20: string;
-  }): Promise<BlindMintOnchainData> {
-    // Handle the actual structure from ABIv2 getClaim
-    const cost = ethers.BigNumber.from(claimData.cost);
-    const erc20 = claimData.erc20;
-
+  private async _processClaimData(
+    claimData: EditionClaimData,
+    platformFee: Money,
+    merklePlatformFee: Money,
+  ): Promise<EditionOnchainData> {
     // Convert dates from unix seconds
-    const convertDate = (unixSeconds: number): Date | undefined => {
-      return !unixSeconds ? undefined : new Date(unixSeconds * 1000);
+    const convertDate = (unixSeconds: number): Date => {
+      return new Date(unixSeconds * 1000);
     };
 
     const networkId = this.data.publicData.network;
@@ -566,40 +624,131 @@ export class BlindMintProduct implements IBlindMintProduct {
 
     // Create Money object which will fetch all metadata automatically
     const costMoney = await Money.create({
-      value: cost,
+      value: claimData.cost,
       networkId,
-      erc20,
+      erc20: claimData.erc20,
       provider,
       fetchUSD: true,
     });
 
-    return {
-      totalSupply: claimData.totalMax || 0,
-      totalMinted: claimData.total || 0,
-      startDate: convertDate(claimData.startDate),
-      endDate: convertDate(claimData.endDate),
-      audienceType: 'None', // Will be updated based on merkle root if needed
+    // Determine audience type based on merkle root
+    let audienceType: AudienceType = 'None';
+    if (claimData.merkleRoot && claimData.merkleRoot !== ethers.constants.HashZero) {
+      audienceType = 'Allowlist';
+    }
+
+    const isERC721 = this.contract.spec.toLowerCase() === 'erc721';
+
+    // Build the base onchain data
+    const baseData = {
+      totalMax: claimData.totalMax === 0 ? null : claimData.totalMax,
+      total: claimData.total || 0,
+      walletMax: claimData.walletMax === 0 ? null : claimData.walletMax,
+      startDate: claimData.startDate ? convertDate(claimData.startDate) : null,
+      endDate: claimData.endDate ? convertDate(claimData.endDate) : null,
+      audienceType,
       cost: costMoney,
+      platformFee,
+      merklePlatformFee,
+      signingAddress: claimData.signingAddress,
+      location: claimData.location,
+      merkleRoot: claimData.merkleRoot,
       paymentReceiver: claimData.paymentReceiver,
-      tokenVariations: claimData.tokenVariations,
-      startingTokenId: claimData.startingTokenId ? claimData.startingTokenId.toString() : '0',
+      storageProtocol: claimData.storageProtocol,
     };
+
+    // Return the appropriate type based on contract spec
+    if (isERC721) {
+      // Type assertion safe due to isERC721 check matching contract type
+      return {
+        ...baseData,
+        identical: (claimData as ERC721ClaimData).identical ?? false,
+      };
+    } else {
+      return {
+        ...baseData,
+        tokenId: (claimData as ERC1155ClaimData).tokenId?.toString() ?? '0',
+      };
+    }
+  }
+
+  private async _fetchClaimableMerkleInfo(
+    _merkleTreeId: number,
+    _walletAddress: string,
+    _contract: EditionClaimContract,
+  ): Promise<ClaimableMerkleInfo> {
+    const merkleInfo = await manifoldApiClient.studioClient.public.getMerkleInfo({
+      merkleTreeId: _merkleTreeId,
+      address: _walletAddress,
+      appId: AppId.EDITION,
+    });
+
+    const mintIndices = merkleInfo
+      .filter((info) => info.value !== undefined)
+      .map((claimMerkleInfo) => claimMerkleInfo.value as number);
+    const mintIndicesStatus = await _contract.checkMintIndices(
+      this.contract.contractAddress,
+      this.id,
+      mintIndices,
+    );
+    const claimableMerkleInfo = merkleInfo.filter(
+      (info, index) => info.value !== undefined && !mintIndicesStatus[index],
+    );
+
+    return {
+      merkleProofs: claimableMerkleInfo.map((claimMerkleInfo) => claimMerkleInfo.merkleProof),
+      mintIndices: claimableMerkleInfo.map((claimMerkleInfo) => claimMerkleInfo.value as number),
+      isInAllowlist: merkleInfo.length > 0,
+    };
+  }
+
+  private async _generateMintProofs(
+    walletAddress: string,
+    quantity: number,
+  ): Promise<{ mintIndices: number[]; merkleProofs: string[][] }> {
+    const onchainData = await this.fetchOnchainData();
+
+    // If no allowlist (merkle root is zero), return empty arrays
+    if (onchainData.audienceType !== 'Allowlist') {
+      return { mintIndices: [], merkleProofs: [] };
+    }
+
+    // For allowlist mints, fetch claimable merkle info
+    if (this.data.publicData.instanceAllowlist?.merkleTreeId) {
+      const contract = this._getClaimContract();
+      const claimableMerkleInfo = await this._fetchClaimableMerkleInfo(
+        this.data.publicData.instanceAllowlist.merkleTreeId,
+        walletAddress,
+        contract,
+      );
+      return {
+        mintIndices: claimableMerkleInfo.mintIndices.slice(0, quantity),
+        merkleProofs: claimableMerkleInfo.merkleProofs.slice(0, quantity),
+      };
+    }
+
+    // Default to empty arrays
+    return { mintIndices: [], merkleProofs: [] };
   }
 
   // =============================================================================
   // PRODUCT INTERFACE IMPLEMENTATION
   // =============================================================================
 
-  async getStatus(): Promise<BlindMintStatus> {
+  async getStatus(): Promise<ProductStatus> {
     const onchainData = await this.fetchOnchainData();
     const now = Date.now();
+
+    // Access totalMax and total from the base properties
+    const totalSupply = 'totalMax' in onchainData ? onchainData.totalMax : 0;
+    const totalMinted = 'total' in onchainData ? onchainData.total : 0;
     if (onchainData.startDate && now < onchainData.startDate.getTime()) {
       return 'upcoming';
     }
     if (onchainData.endDate && now > onchainData.endDate.getTime()) {
       return 'ended';
     }
-    if (onchainData.totalSupply && onchainData.totalMinted >= onchainData.totalSupply) {
+    if (totalSupply && totalMinted >= totalSupply) {
       return 'sold-out';
     }
     return 'active';
@@ -614,67 +763,94 @@ export class BlindMintProduct implements IBlindMintProduct {
     }
 
     const onchainData = await this.fetchOnchainData();
-
-    // Calculate available quantity
-    let quantity = Number.MAX_SAFE_INTEGER;
-    if (onchainData.totalSupply) {
-      const remaining = onchainData.totalSupply - onchainData.totalMinted;
-      quantity = Math.min(quantity, remaining);
-    }
-
-    return { isEligible: true, quantity };
-  }
-
-  // =============================================================================
-  // HELPER METHODS
-  // =============================================================================
-
-  private async _estimateGas(
-    from: string,
-    _to: string,
-    quantity: number,
-    value: ethers.BigNumber,
-  ): Promise<ethers.BigNumber> {
     const contract = this._getClaimContract();
 
-    // Use proper mintReserve signature with indices and proofs
-    const mintIndices: number[] = [];
-    const merkleProofs: string[][] = [];
+    // Calculate total available supply
+    const totalSupply = onchainData.totalMax || Infinity;
+    const total = onchainData.total;
+    const availableSupply = Math.max(0, totalSupply - total);
 
-    return await estimateGas({
-      contract,
-      method: 'mintReserve',
-      args: [this._creatorContract, this.id, quantity, mintIndices, merkleProofs],
-      from,
-      value,
-      fallbackGas: ethers.BigNumber.from(200000),
-    });
+    let availableForWallet = Infinity;
+    let isOnAllowlist = false;
+    let hasWalletMax = false;
+
+    // Handle allowlist mints following claim-widgets pattern
+    if (
+      onchainData.audienceType === 'Allowlist' &&
+      this.data.publicData.instanceAllowlist?.merkleTreeId
+    ) {
+      // Fetch claimable merkle info from Manifold API
+      const claimableMerkleInfo = await this._fetchClaimableMerkleInfo(
+        this.data.publicData.instanceAllowlist.merkleTreeId,
+        recipientAddress,
+        contract,
+      );
+      isOnAllowlist = claimableMerkleInfo.isInAllowlist;
+      availableForWallet = claimableMerkleInfo.mintIndices.length;
+    } else if (onchainData.walletMax && onchainData.walletMax > 0) {
+      // Check wallet max for public sales
+      hasWalletMax = true;
+      const totalMinted = await contract.getTotalMints(
+        recipientAddress,
+        this.contract.contractAddress,
+        this.id,
+      );
+      availableForWallet = Math.max(0, onchainData.walletMax - totalMinted);
+    }
+
+    // Return minimum of supply and wallet availability
+    const quantity = Math.min(availableSupply, availableForWallet);
+
+    // Determine the reason for quantity being 0
+    let reason: string | undefined;
+    if (quantity === 0) {
+      if (isOnAllowlist && availableForWallet === 0) {
+        reason = 'You have used up all your allotted slots';
+      } else if (hasWalletMax && availableForWallet === 0) {
+        reason = 'You have reached the maximum per wallet';
+      } else if (onchainData.audienceType === 'Allowlist' && !isOnAllowlist) {
+        reason = 'You are not on the allowlist';
+      } else {
+        reason = 'No mints available';
+      }
+    }
+
+    return {
+      isEligible: quantity > 0,
+      quantity: quantity === Infinity ? null : quantity, // null indicates no limit
+      reason,
+    };
   }
 
   // =============================================================================
-  // OTHER PRODUCT METHODS (simplified for now)
+  // OTHER PRODUCT METHODS
   // =============================================================================
 
-  async getInventory(): Promise<BlindMintInventory> {
+  async getInventory(): Promise<ProductInventory> {
     const onchainData = await this.fetchOnchainData();
+    const totalMax = 'totalMax' in onchainData ? onchainData.totalMax : 0;
+    const total = 'total' in onchainData ? onchainData.total : 0;
     return {
-      totalSupply:
-        onchainData.totalSupply === Number.MAX_SAFE_INTEGER ? -1 : onchainData.totalSupply,
-      totalPurchased: onchainData.totalMinted,
+      totalSupply: totalMax === null || totalMax === Number.MAX_SAFE_INTEGER ? -1 : totalMax,
+      totalPurchased: total,
     };
   }
 
   async getRules(): Promise<ProductRule> {
     const onchainData = await this.fetchOnchainData();
+
+    const audienceRestriction: AudienceRestriction =
+      onchainData.audienceType === 'Allowlist' ? 'allowlist' : 'none';
+
     return {
-      startDate: onchainData.startDate,
-      endDate: onchainData.endDate,
-      audienceRestriction: onchainData.audienceType as AudienceRestriction,
+      startDate: onchainData.startDate || undefined,
+      endDate: onchainData.endDate || undefined,
+      audienceRestriction,
+      maxPerWallet: onchainData.walletMax || undefined,
     };
   }
 
   async getProvenance(): Promise<ProductProvenance> {
-    const publicData = this.data.publicData;
     return {
       creator: {
         id: this.data.creator.id.toString(),
@@ -682,21 +858,14 @@ export class BlindMintProduct implements IBlindMintProduct {
         address: this.data.creator.address || '',
         name: this.data.creator.name,
       },
-      contract: {
-        id: publicData.contract.id,
-        networkId: publicData.contract.networkId,
-        contractAddress: publicData.contract.contractAddress,
-        name: publicData.contract.name,
-        symbol: publicData.contract.symbol,
-        spec: publicData.contract.spec,
-      },
-      networkId: publicData.network,
+      contract: this.contract,
+      networkId: this.data.publicData.network,
     };
   }
 
   async getMetadata(): Promise<ProductMetadata> {
     return {
-      name: this.data.publicData.name || this.previewData.title || '',
+      name: this.data.publicData.title || this.previewData.title || '',
       description: this.data.publicData.description || this.previewData.description || '',
     };
   }
@@ -713,94 +882,8 @@ export class BlindMintProduct implements IBlindMintProduct {
   }
 
   // =============================================================================
-  // BLINDMINT-SPECIFIC METHODS
-  // =============================================================================
-
-  async getTokenVariations(): Promise<TokenVariation[]> {
-    const onchainData = await this.fetchOnchainData();
-    const publicData = this.data.publicData;
-
-    return publicData.pool.map((item) => ({
-      tokenId: parseInt(onchainData.startingTokenId) + (item.seriesIndex - 1), // seriesIndex is 1-based
-      metadata: item.metadata,
-      tier: this._getTierForIndex(item.seriesIndex - 1, publicData.tierProbabilities),
-      rarityScore: this._calculateRarityScore(item.seriesIndex - 1),
-    }));
-  }
-
-  async getTierProbabilities(): Promise<GachaTier[]> {
-    const publicData = this.data.publicData;
-    if (!publicData.tierProbabilities || publicData.tierProbabilities.length === 0) {
-      return [];
-    }
-
-    // Convert array format to GachaTier[]
-    return publicData.tierProbabilities.map((tier) => ({
-      id: tier.group,
-      name: tier.group,
-      probability: tier.rate,
-      tokenIds: tier.indices,
-      metadata: {},
-    }));
-  }
-
-  async getClaimableTokens(walletAddress: Address): Promise<ClaimableToken[]> {
-    // Check if wallet has any claimable tokens
-    const allocations = await this.getAllocations({ recipientAddress: walletAddress });
-    if (!allocations.isEligible) {
-      return [];
-    }
-
-    // For BlindMint, all tokens in pool are potentially claimable
-    const variations = await this.getTokenVariations();
-    return variations.map((v) => ({
-      tokenId: v.tokenId,
-      metadata: v.metadata,
-      tier: v.tier,
-      isClaimable: true,
-      proofs: [], // No merkle proofs for standard BlindMint
-    }));
-  }
-
-  async estimateMintGas(quantity: number, walletAddress: Address): Promise<bigint> {
-    const onchainData = await this.fetchOnchainData();
-    const totalValue = this._calculateTotalCost(quantity, onchainData);
-
-    const gasEstimate = await this._estimateGas(
-      walletAddress,
-      walletAddress,
-      quantity,
-      ethers.BigNumber.from(totalValue.toString()),
-    );
-
-    return BigInt(gasEstimate.toString());
-  }
-
-  // =============================================================================
   // HELPER METHODS
   // =============================================================================
-
-  private _getTierForIndex(index: number, tierProbs: BlindMintTierProbability[]): string {
-    if (tierProbs && tierProbs.length > 0) {
-      for (const tierProb of tierProbs) {
-        if (tierProb.indices.includes(index)) {
-          return tierProb.group;
-        }
-      }
-    }
-    return 'Common';
-  }
-
-  private _calculateRarityScore(_index: number): number {
-    // Simple rarity calculation
-    return Math.floor(Math.random() * 100);
-  }
-
-  private _calculateTotalCost(quantity: number, onchainData: BlindMintOnchainData): bigint {
-    const mintCost = BigInt(onchainData.cost.value.toString()) * BigInt(quantity);
-    const platformFee = BigInt(this._platformFee?.value.toString() || '0') * BigInt(quantity);
-    return mintCost + platformFee;
-  }
 
   private _applyGasBuffer(gasEstimate: ethers.BigNumber, gasBuffer?: GasBuffer): ethers.BigNumber {
     if (!gasBuffer) {
@@ -824,20 +907,30 @@ export class BlindMintProduct implements IBlindMintProduct {
   /**
    * Build mint transaction data
    */
-  private _buildMintData(creatorContract: string, instanceId: number, quantity: number): string {
-    // Using the actual mint function signature from the contract
+  private _buildMintData(
+    creatorContract: string,
+    instanceId: number,
+    mintCount: number,
+    mintIndices: number[],
+    merkleProofs: string[][],
+    mintFor: string,
+  ): string {
+    // Using the mintProxy function signature from the Edition contract
     const mintInterface = new ethers.utils.Interface([
-      'function mintReserve(address creatorContractAddress,uint256 instanceId,uint32 mintCount)',
+      'function mintProxy(address creatorContractAddress, uint256 instanceId, uint16 mintCount, uint32[] mintIndices, bytes32[][] merkleProofs, address mintFor)',
     ]);
-    return mintInterface.encodeFunctionData('mintReserve', [creatorContract, instanceId, quantity]);
+    return mintInterface.encodeFunctionData('mintProxy', [
+      creatorContract,
+      instanceId,
+      mintCount,
+      mintIndices,
+      merkleProofs,
+      mintFor,
+    ]);
   }
-
-  /**
-   * Calculate gas limit with buffer for adapter transactions
-   */
 }
 
 // Type guard
-export function isBlindMintProduct(product: Product): product is IBlindMintProduct {
-  return product?.type === AppType.BLIND_MINT;
+export function isEditionProduct(product: Product): product is IEditionProduct {
+  return product?.type === AppType.EDITION;
 }

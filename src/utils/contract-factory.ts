@@ -1,6 +1,12 @@
 import * as ethers from 'ethers';
 import type { Address } from '../types/common';
-import { GachaExtensionERC1155ABIv2, ERC20ABI } from '../abis';
+import {
+  GachaExtensionERC1155ABIv2,
+  ERC20ABI,
+  ClaimExtensionERC721ABI,
+  ClaimExtensionERC1155ABI,
+} from '../abis';
+import type { EditionClaimContract } from '../types/edition';
 
 // =============================================================================
 // CONTRACT TYPES
@@ -159,6 +165,26 @@ export class ContractFactory {
     const provider = this.provider;
 
     return new ethers.Contract(address, ERC20ABI, provider) as ERC20Contract;
+  }
+
+  /**
+   * Create Edition ERC721 claim extension contract instance
+   */
+  createEditionContract(address: Address): EditionClaimContract {
+    const provider = this.provider;
+    const contract = new ethers.Contract(address, ClaimExtensionERC721ABI, provider);
+
+    return contract as EditionClaimContract;
+  }
+
+  /**
+   * Create Edition ERC1155 claim extension contract instance
+   */
+  createEdition1155Contract(address: Address): EditionClaimContract {
+    const provider = this.provider;
+    const contract = new ethers.Contract(address, ClaimExtensionERC1155ABI, provider);
+
+    return contract as EditionClaimContract;
   }
 }
 

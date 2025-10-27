@@ -18,7 +18,7 @@ export default defineConfig({
       external: [
         'ethers',
         '@manifoldxyz/manifold-provider-client',
-        '@manifoldxyz/studio-apps-client'
+        '@manifoldxyz/studio-apps-client-public'
       ],
       output: {
         preserveModules: false,
@@ -59,7 +59,7 @@ export default defineConfig({
     ],
     exclude: [
       '@manifoldxyz/manifold-provider-client',
-      '@manifoldxyz/studio-apps-client'
+      '@manifoldxyz/studio-apps-client-public'
     ]
   }
 });

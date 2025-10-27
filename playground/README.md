@@ -94,14 +94,19 @@ npx tsx index.ts
    - Parse Manifold URLs
    - Fetch workspace products
 
-2. **Product Operations**
+2. **Product Types**
+   - **Edition Products**: Standard NFT editions with optional allowlists
+   - **BlindMint Products**: Mystery/gacha-style random NFT mints
+   - **BurnRedeem Products**: Exchange existing tokens for new ones (coming soon)
+
+3. **Product Operations**
    - Check product status
    - Get allocation for addresses
    - Prepare purchase transactions
    - Calculate costs and fees
    - Show transaction steps
 
-3. **Wallet Integration** (if private key provided)
+4. **Wallet Integration** (if private key provided)
    - Connect to configured network
    - Check wallet balance
    - Prepare actual transactions
@@ -151,23 +156,45 @@ Popular RPC providers:
 Test 1: Get Product by Instance ID
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📦 Testing blind-mint Product
-   Name: Test BlindMint
+📦 Testing edition Product
+   Name: Test Edition
    ID: 4150231280
    Network: 11155111
    Status: active
 
    🎫 Allocation for 0x742d35Cc6...
       Eligible: true
-      Available: 5
+      Available: 10
 
    💰 Preparing purchase for 1 NFT...
-      Total Cost: 0.01 ETH
-      Subtotal: 0.008 ETH
-      Fees: 0.002 ETH
+      Total Cost (native): 0.01 ETH
+      Product Cost: 0.008 ETH
+      Platform Fee: 0.002 ETH
       Steps: 1
-      Step 1: Mint BlindMint NFTs (mint)
-         Gas: 150000
+      Step 1: Mint Edition NFTs (mint)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Test 2: Product Type Specific Tests
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Testing Edition (Instance: 4150231281)...
+
+📦 Testing edition Product
+   Name: Limited Edition
+   ID: 4150231281
+   Network: 11155111
+   Status: active
+
+   🎫 Allocation for 0x742d35Cc6...
+      Eligible: true
+      Available: 3
+      
+   💰 Preparing purchase for 1 NFT...
+      Total Cost (native): 0.05 ETH
+      Product Cost: 0.048 ETH
+      Platform Fee: 0.002 ETH
+      Steps: 1
+      Step 1: Mint Edition NFTs (mint)
 
 🎉 Playground completed!
 ```

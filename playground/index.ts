@@ -5,6 +5,7 @@ import {
   AppType,
   createAccountEthers5,
   isBlindMintProduct,
+  isEditionProduct,
   type IAccount,
   type Product,
 } from '../src/index';
@@ -39,7 +40,7 @@ interface ProductTestOptions {
   executePurchase: boolean;
 }
 
-async function testBlindMintProduct(
+async function testEditionProduct(
   product: Product,
   { address, account, executePurchase }: ProductTestOptions,
 ) {
@@ -65,7 +66,85 @@ async function testBlindMintProduct(
     }
 
     // Prepare purchase if eligible
-    if (allocation.isEligible && allocation.quantity > 0) {
+    if (allocation.isEligible) {
+      console.log(`\n   💰 Preparing purchase for 1 NFT...`);
+
+      const quantity = 1;
+      if (!isEditionProduct(product)) {
+        throw new Error('Is not an edition product instance')
+      }
+      const payload = { quantity }
+
+      const prepared = await product.preparePurchase({
+        address,
+        payload,
+      });
+
+      const nativeTotal = prepared.cost.total.native?.formatted ?? 'n/a';
+      const erc20Totals = prepared.cost.total.erc20s
+        ?.map((money) => `${money.formatted} ${money.symbol}`)
+        .join(', ');
+
+      console.log(`      Total Cost (native): ${nativeTotal}`);
+      if (erc20Totals) {
+        console.log(`      Total Cost (tokens): ${erc20Totals}`);
+      }
+
+      console.log(`      Product Cost: ${prepared.cost.breakdown.product.formatted}`);
+      console.log(`      Platform Fee: ${prepared.cost.breakdown.platformFee.formatted}`);
+      console.log(`      Steps: ${prepared.steps.length}`);
+
+      prepared.steps.forEach((step, i) => {
+        console.log(`      Step ${i + 1}: ${step.name} (${step.type})`);
+      });
+
+      // Execute purchase if adapter provided and execution enabled
+      if (account) {
+        if (executePurchase) {
+          console.log(`\n   🛒 Executing purchase via ${account.adapterType} adapter...`);
+          const order = await product.purchase({
+            account,
+            preparedPurchase: prepared,
+          });
+          const receiptHash = order.receipts[0]?.txHash ?? 'pending';
+          console.log(`   ✅ Order submitted: ${receiptHash}`);
+        } else {
+          console.log(`\n   🛒 Adapter ready (set EXECUTE_PURCHASE=true to send the transaction)`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`   ❌ Error testing product:`, error);
+  }
+}
+
+async function testBlindMintProduct(
+  product: Product,
+  { address, account, executePurchase }: ProductTestOptions,
+) {
+  console.log(`\n📦 Testing ${product.type} Product`);
+  console.log(`   Name: ${product.data.appName || 'Unknown'}`);
+  console.log(`   ID: ${product.id}`);
+  console.log(`   Network: ${product.data.publicData.network}`);
+  console.log(`   Account Adapter: ${account ? account.adapterType : 'None'}`);
+  try {
+    // Get product status
+    const status = await product.getStatus();
+    console.log(`   Status: ${status}`);
+
+    // Test allocation check
+    const allocation = await product.getAllocations({
+      recipientAddress: address as `0x${string}`,
+    });
+    console.log(`\n   🎫 Allocation for ${address.slice(0, 10)}...`);
+    console.log(`      Eligible: ${allocation.isEligible}`);
+    console.log(`      Available: ${allocation.quantity}`);
+    if (allocation.reason) {
+      console.log(`      Reason: ${allocation.reason}`);
+    }
+
+    // Prepare purchase if eligible
+    if (allocation.isEligible) {
       console.log(`\n   💰 Preparing purchase for 1 NFT...`);
 
       const quantity = 1;
@@ -142,11 +221,8 @@ async function main() {
     privateKey &&
     privateKey !== '0x0000000000000000000000000000000000000000000000000000000000000000'
   ) {
-    const networkRpc = httpRPCs[testNetworkId];
-    if (networkRpc) {
-      wallet = new ethers.Wallet(privateKey);
-      console.log(`   Wallet: ${wallet.address.slice(0, 10)}...`);
-    }
+    wallet = new ethers.Wallet(privateKey);
+    console.log(`   Wallet: ${wallet.address.slice(0, 10)}...`);
   } else {
     console.log('   Wallet: Not configured (using read-only mode)');
   }
@@ -163,9 +239,6 @@ async function main() {
     account = createAccountEthers5(client,  {
       wallet
     })
-    // Prime adapter with balance lookup so address becomes available
-   const balance=  await account.getBalance(11155111).catch(() => undefined);
-   console.log('current balance', balance)
   } catch (adapterError) {
     console.warn('   ⚠️  Unable to initialise ethers5 adapter:', adapterError);
   }
@@ -179,11 +252,21 @@ async function main() {
 
   try {
     const product = await client.getProduct(testInstanceId);
-    await testBlindMintProduct(product, {
-      address: testAddress,
-      account,
-      executePurchase,
-    });
+    
+    // Determine product type and call appropriate test function
+    if (isEditionProduct(product)) {
+      await testEditionProduct(product, {
+        address: testAddress,
+        account,
+        executePurchase,
+      });
+    } else if (isBlindMintProduct(product)) {
+      await testBlindMintProduct(product, {
+        address: testAddress,
+        account,
+        executePurchase,
+      });
+    }
   } catch (error) {
     console.error('❌ Error getting product:', error);
   }
@@ -204,11 +287,26 @@ async function main() {
       console.log(`\nTesting ${test.type} (Instance: ${test.id})...`);
       try {
         const product = await client.getProduct(test.id);
-        await testBlindMintProduct(product, {
-          address: testAddress,
-          account,
-          executePurchase,
-        });
+        
+        // Determine product type and call appropriate test function
+        if (test.type === 'Edition' && isEditionProduct(product)) {
+          await testEditionProduct(product, {
+            address: testAddress,
+            account,
+            executePurchase,
+          });
+        } else if (test.type === 'BlindMint' && isBlindMintProduct(product)) {
+          await testBlindMintProduct(product, {
+            address: testAddress,
+            account,
+            executePurchase,
+          });
+        } else if (test.type === 'BurnRedeem') {
+          // BurnRedeem not yet implemented
+          console.log(`   ⚠️  BurnRedeem product type not yet implemented`);
+        } else {
+          console.log(`   ⚠️  Product type mismatch or unsupported: ${product.type}`);
+        }
       } catch (error) {
         console.error(`❌ Error testing ${test.type}:`, error);
       }

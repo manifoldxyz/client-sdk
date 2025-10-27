@@ -1,4 +1,4 @@
-import type { PublicInstance } from '@manifoldxyz/studio-apps-client';
+import type { PublicInstance } from '@manifoldxyz/studio-apps-client-public';
 import type { Address, ProductStatus, AppType } from './common';
 import type {
   BaseProduct,
@@ -183,8 +183,6 @@ export interface BlindMintProduct extends BaseProduct<BlindMintPublicData> {
 // =============================================================================
 // SUPPORTING TYPES
 // =============================================================================
-
-export type StorageProtocol = 'ipfs' | 'arweave' | 'http' | 'data';
 
 export interface FloorPriceConfig {
   enabled: boolean;

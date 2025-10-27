@@ -1,5 +1,5 @@
-import type { InstancePreview, PublicInstance } from '@manifoldxyz/studio-apps-client';
-import { StudioAppsClientForPublic } from '@manifoldxyz/studio-apps-client';
+import type { InstancePreview, PublicInstance } from '@manifoldxyz/studio-apps-client-public';
+import { StudioAppsClientForPublic } from '@manifoldxyz/studio-apps-client-public';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 
 /**
@@ -7,7 +7,7 @@ import { ClientSDKError, ErrorCode } from '../types/errors';
  * as per CON-2729 feedback
  */
 export class ManifoldApiClient {
-  private studioClient: StudioAppsClientForPublic;
+  studioClient: StudioAppsClientForPublic;
 
   constructor() {
     // Initialize Studio Apps Client for public access
@@ -61,6 +61,4 @@ export class ManifoldApiClient {
 /**
  * Factory function to create Manifold API client
  */
-export function createManifoldApiClient(): ManifoldApiClient {
-  return new ManifoldApiClient();
-}
+export default new ManifoldApiClient();
