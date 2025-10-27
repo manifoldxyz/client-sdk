@@ -1004,6 +1004,3 @@ export const ClaimExtensionERC1155ABI = [
     type: 'function',
   },
 ] as const;
-
-// For backwards compatibility and unified interface
-export const EditionClaimABI = ClaimExtensionERC721ABI;

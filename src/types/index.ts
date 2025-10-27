@@ -7,6 +7,7 @@ export * from './common';
 
 // BlindMint-specific types
 export * from './blindmint';
+export * from './edition';
 
 // Essential contract types
 export type { ClaimExtensionContract, ERC20Contract, ContractCallOptions } from './contracts';

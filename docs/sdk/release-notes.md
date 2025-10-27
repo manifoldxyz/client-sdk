@@ -1,5 +1,30 @@
 # Release Notes
 
+### October 27, 2025 (0.1.0-beta.5)
+
+* **NEW: Enhanced Playground Testing** - Added comprehensive Edition product testing to playground
+* Added `testEditionProduct` function for testing Edition NFT products specifically
+* Enhanced playground to automatically detect and test different product types (Edition, BlindMint)
+* Exported `isEditionProduct` type guard from main package exports for better product type detection
+* Created comprehensive .env.example file for easier playground configuration
+* Updated playground documentation with Edition product examples and output
+* Fixed TypeScript error in BlindMintProduct allocation quantity check
+* Improved playground test output with proper product-specific icons and formatting
+
+### October 27, 2025 (0.1.0-beta.4)
+
+* **NEW: Comprehensive Examples Library** - Complete reorganization and expansion of SDK examples
+* Added separate example directories for BlindMint and Edition product types
+* Created server-side minting bot examples for both BlindMint and Edition products
+* Implemented automated minting with retry logic and error handling
+* Added monitoring capabilities for auto-minting when products become active
+* Included batch minting functionality for airdrops and bulk operations
+* Enhanced Edition examples with promo code support and allowlist handling
+* Updated all frontend examples to use proper type guards (isEditionProduct, isBlindMintProduct)
+* Improved documentation for server-side minting patterns and best practices
+* Added environment configuration templates for all examples
+* Included TypeScript configurations and package.json for each example type
+
 ### October 24, 2025 (0.1.0-beta.3)
 
 * **NEW: Complete Edition Product support** - Full implementation of Edition NFT product type

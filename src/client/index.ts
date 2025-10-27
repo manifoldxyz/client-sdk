@@ -5,7 +5,7 @@ import { AppId } from '../types/common';
 import { BlindMintProduct } from '../products/blindmint';
 import { EditionProduct } from '../products/edition';
 import { validateInstanceId, parseManifoldUrl } from '../utils/validation';
-import { createManifoldApiClient } from '../api/manifold-api';
+import manifoldApiClient from '../api/manifold-api';
 import type * as ethers from 'ethers';
 import { createProvider } from '../utils';
 
@@ -103,9 +103,6 @@ export function createClient(config?: ClientConfig): ManifoldClient {
     }
   }
 
-  // Initialize Manifold API client with Studio Apps Client
-  const manifoldApi = createManifoldApiClient();
-
   return {
     providers,
     /**
@@ -160,7 +157,7 @@ export function createClient(config?: ClientConfig): ManifoldClient {
 
       try {
         // Fetch both instance and preview data using Studio Apps Client
-        const { instanceData, previewData } = await manifoldApi.getCompleteInstanceData(
+        const { instanceData, previewData } = await manifoldApiClient.getCompleteInstanceData(
           instanceId,
           { maxMediaWidth: 1024 },
         );

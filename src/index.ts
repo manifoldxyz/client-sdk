@@ -68,7 +68,7 @@
 // Core client factory
 export { createClient } from './client';
 
-export { isBlindMintProduct } from './products/index';
+export { isBlindMintProduct, isEditionProduct } from './products/index';
 
 // All type exports
 export * from './types';

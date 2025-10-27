@@ -285,7 +285,7 @@ export class BlindMintProduct implements IBlindMintProduct {
     if (!allocations.isEligible) {
       throw new ClientSDKError(ErrorCode.NOT_ELIGIBLE, allocations.reason || 'Not eligible');
     }
-    if (quantity > allocations.quantity) {
+    if (allocations.quantity !== null && quantity > allocations.quantity) {
       throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Quantity exceeds available allocation');
     }
 

@@ -33,10 +33,7 @@ export { poll, ensureConnectedNetwork } from './network';
 
 export type { EnsureConnectedNetworkOptions } from './network';
 
-// Merkle proof utilities
-export { merkleProofService, MerkleTree } from './merkle-proof';
-
-export type { AllowlistEntry, AllowlistProof } from './merkle-proof';
+// Merkle proof utilities removed - using Manifold API directly
 
 // =============================================================================
 // ADDITIONAL UTILITY FUNCTIONS

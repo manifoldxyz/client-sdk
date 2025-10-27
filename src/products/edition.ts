@@ -24,10 +24,16 @@ import type {
   ProductInventory,
   AudienceType,
   EditionProduct as IEditionProduct,
+  Contract,
 } from '../types';
-import type { Address } from '../types/common';
 import { AppType, AppId } from '../types/common';
-import type { EditionClaimContract, Edition1155ClaimContract } from '../utils/contract-factory';
+import type {
+  ClaimableMerkleInfo,
+  EditionClaimData,
+  EditionClaimContract,
+  ERC721ClaimData,
+  ERC1155ClaimData,
+} from '../types/edition';
 import * as ethers from 'ethers';
 
 import { createProvider } from '../utils/provider-factory';
@@ -35,57 +41,13 @@ import { ContractFactory as ContractFactoryClass } from '../utils/contract-facto
 import { validateAddress } from '../utils/validation';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import type { InstancePreview } from '@manifoldxyz/studio-apps-client';
+import manifoldApiClient from '../api/manifold-api';
 import { estimateGas } from '../utils/gas-estimation';
 import { Money } from '../libs/money';
 import type { Cost } from '../types/money';
 import type { TransactionReceipt } from '../types/purchase';
-// Import merkleProofService for potential future allowlist integration
-// import { merkleProofService } from '../utils/merkle-proof';
 
-/**
- * Base edition claim data structure
- */
-interface BaseEditionClaimData {
-  /** Total tokens minted */
-  total: number;
-  /** Maximum total supply (0 = unlimited) */
-  totalMax: number;
-  /** Maximum tokens per wallet */
-  walletMax?: number;
-  /** Start timestamp (Unix seconds) */
-  startDate: number;
-  /** End timestamp (Unix seconds) */
-  endDate: number;
-  /** Storage protocol identifier */
-  storageProtocol: number;
-  /** Merkle root for allowlist */
-  merkleRoot?: string;
-  /** Metadata location string */
-  location: string;
-  /** Cost per token in wei */
-  cost: ethers.BigNumber;
-  /** Payment receiver address */
-  paymentReceiver: string;
-  /** ERC20 token address (0x0 for ETH) */
-  erc20: string;
-  /** Signing address for verification */
-  signingAddress?: string;
-  /** Token ID (for ERC1155) */
-  tokenId?: ethers.BigNumber;
-  /** Token variations (for ERC721) */
-  tokenVariations?: number;
-  /** Starting token ID (for ERC721) */
-  startingTokenId?: ethers.BigNumber;
-  /** Contract version */
-  contractVersion?: number;
-  /** Whether all tokens are identical */
-  identical?: boolean;
-}
-
-/**
- * Edition claim data union type to handle both ERC721 and ERC1155 responses
- */
-type EditionClaimData = BaseEditionClaimData | { claim: BaseEditionClaimData };
+// EditionSpec import removed - not needed after refactoring
 
 /**
  * Edition product implementation for standard NFT mints.
@@ -129,11 +91,7 @@ export class EditionProduct implements IEditionProduct {
   onchainData?: EditionOnchainData;
 
   // Internal state
-  private _creatorContract: Address;
-  private _extensionAddress: Address;
-  private _platformFee?: Money;
   private _httpRPCs?: Record<number, string>;
-  private _isERC1155: boolean;
 
   /**
    * Creates a new EditionProduct instance.
@@ -166,19 +124,11 @@ export class EditionProduct implements IEditionProduct {
       );
     }
 
-    const publicData = instanceData.publicData;
-
     // Store instance data with properly typed publicData
     this.data = instanceData;
     this.previewData = previewData;
 
     this.id = instanceData.id;
-
-    this._creatorContract = publicData.contract.contractAddress;
-    this._extensionAddress = publicData.extensionAddress;
-
-    // Determine token standard from contract spec
-    this._isERC1155 = publicData.contract.spec === 'erc1155';
   }
 
   // =============================================================================
@@ -220,23 +170,33 @@ export class EditionProduct implements IEditionProduct {
       // Use getClaim method to fetch claim data
       const claimData = await contract.getClaim(this._creatorContract, this.id);
 
-      // Process into EditionOnchainData format
-      const onchainData = await this._processClaimData(claimData);
-
-      // Fetch platform fee from contract and create Money object
-      const mintFee = await contract.MINT_FEE();
+      // Fetch platform fees from contract first
       const networkId = this.data.publicData.network;
       const provider = createProvider({
         networkId,
         customRpcUrls: this._httpRPCs,
       });
 
-      this._platformFee = await Money.create({
+      // Fetch standard mint fee
+      const mintFee = await contract.MINT_FEE();
+      const platformFee = await Money.create({
         value: mintFee,
         networkId,
         provider,
         fetchUSD: true,
       });
+
+      // Fetch merkle mint fee (for allowlist mints)
+      const merkleMintFee = await contract.MINT_FEE_MERKLE();
+      const merklePlatformFee = await Money.create({
+        value: merkleMintFee,
+        networkId,
+        provider,
+        fetchUSD: true,
+      });
+
+      // Process into EditionOnchainData format with platform fees
+      const onchainData = await this._processClaimData(claimData, platformFee, merklePlatformFee);
 
       // Cache the result
       this.onchainData = onchainData;
@@ -330,7 +290,7 @@ export class EditionProduct implements IEditionProduct {
     if (!allocations.isEligible) {
       throw new ClientSDKError(ErrorCode.NOT_ELIGIBLE, allocations.reason || 'Not eligible');
     }
-    if (quantity > allocations.quantity) {
+    if (allocations.quantity !== null && quantity > allocations.quantity) {
       throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Quantity exceeds available allocation');
     }
 
@@ -342,9 +302,12 @@ export class EditionProduct implements IEditionProduct {
 
     // Calculate costs
     const productCost = onchainData.cost.multiplyInt(quantity);
-    const platformFee = this._platformFee
-      ? this._platformFee.multiplyInt(quantity)
-      : await Money.zero({ networkId, provider });
+
+    // Use merkle platform fee for allowlist mints, standard fee otherwise
+    const isAllowlistMint = onchainData.audienceType === 'Allowlist';
+    const feePerMint = isAllowlistMint ? onchainData.merklePlatformFee : onchainData.platformFee;
+
+    const platformFee = feePerMint.multiplyInt(quantity);
 
     // Aggregate costs by currency type
     const costsByToken = new Map<string, Money>();
@@ -432,16 +395,33 @@ export class EditionProduct implements IEditionProduct {
           steps.push(approvalStep);
         }
       } else {
+        let nativeBalance;
+        /**
+         * If account is provided, use it to check native balance. (Optimal for cases where account a browser wallet)
+         * Otherwise, try fetching from the provider directly. (Either from provided JSON-RPC or Manifold Bridge)
+         */
         // Check native balance using provider
         if (account) {
-          const nativeBalance = await account.getBalance(networkId);
-
-          if (nativeBalance && nativeBalance.isLessThan(totalCost)) {
-            throw new ClientSDKError(
-              ErrorCode.INSUFFICIENT_FUNDS,
-              `Insufficient ${totalCost.symbol} balance. Need ${totalCost.formatted} but have ${nativeBalance.formatted}`,
-            );
+          nativeBalance = await account.getBalance(networkId);
+        } else {
+          // Try getting from available provider
+          try {
+            const rawBalance = await provider.getBalance(walletAddress);
+            nativeBalance = await Money.create({
+              value: rawBalance,
+              networkId,
+              provider,
+              fetchUSD: true,
+            });
+          } catch (e) {
+            console.warn('Unable to fetch native balance from provider, skipping balance check.');
           }
+        }
+        if (nativeBalance && nativeBalance.isLessThan(totalCost)) {
+          throw new ClientSDKError(
+            ErrorCode.INSUFFICIENT_FUNDS,
+            `Insufficient ${totalCost.symbol} balance. Need ${totalCost.formatted} but have ${nativeBalance.formatted}`,
+          );
         }
       }
     }
@@ -482,7 +462,6 @@ export class EditionProduct implements IEditionProduct {
           args: [this._creatorContract, this.id, quantity, mintIndices, merkleProofs, address],
           from: address,
           value: nativePaymentValue,
-          fallbackGas: ethers.BigNumber.from(300000),
         });
 
         const gasLimit = this._applyGasBuffer(gasEstimate, params.gasBuffer).toString();
@@ -578,7 +557,37 @@ export class EditionProduct implements IEditionProduct {
   // HELPER METHODS
   // =============================================================================
 
-  private _getClaimContract(): EditionClaimContract | Edition1155ClaimContract {
+  /**
+   * Get the contract information
+   */
+  private get contract(): Contract {
+    return this.data.publicData.contract;
+  }
+
+  /**
+   * Get the creator contract address
+   */
+  private get _creatorContract(): string {
+    return this.data.publicData.contract.contractAddress;
+  }
+
+  /**
+   * Get the extension address (alias for consistency)
+   */
+  private get _extensionAddress(): string {
+    if (this.contract.spec.toLowerCase() === 'erc721') {
+      return this.data.publicData.extensionAddress721.value;
+    }
+    if (this.contract.spec.toLowerCase() === 'erc1155') {
+      return this.data.publicData.extensionAddress1155.value;
+    }
+    throw new ClientSDKError(
+      ErrorCode.INVALID_INPUT,
+      `Unsupported contract spec: ${this.contract.spec}`,
+    );
+  }
+
+  private _getClaimContract() {
     const networkId = this.data.publicData.network || 1;
 
     // Use configured providers (READ operations)
@@ -592,20 +601,16 @@ export class EditionProduct implements IEditionProduct {
       networkId,
     });
 
-    // Return appropriate contract based on token standard
-    return this._isERC1155
-      ? factory.createEdition1155Contract(this._extensionAddress)
-      : factory.createEditionContract(this._extensionAddress);
+    return this.data.publicData.contract.spec.toLowerCase() === 'erc721'
+      ? factory.createEditionContract(this._extensionAddress)
+      : factory.createEdition1155Contract(this._extensionAddress);
   }
 
-  private async _processClaimData(claimData: EditionClaimData): Promise<EditionOnchainData> {
-    // Extract claim data - handle both ERC721 (direct) and ERC1155 (wrapped) formats
-    const claim: BaseEditionClaimData = 'claim' in claimData ? claimData.claim : claimData;
-
-    // Handle the actual structure from Edition getClaim method
-    const cost = ethers.BigNumber.from(claim.cost);
-    const erc20 = claim.erc20;
-
+  private async _processClaimData(
+    claimData: EditionClaimData,
+    platformFee: Money,
+    merklePlatformFee: Money,
+  ): Promise<EditionOnchainData> {
     // Convert dates from unix seconds
     const convertDate = (unixSeconds: number): Date => {
       return new Date(unixSeconds * 1000);
@@ -619,45 +624,110 @@ export class EditionProduct implements IEditionProduct {
 
     // Create Money object which will fetch all metadata automatically
     const costMoney = await Money.create({
-      value: cost,
+      value: claimData.cost,
       networkId,
-      erc20,
+      erc20: claimData.erc20,
       provider,
       fetchUSD: true,
     });
 
     // Determine audience type based on merkle root
     let audienceType: AudienceType = 'None';
-    if (claim.merkleRoot && claim.merkleRoot !== ethers.constants.HashZero) {
+    if (claimData.merkleRoot && claimData.merkleRoot !== ethers.constants.HashZero) {
       audienceType = 'Allowlist';
     }
 
-    return {
-      totalSupply: claim.totalMax || 0,
-      totalMinted: claim.total || 0,
-      walletMax: claim.walletMax || 0,
-      startDate: convertDate(claim.startDate),
-      endDate: convertDate(claim.endDate),
+    const isERC721 = this.contract.spec.toLowerCase() === 'erc721';
+
+    // Build the base onchain data
+    const baseData = {
+      totalMax: claimData.totalMax === 0 ? null : claimData.totalMax,
+      total: claimData.total || 0,
+      walletMax: claimData.walletMax === 0 ? null : claimData.walletMax,
+      startDate: claimData.startDate ? convertDate(claimData.startDate) : null,
+      endDate: claimData.endDate ? convertDate(claimData.endDate) : null,
       audienceType,
       cost: costMoney,
-      paymentReceiver: claim.paymentReceiver,
+      platformFee,
+      merklePlatformFee,
+      signingAddress: claimData.signingAddress,
+      location: claimData.location,
+      merkleRoot: claimData.merkleRoot,
+      paymentReceiver: claimData.paymentReceiver,
+      storageProtocol: claimData.storageProtocol,
+    };
+
+    // Return the appropriate type based on contract spec
+    if (isERC721) {
+      // Type assertion safe due to isERC721 check matching contract type
+      return {
+        ...baseData,
+        identical: (claimData as ERC721ClaimData).identical ?? false,
+      };
+    } else {
+      return {
+        ...baseData,
+        tokenId: (claimData as ERC1155ClaimData).tokenId?.toString() ?? '0',
+      };
+    }
+  }
+
+  private async _fetchClaimableMerkleInfo(
+    _merkleTreeId: number,
+    _walletAddress: string,
+    _contract: EditionClaimContract,
+  ): Promise<ClaimableMerkleInfo> {
+    const merkleInfo = await manifoldApiClient.studioClient.public.getMerkleInfo({
+      merkleTreeId: _merkleTreeId,
+      address: _walletAddress,
+      appId: AppId.EDITION,
+    });
+
+    const mintIndices = merkleInfo
+      .filter((info) => info.value !== undefined)
+      .map((claimMerkleInfo) => claimMerkleInfo.value as number);
+    const mintIndicesStatus = await _contract.checkMintIndices(
+      this.contract.contractAddress,
+      this.id,
+      mintIndices,
+    );
+    const claimableMerkleInfo = merkleInfo.filter(
+      (info, index) => info.value !== undefined && !mintIndicesStatus[index],
+    );
+
+    return {
+      merkleProofs: claimableMerkleInfo.map((claimMerkleInfo) => claimMerkleInfo.merkleProof),
+      mintIndices: claimableMerkleInfo.map((claimMerkleInfo) => claimMerkleInfo.value as number),
+      isInAllowlist: merkleInfo.length > 0,
     };
   }
 
   private async _generateMintProofs(
-    _walletAddress: string,
-    _quantity: number,
+    walletAddress: string,
+    quantity: number,
   ): Promise<{ mintIndices: number[]; merkleProofs: string[][] }> {
     const onchainData = await this.fetchOnchainData();
 
     // If no allowlist (merkle root is zero), return empty arrays
-    if (onchainData.audienceType === 'None') {
+    if (onchainData.audienceType !== 'Allowlist') {
       return { mintIndices: [], merkleProofs: [] };
     }
 
-    // For allowlist, we would need to fetch the allowlist data from the API
-    // This is a simplified implementation - in practice, you'd fetch from Manifold API
-    // For now, return empty arrays (public sale scenario)
+    // For allowlist mints, fetch claimable merkle info
+    if (this.data.publicData.instanceAllowlist?.merkleTreeId) {
+      const contract = this._getClaimContract();
+      const claimableMerkleInfo = await this._fetchClaimableMerkleInfo(
+        this.data.publicData.instanceAllowlist.merkleTreeId,
+        walletAddress,
+        contract,
+      );
+      return {
+        mintIndices: claimableMerkleInfo.mintIndices.slice(0, quantity),
+        merkleProofs: claimableMerkleInfo.merkleProofs.slice(0, quantity),
+      };
+    }
+
+    // Default to empty arrays
     return { mintIndices: [], merkleProofs: [] };
   }
 
@@ -669,13 +739,16 @@ export class EditionProduct implements IEditionProduct {
     const onchainData = await this.fetchOnchainData();
     const now = Date.now();
 
+    // Access totalMax and total from the base properties
+    const totalSupply = 'totalMax' in onchainData ? onchainData.totalMax : 0;
+    const totalMinted = 'total' in onchainData ? onchainData.total : 0;
     if (onchainData.startDate && now < onchainData.startDate.getTime()) {
       return 'upcoming';
     }
     if (onchainData.endDate && now > onchainData.endDate.getTime()) {
       return 'ended';
     }
-    if (onchainData.totalSupply && onchainData.totalMinted >= onchainData.totalSupply) {
+    if (totalSupply && totalMinted >= totalSupply) {
       return 'sold-out';
     }
     return 'active';
@@ -690,41 +763,63 @@ export class EditionProduct implements IEditionProduct {
     }
 
     const onchainData = await this.fetchOnchainData();
-
-    // Check if allowlist is active
-    if (onchainData.audienceType === 'Allowlist') {
-      // In a real implementation, you would:
-      // 1. Fetch allowlist data from Manifold API
-      // 2. Use merkleProofService.checkEligibility() to verify eligibility
-      // For now, we'll assume public eligibility
-    }
-
-    // Calculate available quantity considering wallet max and remaining supply
-    let quantity = onchainData.walletMax || Number.MAX_SAFE_INTEGER;
-
-    if (onchainData.totalSupply) {
-      const remaining = onchainData.totalSupply - onchainData.totalMinted;
-      quantity = Math.min(quantity, remaining);
-    }
-
-    // Check current mints for this wallet (simplified)
     const contract = this._getClaimContract();
-    try {
-      const currentMints = await contract.getTotalMints(
+
+    // Calculate total available supply
+    const totalSupply = onchainData.totalMax || Infinity;
+    const total = onchainData.total;
+    const availableSupply = Math.max(0, totalSupply - total);
+
+    let availableForWallet = Infinity;
+    let isOnAllowlist = false;
+    let hasWalletMax = false;
+
+    // Handle allowlist mints following claim-widgets pattern
+    if (
+      onchainData.audienceType === 'Allowlist' &&
+      this.data.publicData.instanceAllowlist?.merkleTreeId
+    ) {
+      // Fetch claimable merkle info from Manifold API
+      const claimableMerkleInfo = await this._fetchClaimableMerkleInfo(
+        this.data.publicData.instanceAllowlist.merkleTreeId,
         recipientAddress,
-        this._creatorContract,
+        contract,
+      );
+      isOnAllowlist = claimableMerkleInfo.isInAllowlist;
+      availableForWallet = claimableMerkleInfo.mintIndices.length;
+    } else if (onchainData.walletMax && onchainData.walletMax > 0) {
+      // Check wallet max for public sales
+      hasWalletMax = true;
+      const totalMinted = await contract.getTotalMints(
+        recipientAddress,
+        this.contract.contractAddress,
         this.id,
       );
-      const remainingForWallet = Math.max(
-        0,
-        (onchainData.walletMax || Number.MAX_SAFE_INTEGER) - currentMints,
-      );
-      quantity = Math.min(quantity, remainingForWallet);
-    } catch (error) {
-      // If getTotalMints fails, continue with calculated quantity
+      availableForWallet = Math.max(0, onchainData.walletMax - totalMinted);
     }
 
-    return { isEligible: quantity > 0, quantity: Math.max(0, quantity) };
+    // Return minimum of supply and wallet availability
+    const quantity = Math.min(availableSupply, availableForWallet);
+
+    // Determine the reason for quantity being 0
+    let reason: string | undefined;
+    if (quantity === 0) {
+      if (isOnAllowlist && availableForWallet === 0) {
+        reason = 'You have used up all your allotted slots';
+      } else if (hasWalletMax && availableForWallet === 0) {
+        reason = 'You have reached the maximum per wallet';
+      } else if (onchainData.audienceType === 'Allowlist' && !isOnAllowlist) {
+        reason = 'You are not on the allowlist';
+      } else {
+        reason = 'No mints available';
+      }
+    }
+
+    return {
+      isEligible: quantity > 0,
+      quantity: quantity === Infinity ? null : quantity, // null indicates no limit
+      reason,
+    };
   }
 
   // =============================================================================
@@ -733,10 +828,11 @@ export class EditionProduct implements IEditionProduct {
 
   async getInventory(): Promise<ProductInventory> {
     const onchainData = await this.fetchOnchainData();
+    const totalMax = 'totalMax' in onchainData ? onchainData.totalMax : 0;
+    const total = 'total' in onchainData ? onchainData.total : 0;
     return {
-      totalSupply:
-        onchainData.totalSupply === Number.MAX_SAFE_INTEGER ? -1 : onchainData.totalSupply,
-      totalPurchased: onchainData.totalMinted,
+      totalSupply: totalMax === null || totalMax === Number.MAX_SAFE_INTEGER ? -1 : totalMax,
+      totalPurchased: total,
     };
   }
 
@@ -747,15 +843,14 @@ export class EditionProduct implements IEditionProduct {
       onchainData.audienceType === 'Allowlist' ? 'allowlist' : 'none';
 
     return {
-      startDate: onchainData.startDate,
-      endDate: onchainData.endDate,
+      startDate: onchainData.startDate || undefined,
+      endDate: onchainData.endDate || undefined,
       audienceRestriction,
       maxPerWallet: onchainData.walletMax || undefined,
     };
   }
 
   async getProvenance(): Promise<ProductProvenance> {
-    const publicData = this.data.publicData;
     return {
       creator: {
         id: this.data.creator.id.toString(),
@@ -763,15 +858,8 @@ export class EditionProduct implements IEditionProduct {
         address: this.data.creator.address || '',
         name: this.data.creator.name,
       },
-      contract: {
-        id: publicData.contract.id,
-        networkId: publicData.contract.networkId,
-        contractAddress: publicData.contract.contractAddress,
-        name: publicData.contract.name,
-        symbol: publicData.contract.symbol,
-        spec: publicData.contract.spec,
-      },
-      networkId: publicData.network,
+      contract: this.contract,
+      networkId: this.data.publicData.network,
     };
   }
 

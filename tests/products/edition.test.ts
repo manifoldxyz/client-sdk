@@ -68,6 +68,7 @@ const basePreviewData: InstancePreview = {
 const createMockClaimContract = () => ({
   getClaim: vi.fn(),
   MINT_FEE: vi.fn(),
+  MINT_FEE_MERKLE: vi.fn(),
   getTotalMints: vi.fn(),
   mintProxy: vi.fn(),
   estimateGas: vi.fn(),
@@ -202,11 +203,17 @@ describe('EditionProduct', () => {
       endDate: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
       merkleRoot: ethers.constants.HashZero,
       paymentReceiver: '0x1111111111111111111111111111111111111111',
+      signingAddress: '0x2222222222222222222222222222222222222222',
+      location: 'ipfs://QmXxx',
+      storageProtocol: 1,
+      contractVersion: 7,
+      identical: true, // For ERC721
     };
 
     beforeEach(() => {
       mockClaimContract.getClaim.mockResolvedValue(mockClaimData);
       mockClaimContract.MINT_FEE.mockResolvedValue(ethers.BigNumber.from('500000000000000000')); // 0.5 ETH platform fee
+      mockClaimContract.MINT_FEE_MERKLE.mockResolvedValue(ethers.BigNumber.from('690000000000000000')); // 0.69 ETH merkle fee
     });
 
     it('fetches and caches onchain data successfully', async () => {
@@ -278,17 +285,18 @@ describe('EditionProduct', () => {
       await expect(product.fetchOnchainData()).rejects.toThrow(ClientSDKError);
     });
 
-    it('uses Edition1155 contract for ERC1155 tokens', async () => {
-      const product = createProduct({}, { contract: { ...baseInstanceData.publicData.contract, spec: 'erc1155' } });
-      await product.fetchOnchainData();
+    it('uses Edition contract for both ERC721 and ERC1155 tokens', async () => {
+      // Test ERC1155
+      const product1155 = createProduct({}, { contract: { ...baseInstanceData.publicData.contract, spec: 'erc1155' } });
+      await product1155.fetchOnchainData();
+      expect(mockContractFactoryInstance.createEditionContract).toHaveBeenCalledWith('0x9876543210987654321098765432109876543210');
 
-      expect(mockContractFactoryInstance.createEdition1155Contract).toHaveBeenCalledWith('0x9876543210987654321098765432109876543210');
-    });
+      // Clear mock calls
+      mockContractFactoryInstance.createEditionContract.mockClear();
 
-    it('uses Edition contract for ERC721 tokens', async () => {
-      const product = createProduct();
-      await product.fetchOnchainData();
-
+      // Test ERC721
+      const product721 = createProduct();
+      await product721.fetchOnchainData();
       expect(mockContractFactoryInstance.createEditionContract).toHaveBeenCalledWith('0x9876543210987654321098765432109876543210');
     });
   });
@@ -1125,7 +1133,7 @@ describe('EditionProduct', () => {
       const product = createProduct();
       const onchainData = await product.fetchOnchainData();
 
-      expect(onchainData.totalSupply).toBe(0);
+      expect(onchainData.totalSupply).toBe(Number.MAX_SAFE_INTEGER); // Unlimited supply is represented as MAX_SAFE_INTEGER
       
       const status = await product.getStatus();
       expect(status).toBe('active'); // Should not be sold out

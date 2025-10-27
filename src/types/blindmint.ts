@@ -184,8 +184,6 @@ export interface BlindMintProduct extends BaseProduct<BlindMintPublicData> {
 // SUPPORTING TYPES
 // =============================================================================
 
-export type StorageProtocol = 'ipfs' | 'arweave' | 'http' | 'data';
-
 export interface FloorPriceConfig {
   enabled: boolean;
   source: 'opensea' | 'manifold' | 'custom';
