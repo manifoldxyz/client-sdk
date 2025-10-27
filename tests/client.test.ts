@@ -12,9 +12,9 @@ vi.mock('../src/utils', () => {
 vi.mock('../src/api/manifold-api', () => {
   const getCompleteInstanceDataMock = vi.fn();
   return {
-    createManifoldApiClient: vi.fn(() => ({
+    default: {
       getCompleteInstanceData: getCompleteInstanceDataMock,
-    })),
+    },
   };
 });
 
@@ -44,9 +44,9 @@ import { createClient } from '../src/client';
 
 // Get references to mocked functions
 const { createProvider: createProviderMock } = await import('../src/utils');
-const { createManifoldApiClient } = await import('../src/api/manifold-api');
+const manifoldApiClient = (await import('../src/api/manifold-api')).default as any;
 const { BlindMintProduct: BlindMintProductMock } = await import('../src/products/blindmint');
-const getCompleteInstanceDataMock = (createManifoldApiClient as any)().getCompleteInstanceData;
+const getCompleteInstanceDataMock = manifoldApiClient.getCompleteInstanceData;
 
 describe('createClient', () => {
   beforeEach(() => {

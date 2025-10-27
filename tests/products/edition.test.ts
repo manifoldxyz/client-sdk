@@ -10,9 +10,16 @@ import * as ethers from 'ethers';
 // Mock dependencies
 vi.mock('../../src/utils/provider-factory');
 vi.mock('../../src/utils/contract-factory');
-vi.mock('../../src/libs/money');
 vi.mock('../../src/utils/gas-estimation');
 vi.mock('../../src/utils/validation');
+
+// Mock Money class with proper structure
+vi.mock('../../src/libs/money', () => ({
+  Money: {
+    create: vi.fn(),
+    zero: vi.fn(),
+  }
+}));
 
 // Import mocked modules
 import { createProvider } from '../../src/utils/provider-factory';
@@ -21,7 +28,6 @@ import { estimateGas } from '../../src/utils/gas-estimation';
 import { validateAddress } from '../../src/utils/validation';
 
 const mockCreateProvider = createProvider as MockedFunction<typeof createProvider>;
-const mockContractFactory = ContractFactory as MockedFunction<typeof ContractFactory>;
 const mockEstimateGas = estimateGas as MockedFunction<typeof estimateGas>;
 const mockValidateAddress = validateAddress as MockedFunction<typeof validateAddress>;
 
@@ -137,6 +143,27 @@ describe('EditionProduct', () => {
     // Setup mock contracts
     mockClaimContract = createMockClaimContract();
     mockERC20Contract = createMockERC20Contract();
+    
+    // Setup default return values for contract methods
+    mockClaimContract.getClaim.mockResolvedValue({
+      cost: ethers.BigNumber.from('1000000000000000000'), // 1 ETH
+      erc20: ethers.constants.AddressZero,
+      totalMax: 1000,
+      total: 100,
+      walletMax: 5,
+      startDate: Math.floor(Date.now() / 1000) - 3600, // 1 hour ago
+      endDate: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+      merkleRoot: ethers.constants.HashZero,
+      paymentReceiver: '0x1111111111111111111111111111111111111111',
+      signingAddress: '0x2222222222222222222222222222222222222222',
+      location: 'ipfs://QmXxx',
+      storageProtocol: 1,
+      contractVersion: 7,
+      identical: true,
+    });
+    mockClaimContract.MINT_FEE.mockResolvedValue(ethers.BigNumber.from('500000000000000000')); // 0.5 ETH
+    mockClaimContract.MINT_FEE_MERKLE.mockResolvedValue(ethers.BigNumber.from('690000000000000000')); // 0.69 ETH
+    mockClaimContract.getTotalMints.mockResolvedValue(ethers.BigNumber.from('100'));
 
     // Setup mock contract factory
     mockContractFactoryInstance = {
@@ -147,14 +174,19 @@ describe('EditionProduct', () => {
 
     // Setup mocks
     mockCreateProvider.mockReturnValue(mockProvider);
-    mockContractFactory.mockImplementation(() => mockContractFactoryInstance);
+    // Mock the ContractFactory as a constructor that returns our mock instance
+    vi.mocked(ContractFactory).mockImplementation(() => mockContractFactoryInstance as any);
     mockValidateAddress.mockReturnValue(true);
     mockEstimateGas.mockResolvedValue(ethers.BigNumber.from('200000'));
 
     // Setup Money mock
-    const mockMoneyClass = Money as any;
-    mockMoneyClass.create = vi.fn().mockResolvedValue(createMockMoney());
-    mockMoneyClass.zero = vi.fn().mockResolvedValue(createMockMoney('0'));
+    vi.mocked(Money.create).mockImplementation(async (params: any) => {
+      const isERC20 = params?.erc20 && params.erc20 !== ethers.constants.AddressZero;
+      const valueStr = params?.value ? 
+        (typeof params.value === 'string' ? params.value : params.value.toString()) : '0';
+      return createMockMoney(valueStr, isERC20, params?.erc20);
+    });
+    vi.mocked(Money.zero).mockImplementation(() => createMockMoney('0'));
   });
 
   describe('Constructor', () => {
@@ -1059,7 +1091,7 @@ describe('EditionProduct', () => {
     });
 
     it('handles contract factory creation failure', async () => {
-      mockContractFactory.mockImplementation(() => {
+      vi.mocked(ContractFactory).mockImplementation(() => {
         throw new Error('Contract factory creation failed');
       });
 
