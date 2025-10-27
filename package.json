@@ -39,9 +39,9 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
-    "@manifoldxyz/js-ts-utils": "^7.5.0",
+    "@manifoldxyz/js-ts-utils": "^9.0.0",
     "@manifoldxyz/manifold-provider-client": "^0.2.0",
-    "@manifoldxyz/studio-apps-client": "^3.6.0",
+    "@manifoldxyz/studio-apps-client-public": "^1.0.0-beta.0",
     "ethers": "^5.7.2"
   },
   "peerDependencies": {
