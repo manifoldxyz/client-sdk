@@ -3,7 +3,7 @@ import { EditionProduct, isEditionProduct } from '../../src/products/edition';
 import { AppId, AppType } from '../../src/types/common';
 import { ClientSDKError, ErrorCode } from '../../src/types/errors';
 import type { InstanceData, EditionPublicData, EditionOnchainData } from '../../src/types/product';
-import type { InstancePreview } from '@manifoldxyz/studio-apps-client';
+import type { InstancePreview } from '@manifoldxyz/studio-apps-client-public';
 import { Money } from '../../src/libs/money';
 import * as ethers from 'ethers';
 

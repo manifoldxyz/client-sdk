@@ -40,7 +40,7 @@ import { createProvider } from '../utils/provider-factory';
 import { ContractFactory as ContractFactoryClass } from '../utils/contract-factory';
 import { validateAddress } from '../utils/validation';
 import { ClientSDKError, ErrorCode } from '../types/errors';
-import type { InstancePreview } from '@manifoldxyz/studio-apps-client';
+import type { InstancePreview } from '@manifoldxyz/studio-apps-client-public';
 import manifoldApiClient from '../api/manifold-api';
 import { estimateGas } from '../utils/gas-estimation';
 import { Money } from '../libs/money';

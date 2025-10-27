@@ -1,4 +1,4 @@
-import type { PublicInstance } from '@manifoldxyz/studio-apps-client';
+import type { PublicInstance } from '@manifoldxyz/studio-apps-client-public';
 import type { Address, ProductStatus, AppType } from './common';
 import type {
   BaseProduct,

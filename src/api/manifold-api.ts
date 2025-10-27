@@ -1,5 +1,5 @@
-import type { InstancePreview, PublicInstance } from '@manifoldxyz/studio-apps-client';
-import { StudioAppsClientForPublic } from '@manifoldxyz/studio-apps-client';
+import type { InstancePreview, PublicInstance } from '@manifoldxyz/studio-apps-client-public';
+import { StudioAppsClientForPublic } from '@manifoldxyz/studio-apps-client-public';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 
 /**

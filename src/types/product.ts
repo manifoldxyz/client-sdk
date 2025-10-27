@@ -1,4 +1,4 @@
-import type { InstancePreview, PublicInstance } from '@manifoldxyz/studio-apps-client';
+import type { InstancePreview, PublicInstance } from '@manifoldxyz/studio-apps-client-public';
 import type { Address, AppId, AppType, ProductStatus } from './common';
 import type {
   PreparedPurchase,
