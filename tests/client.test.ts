@@ -64,8 +64,8 @@ describe('createClient', () => {
   it('creates providers for supplied httpRPCs', () => {
     const providers = [{ mock: 1 }, { mock: 2 }];
     createProviderMock
-      .mockImplementationOnce(() => providers[0])
-      .mockImplementationOnce(() => providers[1]);
+      .mockImplementationOnce(async () => providers[0])
+      .mockImplementationOnce(async () => providers[1]);
 
     const client = createClient({
       httpRPCs: {

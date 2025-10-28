@@ -165,14 +165,14 @@ export class EditionProduct implements IEditionProduct {
     }
 
     try {
-      const contract = this._getClaimContract();
+      const contract = await this._getClaimContract();
 
       // Use getClaim method to fetch claim data
       const claimData = await contract.getClaim(this._creatorContract, this.id);
 
       // Fetch platform fees from contract first
       const networkId = this.data.publicData.network;
-      const provider = createProvider({
+      const provider = await createProvider({
         networkId,
         customRpcUrls: this._httpRPCs,
       });
@@ -295,7 +295,7 @@ export class EditionProduct implements IEditionProduct {
     }
 
     const onchainData = await this.fetchOnchainData();
-    const provider = createProvider({
+    const provider = await createProvider({
       networkId,
       customRpcUrls: this._httpRPCs,
     });
@@ -454,7 +454,7 @@ export class EditionProduct implements IEditionProduct {
         // This will handle network switch and adding custom network to user wallet if needed
         await account.switchNetwork(networkId);
         const address = await account.getAddress();
-        const editionContract = this._getClaimContract();
+        const editionContract = await this._getClaimContract();
 
         const gasEstimate = await estimateGas({
           contract: editionContract,
@@ -587,11 +587,11 @@ export class EditionProduct implements IEditionProduct {
     );
   }
 
-  private _getClaimContract() {
+  private async _getClaimContract(): Promise<EditionClaimContract> {
     const networkId = this.data.publicData.network || 1;
 
     // Use configured providers (READ operations)
-    const provider = createProvider({
+    const provider = await createProvider({
       networkId,
       customRpcUrls: this._httpRPCs,
     });
@@ -617,7 +617,7 @@ export class EditionProduct implements IEditionProduct {
     };
 
     const networkId = this.data.publicData.network;
-    const provider = createProvider({
+    const provider = await createProvider({
       networkId,
       customRpcUrls: this._httpRPCs,
     });
@@ -715,7 +715,7 @@ export class EditionProduct implements IEditionProduct {
 
     // For allowlist mints, fetch claimable merkle info
     if (this.data.publicData.instanceAllowlist?.merkleTreeId) {
-      const contract = this._getClaimContract();
+      const contract = await this._getClaimContract();
       const claimableMerkleInfo = await this._fetchClaimableMerkleInfo(
         this.data.publicData.instanceAllowlist.merkleTreeId,
         walletAddress,
@@ -763,7 +763,7 @@ export class EditionProduct implements IEditionProduct {
     }
 
     const onchainData = await this.fetchOnchainData();
-    const contract = this._getClaimContract();
+    const contract = await this._getClaimContract();
 
     // Calculate total available supply
     const totalSupply = onchainData.totalMax || Infinity;

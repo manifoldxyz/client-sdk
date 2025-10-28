@@ -173,7 +173,7 @@ describe('EditionProduct', () => {
     };
 
     // Setup mocks
-    mockCreateProvider.mockReturnValue(mockProvider);
+    mockCreateProvider.mockResolvedValue(mockProvider);
     // Mock the ContractFactory as a constructor that returns our mock instance
     vi.mocked(ContractFactory).mockImplementation(() => mockContractFactoryInstance as any);
     mockValidateAddress.mockReturnValue(true);
@@ -1082,9 +1082,7 @@ describe('EditionProduct', () => {
 
   describe('Error Scenarios', () => {
     it('handles provider creation failure', async () => {
-      mockCreateProvider.mockImplementation(() => {
-        throw new Error('Provider creation failed');
-      });
+      mockCreateProvider.mockRejectedValue(new Error('Provider creation failed'));
 
       const product = createProduct();
       await expect(product.fetchOnchainData()).rejects.toThrow(ClientSDKError);

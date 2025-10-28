@@ -1,6 +1,5 @@
 import type { HttpRPCs } from './common';
 import type { Product } from './product';
-import type { ethers } from 'ethers';
 
 /**
  * Configuration options for initializing the Manifold SDK client.
@@ -51,15 +50,7 @@ export interface ClientConfig {
  * @public
  */
 export interface ManifoldClient {
-  /**
-   * Map of configured JSON-RPC providers by network ID.
-   * Used internally for blockchain interactions.
-   *
-   * @internal
-   */
-  providers: {
-    [networkId: number]: ethers.providers.JsonRpcProvider;
-  };
+  httpRPCs: HttpRPCs;
 
   /**
    * Fetches detailed product information from Manifold.

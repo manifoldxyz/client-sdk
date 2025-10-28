@@ -6,8 +6,6 @@ import { BlindMintProduct } from '../products/blindmint';
 import { EditionProduct } from '../products/edition';
 import { validateInstanceId, parseManifoldUrl } from '../utils/validation';
 import manifoldApiClient from '../api/manifold-api';
-import type * as ethers from 'ethers';
-import { createProvider } from '../utils';
 
 /**
  * Type guard to check if instanceData is for BlindMint product type.
@@ -90,21 +88,8 @@ function isEditionInstanceData(
 export function createClient(config?: ClientConfig): ManifoldClient {
   const httpRPCs = config?.httpRPCs ?? {};
 
-  // Create JsonRpcProvider instances if httpRPCs is defined
-  const providers: Record<number, ethers.providers.JsonRpcProvider> = {};
-  if (httpRPCs && Object.keys(httpRPCs).length > 0) {
-    for (const [networkIdStr] of Object.entries(httpRPCs)) {
-      const networkId = Number(networkIdStr);
-      providers[networkId] = createProvider({
-        networkId,
-        customRpcUrls: httpRPCs,
-        useBridge: false,
-      });
-    }
-  }
-
   return {
-    providers,
+    httpRPCs,
     /**
      * Fetches detailed product information from Manifold.
      *

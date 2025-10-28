@@ -8,7 +8,7 @@ import type {
 import { Money } from '../libs/money';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import type { ManifoldClient } from '../types';
-import { ensureConnectedNetwork } from '../utils';
+import { createProvider, ensureConnectedNetwork } from '../utils';
 import type { Network } from '@manifoldxyz/js-ts-utils';
 
 // =============================================================================
@@ -292,7 +292,12 @@ class Ethers5Account implements IAccount {
       throw new ClientSDKError(ErrorCode.UNKNOWN_ERROR, `Unknown error, could not locate wallet`);
     }
     // Make sure the wallet is connected to the proper rpc
-    const provider = this._client.providers?.[networkId];
+    const provider = await createProvider({
+      customRpcUrls: this._client.httpRPCs,
+      networkId,
+      useBridge: false,
+    });
+
     if (!provider) {
       throw new ClientSDKError(
         ErrorCode.MISSING_RPC_URL,

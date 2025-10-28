@@ -167,7 +167,7 @@ export class BlindMintProduct implements IBlindMintProduct {
       return this.onchainData;
     }
 
-    const contract = this._getClaimContract();
+    const contract = await this._getClaimContract();
 
     try {
       // Use getClaim method like gachapon-widgets
@@ -180,7 +180,7 @@ export class BlindMintProduct implements IBlindMintProduct {
       // Fetch platform fee from contract and create Money object
       const mintFee = await contract.MINT_FEE();
       const networkId = this.data.publicData.network;
-      const provider = createProvider({
+      const provider = await createProvider({
         networkId,
         customRpcUrls: this._httpRPCs,
       });
@@ -290,7 +290,7 @@ export class BlindMintProduct implements IBlindMintProduct {
     }
 
     const onchainData = await this.fetchOnchainData();
-    const provider = createProvider({
+    const provider = await createProvider({
       networkId,
       customRpcUrls: this._httpRPCs,
     });
@@ -519,11 +519,11 @@ export class BlindMintProduct implements IBlindMintProduct {
   // HELPER METHODS
   // =============================================================================
 
-  private _getClaimContract(): BlindMintClaimContract {
+  private async _getClaimContract(): Promise<BlindMintClaimContract> {
     const networkId = this.data.publicData.network || 1;
 
     // Use configured providers (READ operations)
-    const provider = createProvider({
+    const provider = await createProvider({
       networkId,
       customRpcUrls: this._httpRPCs,
     });
@@ -558,7 +558,7 @@ export class BlindMintProduct implements IBlindMintProduct {
     };
 
     const networkId = this.data.publicData.network;
-    const provider = createProvider({
+    const provider = await createProvider({
       networkId,
       customRpcUrls: this._httpRPCs,
     });
@@ -634,7 +634,7 @@ export class BlindMintProduct implements IBlindMintProduct {
     quantity: number,
     value: ethers.BigNumber,
   ): Promise<ethers.BigNumber> {
-    const contract = this._getClaimContract();
+    const contract = await this._getClaimContract();
 
     // Use proper mintReserve signature with indices and proofs
     const mintIndices: number[] = [];
