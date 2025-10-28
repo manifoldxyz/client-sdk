@@ -25,12 +25,7 @@ export function MintButton() {
 
     try {
       // Create Manifold SDK client
-      const client = createClient({
-        httpRPCs: {
-          1: process.env.NEXT_PUBLIC_RPC_URL_MAINNET || 'https://eth-mainnet.g.alchemy.com/v2/demo',
-          8453: process.env.NEXT_PUBLIC_RPC_URL_BASE || 'https://base-mainnet.infura.io/v3/demo',
-        }
-      });
+      const client = createClient();
       const viemClient = walletClient;
       // Create viem adapter from wallet client
       const account = createAccountViem({
@@ -70,7 +65,7 @@ export function MintButton() {
       setStatus(`✅ Mint successful! TX: ${txHash?.slice(0, 10)}...`);
       
     } catch (err: any) {
-      console.error('Mint error:', err);
+      console.error('Mint error:', err.details);
       setError(err.message || 'Failed to mint');
       setStatus('');
     } finally {

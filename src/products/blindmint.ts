@@ -446,7 +446,6 @@ export class BlindMintProduct implements IBlindMintProduct {
         const confirmation = await account.sendTransactionWithConfirmation(txRequest, {
           confirmations: options?.confirmations || 1,
         });
-
         const receiptInfo = confirmation.receipt;
         const blockNumber = receiptInfo?.blockNumber ?? confirmation.blockNumber;
         const gasUsedValue = receiptInfo?.gasUsed ?? confirmation.gasUsed;

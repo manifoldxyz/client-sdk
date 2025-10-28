@@ -14,6 +14,7 @@ import { ethers } from 'ethers';
 
 import type { TransactionReceipt, WalletClient, Account, Chain, Transport } from 'viem';
 import { waitForTransactionReceipt, getBalance, readContract } from 'viem/actions';
+import { optimism, base, sepolia, mainnet, shape, polygon } from 'viem/chains';
 
 // =============================================================================
 // VIEM ADAPTER IMPLEMENTATION
@@ -87,7 +88,6 @@ class ViemAccount implements IAccount {
     try {
       // Convert universal request to viem transaction request
       const viemRequest = this._convertToViemRequest(request);
-
       // Send transaction using viem
       const hash = await this._walletClient.sendTransaction(viemRequest);
 
@@ -319,7 +319,7 @@ class ViemAccount implements IAccount {
     }
 
     if (request.chainId !== undefined) {
-      viemRequest.chainId = request.chainId;
+      viemRequest.chain = this._chainIdToViemChain(request.chainId);
     }
 
     if (request.type !== undefined) {
@@ -335,6 +335,28 @@ class ViemAccount implements IAccount {
     }
 
     return viemRequest as Parameters<WalletClient['sendTransaction']>[0];
+  }
+
+  private _chainIdToViemChain(chainId: number): Chain {
+    switch (chainId) {
+      case 1:
+        return mainnet;
+      case 10:
+        return optimism;
+      case 11155111:
+        return sepolia;
+      case 8453:
+        return base;
+      case 360:
+        return shape;
+      case 137:
+        return polygon;
+      default:
+        throw new ClientSDKError(
+          ErrorCode.UNSUPPORTED_TYPE,
+          `Unsupported chain ID: ${chainId}. Please add support for this chain in the viem adapter.`,
+        );
+    }
   }
 
   /**
@@ -572,7 +594,7 @@ class ViemAccount implements IAccount {
       adapterType: this.adapterType,
       method,
       params,
-      originalError: error instanceof Error ? error : undefined,
+      originalError: error,
     });
   }
 }
