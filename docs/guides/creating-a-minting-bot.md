@@ -61,42 +61,7 @@ try {
 * **Retry Logic**: Implement retry mechanisms for transient failures
 * **Security**: Never commit private keys, use environment variables
 
-## Advanced Features
 
-### Monitoring and Auto-Minting
-
-Monitor products and automatically mint when they become active:
-
-```typescript
-// See examples/server-side/edition-bot.ts for full implementation
-async function monitorAndMint(instanceId: string) {
-  while (true) {
-    const product = await client.getProduct(instanceId);
-    const status = await product.getStatus();
-    
-    if (status === 'active') {
-      // Execute mint
-      return await executeMint(product);
-    }
-    
-    await sleep(60000); // Check every minute
-  }
-}
-```
-
-### Batch Minting for Airdrops
-
-Mint for multiple wallets efficiently:
-
-```typescript
-// See examples/server-side/ for full implementation
-const wallets = ['privateKey1', 'privateKey2', 'privateKey3'];
-for (const privateKey of wallets) {
-  const wallet = new ethers.Wallet(privateKey, provider);
-  // Execute mint for each wallet with proper error handling
-  await mintWithRetry(wallet);
-}
-```
 
 ## Environment Configuration
 
@@ -104,10 +69,6 @@ for (const privateKey of wallets) {
 # Required
 WALLET_PRIVATE_KEY=your_private_key_here
 INSTANCE_ID=your_product_instance_id
-
-# RPC Endpoints
-MAINNET_RPC=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
-BASE_RPC=https://base-mainnet.g.alchemy.com/v2/YOUR_KEY
 
 # Optional
 MINT_QUANTITY=1
