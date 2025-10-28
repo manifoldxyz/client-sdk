@@ -19,11 +19,7 @@ Creates an account representation from an **Ethers v5** signer or wallet.\
 
 <pre class="language-jsx"><code class="lang-jsx">import { createAccountEthers5, createClient } from '@manifoldxyz/client-sdk';
 
-const client = createClient({
-  httpRPCs: {
-    1: 'https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY',
-  },
-});
+const client = createClient();
 <strong>const product = await client.getProduct('4150231280');
 </strong>const prepared = await product.preparePurchase({
   address: wallet.address,

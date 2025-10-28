@@ -22,7 +22,6 @@ npm install
 ```bash
 NEXT_PUBLIC_INSTANCE_ID= # You blind mint instance ID from Manifold Studio 
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID= # Get one at https://dashboard.reown.com/sign-in
-NEXT_PUBLIC_ALCHEMY_API_KEY= # Get one at https://dashboard.alchemy.com/
 ```
 
 **Run locally**
@@ -53,7 +52,7 @@ export default function Home() {
 }
 ```
 
-3. Implement the [MintButton.tsx](../../examples/step-by-step-mint/src/components/MintButton.tsx)
+3. Implement the [MintButton.tsx](../../../examples/step-by-step-mint/src/components/MintButton.tsx)
 
 On button click, initialize the client, fetch the product, and call `preparePurchase` to get the steps.
 
@@ -62,12 +61,7 @@ This is handled within [handlePreparePurchase](https://github.com/manifoldxyz/cl
 a. Create a [Manifold Client](../../sdk/manifold-client/)
 
 ```typescript
-const client = createClient({
-  httpRPCs: {
-    1: process.env.NEXT_PUBLIC_RPC_URL_MAINNET,
-    8453: process.env.NEXT_PUBLIC_RPC_URL_BASE
-  }
-});
+const client = createClient();
 ```
 
 b. Fetch the product and validate the type
@@ -144,7 +138,7 @@ b. Execute the step by calling the [execute](../../sdk/transaction-steps/execute
   
 </code></pre>
 
-c. Render the [StepModal](../../examples/step-by-step-mint/src/components/StepModal.tsx)
+c. Render the [StepModal](../../../examples/step-by-step-mint/src/components/StepModal.tsx)
 
 ```tsx
   {preparedPurchase && (

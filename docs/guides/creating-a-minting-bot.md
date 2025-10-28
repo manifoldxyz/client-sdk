@@ -1,12 +1,13 @@
-# Creating a Minting Bot
+# Creating a minting bot
 
-The SDK can be used on the server side, enabling use cases such as running a [minting bot ](https://help.manifold.xyz/en/articles/11509060-bankrbot)
+The SDK can be used on the server side, enabling use cases such as running a [minting bot](https://help.manifold.xyz/en/articles/11509060-bankrbot)
 
 ## Complete Examples Available
 
 Full working examples with comprehensive error handling, monitoring, and batch operations are available in the `/examples/server-side/` directory:
-- **`blindmint-bot.ts`** - Complete BlindMint automated minting bot with retry logic
-- **`edition-bot.ts`** - Complete Edition automated minting bot with monitoring capabilities
+
+* **`blindmint-bot.ts`** - Complete BlindMint automated minting bot with retry logic
+* **`edition-bot.ts`** - Complete Edition automated minting bot with monitoring capabilities
 
 ## Basic Example
 
@@ -14,9 +15,7 @@ Full working examples with comprehensive error handling, monitoring, and batch o
 import { createClient, createAccountEthers5, isBlindMintProduct, isEditionProduct } from '@manifoldxyz/client-sdk';
 import { ethers } from "ethers";
 
-const client = createClient({
-  httpRPCs: { 1: process.env.MAINNET_RPC! },
-});
+const client = createClient();
 
 const product = await client.getProduct('INSTANCE_ID');
 
@@ -48,7 +47,7 @@ try {
     preparedPurchase: prepared,
   });
   console.log(order.status, order.receipts.map((r) => r.txHash));
-catch (error) {
+} catch (error) {
   console.log(`Unable to execute transaction: ${error.message}`)
 }
 ```
@@ -65,6 +64,7 @@ catch (error) {
 ## Advanced Features
 
 ### Monitoring and Auto-Minting
+
 Monitor products and automatically mint when they become active:
 
 ```typescript
@@ -85,6 +85,7 @@ async function monitorAndMint(instanceId: string) {
 ```
 
 ### Batch Minting for Airdrops
+
 Mint for multiple wallets efficiently:
 
 ```typescript
@@ -116,7 +117,7 @@ MAX_RETRIES=3
 
 ## Resources
 
-* **[Complete BlindMint Bot Example](../../examples/server-side/blindmint-bot.ts)** - Full implementation with pools, tiers, and reveal handling
-* **[Complete Edition Bot Example](../../examples/server-side/edition-bot.ts)** - Full implementation with monitoring and promo codes
-* **[Server-Side Examples README](../../examples/server-side/README.md)** - Setup and deployment guide
+* [**Complete BlindMint Bot Example**](../../examples/server-side/blindmint-bot.ts) - Full implementation with pools, tiers, and reveal handling
+* [**Complete Edition Bot Example**](../../examples/server-side/edition-bot.ts) - Full implementation with monitoring and promo codes
+* [**Server-Side Examples README**](../../examples/server-side/) - Setup and deployment guide
 * See method documentation for detailed error descriptions

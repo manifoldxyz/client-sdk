@@ -28,14 +28,9 @@ npm install @manifoldxyz/client-sdk
 {% tab title="index.ts" %}
 ```typescript
 import { createClient, isBlindMintProduct, isEditionProduct, createAccountViem } from '@manifoldxyz/client-sdk';
-import { walletClient } from './client.ts';
+import { walletClient } from './walletClient.ts';
 
-const client = createClient({
-  httpRPCs: {
-    1: 'https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY',
-    8453: 'https://base-mainnet.infura.io/v3/YOUR_KEY',
-  },
-});
+const client = createClient();
 
 // Fetch product
 const product = await client.getProduct('4150231280');
@@ -77,7 +72,7 @@ if (isEditionProduct(product)) {
 ```
 {% endtab %}
 
-{% tab title="client.ts" %}
+{% tab title="walletClient.ts" %}
 ```typescript
 import { createWalletClient, custom } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
@@ -97,8 +92,6 @@ export { walletClient }
 ## Create your first product
 
 Head over to [Manifold Studio](https://studio.manifold.xyz/) to [create your first product](https://help.manifold.xyz/en/collections/9493376-your-create-menu). The SDK currently supports [Edition](https://help.manifold.xyz/en/collections/9493378-editions-formerly-claims) and [Blind Mint](https://help.manifold.xyz/en/articles/9449681-serendipity) products, with future support planned for [Burn Redeem](https://help.manifold.xyz/en/articles/9387352-create-a-burn-redeem-campaign).
-
-
 
 1. Visit [studio.manifold.xyz](https://studio.manifold.xyz/) and sign in.
 2. Navigate to the [Create+ Menu](https://help.manifold.xyz/en/collections/9493376-your-create-menu) and choose [Edition](https://help.manifold.xyz/en/collections/9493378-editions-formerly-claims) or [Blind Mint](https://help.manifold.xyz/en/articles/9449681-serendipity) .
@@ -141,4 +134,4 @@ If you encounter installation or build errors, the most common cause is using an
 \
 This entire site is converted into a single markdown doc that can fit inside the context window of most LLMs. See [The /llms.txt file](https://manifold-1.gitbook.io/manifold-client-sdk/llms-full.txt).
 
-\
+\\
