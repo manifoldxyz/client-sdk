@@ -12,7 +12,6 @@ Before getting started, make sure you have the following:
   * Check your version: `node --version`
   * Download from [nodejs.org](https://nodejs.org/)
 * A package manager (npm, pnpm, or yarn)
-* RPC URLs for supported networks. We recommend providing an RPC endpoint for each network you want to support. You can obtain these from RPC providers such as [Alchemy](https://www.alchemy.com) or [Infura](https://infura.io).
 
 ## Installation <a href="#installation" id="installation"></a>
 
