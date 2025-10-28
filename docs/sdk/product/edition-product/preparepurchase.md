@@ -31,11 +31,7 @@ Simulates a purchase to check eligibility and calculate the total cost.
 
 <pre class="language-jsx"><code class="lang-jsx">import { createClient, type AppType } from '@manifoldxyz/client-sdk'
 
-const client = createClient({
-  httpRPCs: {
-    1: "&#x3C;https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY>",
-  }
-});
+const client = createClient();
 
 const product = await client.getProduct('12311232')
 if (product.type !== AppType.Edition) {

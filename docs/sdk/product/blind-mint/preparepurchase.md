@@ -24,11 +24,7 @@ Simulates purchase to check eligibility and get total cost.
 ```jsx
 import { createClient, type AppType, isBlindMintProduct } from '@manifoldxyz/client-sdk'
 
-const client = createClient({
-  httpRPCs: {
-    1: "<https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY>",
-  }
-});
+const client = createClient();
 
 const product = await client.getProduct('12311232')
 if (!isBlindMintProduct(product)) {
