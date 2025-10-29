@@ -20,18 +20,23 @@ export interface ProviderFactoryOptions {
 /**
  * Create dual provider instance with primary and bridge providers as fallback
  */
-export function createProvider(options: ProviderFactoryOptions): ethers.providers.JsonRpcProvider {
+export async function createProvider(
+  options: ProviderFactoryOptions,
+): Promise<ethers.providers.JsonRpcProvider> {
   const { networkId, customRpcUrls, useBridge = true } = options;
 
   // Create primary provider from custom RPC URLs if available
   const primary = createPrimaryProvider(networkId, customRpcUrls);
   if (primary) {
-    return primary;
+    const isHealthy = await isProviderHealthy(primary);
+    if (isHealthy) {
+      return primary;
+    }
   }
   if (!useBridge) {
     throw new ClientSDKError(
       ErrorCode.MISSING_RPC_URL,
-      `No RPC URL available for networkId ${networkId}`,
+      `Unable to obtain valid RPC URL for networkId ${networkId}`,
     );
   }
   const bridgeProvider = new ManifoldBridgeProvider(networkId);
@@ -63,5 +68,18 @@ function createPrimaryProvider(
   } catch (error) {
     console.log('errrr', error);
     return null;
+  }
+}
+
+/**
+ * Perform a lightweight health check to ensure the provider responds
+ */
+async function isProviderHealthy(provider: ethers.providers.JsonRpcProvider): Promise<boolean> {
+  try {
+    await provider.getBlockNumber();
+    return true;
+  } catch (error) {
+    console.warn('Primary RPC health check failed:', (error as Error).message);
+    return false;
   }
 }

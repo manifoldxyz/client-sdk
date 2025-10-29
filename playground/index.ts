@@ -36,19 +36,20 @@ const getNetworkRPCs = (): Record<number, string> => {
 
 interface ProductTestOptions {
   address: string;
+  recipientAddress?: string;
   account?: IAccount;
   executePurchase: boolean;
 }
 
 async function testEditionProduct(
   product: Product,
-  { address, account, executePurchase }: ProductTestOptions,
+  { address, recipientAddress, account, executePurchase }: ProductTestOptions,
 ) {
   console.log(`\n📦 Testing ${product.type} Product`);
   console.log(`   Name: ${product.data.appName || 'Unknown'}`);
   console.log(`   ID: ${product.id}`);
   console.log(`   Network: ${product.data.publicData.network}`);
-
+  const recipient = recipientAddress || address;
   try {
     // Get product status
     const status = await product.getStatus();
@@ -56,9 +57,9 @@ async function testEditionProduct(
 
     // Test allocation check
     const allocation = await product.getAllocations({
-      recipientAddress: address as `0x${string}`,
+      recipientAddress: recipient as `0x${string}`,
     });
-    console.log(`\n   🎫 Allocation for ${address.slice(0, 10)}...`);
+    console.log(`\n   🎫 Allocation for ${recipient.slice(0, 10)}...`);
     console.log(`      Eligible: ${allocation.isEligible}`);
     console.log(`      Available: ${allocation.quantity}`);
     if (allocation.reason) {
@@ -77,6 +78,7 @@ async function testEditionProduct(
 
       const prepared = await product.preparePurchase({
         address,
+        recipientAddress: recipient,
         payload,
       });
 
@@ -227,7 +229,7 @@ async function main() {
     console.log('   Wallet: Not configured (using read-only mode)');
   }
 
-  const testAddress = wallet?.address ?? '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0';
+  const testAddress = wallet?.address || '0x000000000000000000000000000000000000dead';
 
   // Create client
   const client = createClient({
