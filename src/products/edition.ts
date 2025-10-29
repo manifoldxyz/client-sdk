@@ -253,14 +253,23 @@ export class EditionProduct implements IEditionProduct {
    * @public
    */
   async preparePurchase(params: PreparePurchaseParams<EditionPayload>): Promise<PreparedPurchase> {
-    const { address, payload, account } = params;
+    const { userAddress, recipientAddress, payload, account } = params;
     const quantity = payload?.quantity || 1;
     const networkId = this.data.publicData.network;
-    const walletAddress = address;
 
-    if (!validateAddress(walletAddress)) {
-      throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Invalid wallet address', {
-        walletAddress,
+    // The address that will trigger and fund the transaction
+    const user = account ? await account.getAddress() : userAddress;
+    const recipient = recipientAddress || user;
+
+    if (!validateAddress(user)) {
+      throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Invalid user wallet address', {
+        user,
+      });
+    }
+
+    if (!validateAddress(recipient)) {
+      throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Invalid recipient wallet address', {
+        recipient,
       });
     }
 
@@ -286,7 +295,7 @@ export class EditionProduct implements IEditionProduct {
     }
 
     // Check allocations
-    const allocations = await this.getAllocations({ recipientAddress: walletAddress });
+    const allocations = await this.getAllocations({ recipientAddress: recipient });
     if (!allocations.isEligible) {
       throw new ClientSDKError(ErrorCode.NOT_ELIGIBLE, allocations.reason || 'Not eligible');
     }
@@ -337,8 +346,8 @@ export class EditionProduct implements IEditionProduct {
       if (totalCost.isERC20()) {
         const erc20Contract = contractFactory.createERC20Contract(tokenAddress);
         const [balance, currentAllowance] = await Promise.all([
-          erc20Contract.balanceOf(walletAddress),
-          erc20Contract.allowance(walletAddress, this._extensionAddress),
+          erc20Contract.balanceOf(user),
+          erc20Contract.allowance(user, this._extensionAddress),
         ]);
 
         if (balance.lt(totalCost.raw)) {
@@ -406,7 +415,7 @@ export class EditionProduct implements IEditionProduct {
         } else {
           // Try getting from available provider
           try {
-            const rawBalance = await provider.getBalance(walletAddress);
+            const rawBalance = await provider.getBalance(user);
             nativeBalance = await Money.create({
               value: rawBalance,
               networkId,
@@ -441,9 +450,6 @@ export class EditionProduct implements IEditionProduct {
     if (nativeCost) mintCost.native = nativeCost;
     if (erc20Costs.length > 0) mintCost.erc20s = erc20Costs;
 
-    // Generate merkle proofs if needed for allowlist
-    const { mintIndices, merkleProofs } = await this._generateMintProofs(walletAddress, quantity);
-
     const mintStep: TransactionStep = {
       id: 'mint',
       name: 'Mint Edition NFTs',
@@ -454,12 +460,25 @@ export class EditionProduct implements IEditionProduct {
         // This will handle network switch and adding custom network to user wallet if needed
         await account.switchNetwork(networkId);
         const address = await account.getAddress();
+        const mintToAddress = recipientAddress || address;
+        // Generate merkle proofs if needed for allowlist
+        const { mintIndices, merkleProofs } = await this._generateMintProofs(
+          mintToAddress,
+          quantity,
+        );
         const editionContract = await this._getClaimContract();
 
         const gasEstimate = await estimateGas({
           contract: editionContract,
           method: 'mintProxy',
-          args: [this._creatorContract, this.id, quantity, mintIndices, merkleProofs, address],
+          args: [
+            this._creatorContract,
+            this.id,
+            quantity,
+            mintIndices,
+            merkleProofs,
+            mintToAddress,
+          ],
           from: address,
           value: nativePaymentValue,
         });
@@ -473,7 +492,7 @@ export class EditionProduct implements IEditionProduct {
             quantity,
             mintIndices,
             merkleProofs,
-            address,
+            mintToAddress,
           ),
           value: nativePaymentValue.toString(),
           gasLimit,
@@ -682,7 +701,6 @@ export class EditionProduct implements IEditionProduct {
       address: _walletAddress,
       appId: AppId.EDITION,
     });
-
     const mintIndices = merkleInfo
       .filter((info) => info.value !== undefined)
       .map((claimMerkleInfo) => claimMerkleInfo.value as number);
@@ -707,12 +725,10 @@ export class EditionProduct implements IEditionProduct {
     quantity: number,
   ): Promise<{ mintIndices: number[]; merkleProofs: string[][] }> {
     const onchainData = await this.fetchOnchainData();
-
     // If no allowlist (merkle root is zero), return empty arrays
     if (onchainData.audienceType !== 'Allowlist') {
       return { mintIndices: [], merkleProofs: [] };
     }
-
     // For allowlist mints, fetch claimable merkle info
     if (this.data.publicData.instanceAllowlist?.merkleTreeId) {
       const contract = await this._getClaimContract();

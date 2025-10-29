@@ -3,9 +3,9 @@ import type { Cost, Money } from './money';
 import type { IAccount } from './account-adapter';
 
 export interface PreparePurchaseParams<T> {
-  address: Address;
-  account?: IAccount;
+  userAddress: Address;
   recipientAddress?: Address;
+  account?: IAccount;
   networkId?: number;
   payload: T;
   gasBuffer?: GasBuffer;
