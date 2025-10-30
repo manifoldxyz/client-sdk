@@ -19,6 +19,11 @@ const baseInstanceData = {
       contractAddress: '0x0000000000000000000000000000000000000002',
       networkId: 1,
       spec: 'ERC1155',
+      explorer: {
+        etherscanUrl: 'https://etherscan.io/address/0x0000000000000000000000000000000000000002',
+        manifoldUrl: 'https://manifold.xyz/@creator/contract/123',
+        openseaUrl: 'https://opensea.io/assets/ethereum/0x0000000000000000000000000000000000000002',
+      },
     },
     extensionAddress1155: {
       value: '0x0000000000000000000000000000000000000003',
@@ -144,12 +149,12 @@ describe('BlindMintProduct', () => {
         name: baseInstanceData.creator.name,
       },
       contract: {
-        id: baseInstanceData.publicData.contract.id,
         networkId: baseInstanceData.publicData.contract.networkId,
         contractAddress: baseInstanceData.publicData.contract.contractAddress,
         name: baseInstanceData.publicData.contract.name,
         symbol: baseInstanceData.publicData.contract.symbol,
-        spec: baseInstanceData.publicData.contract.spec,
+        spec: 'erc1155', // normalized to lowercase
+        explorer: baseInstanceData.publicData.contract.explorer,
       },
       networkId: baseInstanceData.publicData.network,
     });

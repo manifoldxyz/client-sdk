@@ -52,7 +52,14 @@ const baseInstanceData: InstanceData<EditionPublicData> = {
       networkId: 1,
       spec: 'erc721',
     },
-    extensionAddress: '0x9876543210987654321098765432109876543210',
+    extensionAddress721: {
+      value: '0x9876543210987654321098765432109876543210',
+      version: 7,
+    },
+    extensionAddress1155: {
+      value: '0x9876543210987654321098765432109876543211',
+      version: 7,
+    },
   },
   creator: {
     id: 42,
@@ -181,12 +188,16 @@ describe('EditionProduct', () => {
 
     // Setup Money mock
     vi.mocked(Money.create).mockImplementation(async (params: any) => {
+      // Handle undefined params
+      if (!params) {
+        return createMockMoney('0', false);
+      }
       const isERC20 = params?.erc20 && params.erc20 !== ethers.constants.AddressZero;
       const valueStr = params?.value ? 
         (typeof params.value === 'string' ? params.value : params.value.toString()) : '0';
       return createMockMoney(valueStr, isERC20, params?.erc20);
     });
-    vi.mocked(Money.zero).mockImplementation(() => createMockMoney('0'));
+    vi.mocked(Money.zero).mockImplementation(async () => createMockMoney('0'));
   });
 
   describe('Constructor', () => {
@@ -212,7 +223,7 @@ describe('EditionProduct', () => {
     it('stores creator contract and extension addresses', () => {
       const product = createProduct();
       expect(product.data.publicData.contract.contractAddress).toBe('0x1234567890123456789012345678901234567890');
-      expect(product.data.publicData.extensionAddress).toBe('0x9876543210987654321098765432109876543210');
+      expect(product.data.publicData.extensionAddress721.value).toBe('0x9876543210987654321098765432109876543210');
     });
   });
 
@@ -256,8 +267,8 @@ describe('EditionProduct', () => {
         baseInstanceData.publicData.contract.contractAddress,
         123456
       );
-      expect(onchainData.totalSupply).toBe(1000);
-      expect(onchainData.totalMinted).toBe(100);
+      expect(onchainData.totalMax).toBe(1000);
+      expect(onchainData.total).toBe(100);
       expect(onchainData.walletMax).toBe(5);
       expect(onchainData.audienceType).toBe('None'); // No merkle root
       expect(product.onchainData).toBe(onchainData);
@@ -321,10 +332,10 @@ describe('EditionProduct', () => {
       // Test ERC1155
       const product1155 = createProduct({}, { contract: { ...baseInstanceData.publicData.contract, spec: 'erc1155' } });
       await product1155.fetchOnchainData();
-      expect(mockContractFactoryInstance.createEditionContract).toHaveBeenCalledWith('0x9876543210987654321098765432109876543210');
+      expect(mockContractFactoryInstance.createEdition1155Contract).toHaveBeenCalledWith('0x9876543210987654321098765432109876543211');
 
       // Clear mock calls
-      mockContractFactoryInstance.createEditionContract.mockClear();
+      mockContractFactoryInstance.createEdition1155Contract.mockClear();
 
       // Test ERC721
       const product721 = createProduct();
@@ -474,12 +485,11 @@ describe('EditionProduct', () => {
       mockClaimContract.getTotalMints.mockRejectedValue(new Error('Contract call failed'));
 
       const product = createProduct();
-      const allocations = await product.getAllocations({
+      
+      // Should throw error when getTotalMints fails
+      await expect(product.getAllocations({
         recipientAddress: '0x1111111111111111111111111111111111111111',
-      });
-
-      expect(allocations.isEligible).toBe(true);
-      expect(allocations.quantity).toBe(5); // Falls back to wallet max
+      })).rejects.toThrow('Contract call failed');
     });
   });
 
@@ -510,7 +520,7 @@ describe('EditionProduct', () => {
     it('prepares purchase for native currency successfully', async () => {
       const product = createProduct();
       const prepared = await product.preparePurchase({
-        address: walletAddress,
+        userAddress: walletAddress,
         payload: { quantity: 2 },
       });
 
@@ -541,7 +551,7 @@ describe('EditionProduct', () => {
 
       const product = createProduct();
       const prepared = await product.preparePurchase({
-        address: walletAddress,
+        userAddress: walletAddress,
         payload: { quantity: 1 },
       });
 
@@ -576,7 +586,7 @@ describe('EditionProduct', () => {
 
       const product = createProduct();
       await expect(product.preparePurchase({
-        address: walletAddress,
+        userAddress: walletAddress,
         payload: { quantity: 1 },
       })).rejects.toThrow(ClientSDKError);
     });
@@ -596,7 +606,7 @@ describe('EditionProduct', () => {
 
       const product = createProduct();
       await expect(product.preparePurchase({
-        address: walletAddress,
+        userAddress: walletAddress,
         payload: { quantity: 1 },
       })).rejects.toThrow(ClientSDKError);
     });
@@ -616,7 +626,7 @@ describe('EditionProduct', () => {
 
       const product = createProduct();
       await expect(product.preparePurchase({
-        address: walletAddress,
+        userAddress: walletAddress,
         payload: { quantity: 1 },
       })).rejects.toThrow(ClientSDKError);
     });
@@ -643,7 +653,7 @@ describe('EditionProduct', () => {
 
       const product = createProduct();
       await expect(product.preparePurchase({
-        address: walletAddress,
+        userAddress: walletAddress,
         payload: { quantity: 1 },
       })).rejects.toThrow(ClientSDKError);
     });
@@ -651,7 +661,7 @@ describe('EditionProduct', () => {
     it('applies gas buffer correctly', async () => {
       const product = createProduct();
       const prepared = await product.preparePurchase({
-        address: walletAddress,
+        userAddress: walletAddress,
         payload: { quantity: 1 },
         gasBuffer: { multiplier: 1.5 }, // 50% buffer
       });
@@ -669,7 +679,7 @@ describe('EditionProduct', () => {
 
       const product = createProduct();
       const prepared = await product.preparePurchase({
-        address: walletAddress,
+        userAddress: walletAddress,
         payload: { quantity: 1 },
         account: mockAccount as any,
       });
@@ -700,7 +710,7 @@ describe('EditionProduct', () => {
 
       const product = createProduct();
       const prepared = await product.preparePurchase({
-        address: walletAddress,
+        userAddress: walletAddress,
         payload: { quantity: 1 },
       });
 
@@ -753,12 +763,31 @@ describe('EditionProduct', () => {
 
     it('executes purchase successfully', async () => {
       const product = createProduct();
+      const walletAddress = '0x1111111111111111111111111111111111111111';
       const mockStepExecute = vi.fn().mockResolvedValue({
-        networkId: 1,
-        step: 'mint',
-        txHash: '0x1234567890abcdef',
-        blockNumber: 12345,
-        gasUsed: BigInt(200000),
+        transactionReceipt: {
+          networkId: 1,
+          step: 'mint',
+          txHash: '0x1234567890abcdef',
+          blockNumber: 12345,
+          gasUsed: BigInt(200000),
+        },
+        order: {
+          walletAddress: walletAddress,
+          orderItems: [
+            {
+              tokenId: '1',
+              quantity: 1,
+              cost: createMockMoney('1000000000000000000'),
+            },
+            {
+              tokenId: '2',
+              quantity: 1,
+              cost: createMockMoney('1000000000000000000'),
+            },
+          ],
+          totalCost: createMockMoney('2000000000000000000'),
+        },
       });
 
       const preparedPurchase = {
@@ -777,9 +806,9 @@ describe('EditionProduct', () => {
       });
 
       expect(mockStepExecute).toHaveBeenCalledWith(mockAccount);
-      expect(order.status).toBe('completed');
-      expect(order.receipts).toHaveLength(1);
-      expect(order.buyer.walletAddress).toBe('0x1111111111111111111111111111111111111111');
+      expect(order.order).toBeDefined();
+      expect(order.transactionReceipt).toBeDefined();
+      expect(order.order.walletAddress).toBe(walletAddress);
     });
 
     it('handles step execution failure', async () => {
@@ -804,19 +833,35 @@ describe('EditionProduct', () => {
 
     it('executes multiple steps in sequence', async () => {
       const product = createProduct();
+      const walletAddress = '0x1111111111111111111111111111111111111111';
       const mockApprovalExecute = vi.fn().mockResolvedValue({
-        networkId: 1,
-        step: 'approve-usdc',
-        txHash: '0xabcdef1234567890',
-        blockNumber: 12344,
-        gasUsed: BigInt(50000),
+        transactionReceipt: {
+          networkId: 1,
+          step: 'approve-usdc',
+          txHash: '0xabcdef1234567890',
+          blockNumber: 12344,
+          gasUsed: BigInt(50000),
+        },
       });
       const mockMintExecute = vi.fn().mockResolvedValue({
-        networkId: 1,
-        step: 'mint',
-        txHash: '0x1234567890abcdef',
-        blockNumber: 12345,
-        gasUsed: BigInt(200000),
+        transactionReceipt: {
+          networkId: 1,
+          step: 'mint',
+          txHash: '0x1234567890abcdef',
+          blockNumber: 12345,
+          gasUsed: BigInt(200000),
+        },
+        order: {
+          walletAddress: walletAddress,
+          orderItems: [
+            {
+              tokenId: '1',
+              quantity: 2,
+              cost: createMockMoney('2000000000000000000'),
+            },
+          ],
+          totalCost: createMockMoney('2000000000000000000'),
+        },
       });
 
       const preparedPurchase = {
@@ -846,7 +891,8 @@ describe('EditionProduct', () => {
 
       expect(mockApprovalExecute).toHaveBeenCalledWith(mockAccount);
       expect(mockMintExecute).toHaveBeenCalledWith(mockAccount);
-      expect(order.receipts).toHaveLength(2);
+      expect(order.order).toBeDefined();
+      expect(order.transactionReceipt).toBeDefined();
     });
 
     it('includes successful receipts when later step fails', async () => {
@@ -1010,14 +1056,21 @@ describe('EditionProduct', () => {
         expect(media).toEqual({
           image: 'https://example.com/thumbnail.jpg',
           imagePreview: 'https://example.com/thumbnail.jpg',
+          animation: undefined,
+          animationPreview: 'https://example.com/animation.mp4',
         });
       });
 
       it('returns undefined when no thumbnail', async () => {
-        const product = createProduct({}, {}, { thumbnail: undefined });
+        const product = createProduct({}, { asset: { ...baseInstanceData.publicData.asset, image: undefined, image_preview: undefined, animation: undefined, animation_preview: undefined } }, { thumbnail: undefined });
         const media = await product.getPreviewMedia();
 
-        expect(media).toBeUndefined();
+        expect(media).toEqual({
+          image: undefined,
+          imagePreview: undefined, 
+          animation: undefined,
+          animationPreview: undefined,
+        });
       });
     });
   });
@@ -1138,7 +1191,7 @@ describe('EditionProduct', () => {
 
       const product = createProduct();
       const prepared = await product.preparePurchase({
-        address: '0x1111111111111111111111111111111111111111',
+        userAddress: '0x1111111111111111111111111111111111111111',
         payload: { quantity: 1 },
       });
 
@@ -1163,7 +1216,7 @@ describe('EditionProduct', () => {
       const product = createProduct();
       const onchainData = await product.fetchOnchainData();
 
-      expect(onchainData.totalSupply).toBe(Number.MAX_SAFE_INTEGER); // Unlimited supply is represented as MAX_SAFE_INTEGER
+      expect(onchainData.totalMax).toBe(null); // Unlimited supply is represented as null
       
       const status = await product.getStatus();
       expect(status).toBe('active'); // Should not be sold out

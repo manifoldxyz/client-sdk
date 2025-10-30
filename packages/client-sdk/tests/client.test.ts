@@ -57,16 +57,11 @@ describe('createClient', () => {
 
   it('returns empty providers when no RPCs supplied', () => {
     const client = createClient();
-    expect(client.providers).toEqual({});
+    expect(client.httpRPCs).toEqual({});
     expect(createProviderMock).not.toHaveBeenCalled();
   });
 
   it('creates providers for supplied httpRPCs', () => {
-    const providers = [{ mock: 1 }, { mock: 2 }];
-    createProviderMock
-      .mockImplementationOnce(async () => providers[0])
-      .mockImplementationOnce(async () => providers[1]);
-
     const client = createClient({
       httpRPCs: {
         1: 'https://mainnet.rpc',
@@ -74,17 +69,13 @@ describe('createClient', () => {
       },
     });
 
-    expect(createProviderMock).toHaveBeenCalledTimes(2);
-    expect(createProviderMock).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({ networkId: 1, useBridge: false }),
-    );
-    expect(createProviderMock).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({ networkId: 10, useBridge: false }),
-    );
-    expect(client.providers[1]).toBe(providers[0]);
-    expect(client.providers[10]).toBe(providers[1]);
+    // Client just stores httpRPCs, doesn't create providers immediately
+    expect(client.httpRPCs).toEqual({
+      1: 'https://mainnet.rpc',
+      10: 'https://optimism.rpc',
+    });
+    // createProvider is not called during client creation
+    expect(createProviderMock).not.toHaveBeenCalled();
   });
 
   it('rejects malformed instance ids', async () => {

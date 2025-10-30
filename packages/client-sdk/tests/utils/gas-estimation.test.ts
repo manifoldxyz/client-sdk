@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ethers } from 'ethers';
 import { estimateGas, applyGasBuffer } from '../../src/utils/gas-estimation';
+import { ErrorCode } from '../../src/types/errors';
 
 describe('gas estimation utilities', () => {
   it('estimates gas using contract method when available', async () => {
@@ -44,19 +45,22 @@ describe('gas estimation utilities', () => {
     expect(result).toEqual(fallback);
   });
 
-  it('falls back to default gas when method is missing', async () => {
+  it('throws error when method is missing and no fallback provided', async () => {
     const contract = {
       estimateGas: {},
     } as unknown as ethers.Contract;
 
-    const result = await estimateGas({
-      contract,
-      method: 'approve',
-      args: [],
-      from: '0x0000000000000000000000000000000000000001',
+    await expect(
+      estimateGas({
+        contract,
+        method: 'approve',
+        args: [],
+        from: '0x0000000000000000000000000000000000000001',
+      })
+    ).rejects.toMatchObject({
+      code: ErrorCode.ESTIMATION_FAILED,
+      message: 'Method approve not found on contract',
     });
-
-    expect(result).toEqual(ethers.BigNumber.from(200000));
   });
 
   it('applies buffer percentage to gas estimates', () => {
