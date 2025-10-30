@@ -4,7 +4,6 @@ import type {
   AllocationResponse,
   PreparePurchaseParams,
   PurchaseParams,
-  Order,
   ProductMetadata,
   ProductRule,
   ProductProvenance,
@@ -27,6 +26,10 @@ import type {
   ClaimableToken,
   BlindMintTierProbability,
   BlindMintProduct as IBlindMintProduct,
+  Receipt,
+  TransactionReceipt,
+  Contract,
+  BlindMintPublicDataResponse,
 } from '../types';
 import type { Address } from '../types/common';
 import { AppType, AppId } from '../types/common';
@@ -37,11 +40,12 @@ import { createProvider } from '../utils/provider-factory';
 import { ContractFactory as ContractFactoryClass } from '../utils/contract-factory';
 import { validateAddress } from '../utils/validation';
 import { ClientSDKError, ErrorCode } from '../types/errors';
-import type { InstancePreview } from '@manifoldxyz/studio-apps-client-public';
+import type { InstancePreview, PublicInstance } from '@manifoldxyz/studio-apps-client-public';
 import { estimateGas } from '../utils/gas-estimation';
 import { Money } from '../libs/money';
 import type { Cost } from '../types/money';
-import type { TransactionReceipt } from '../types/purchase';
+import type { UniversalTransactionResponse } from '../types/account-adapter';
+import { convertManifoldContractToContract } from '../utils/common';
 
 /**
  * BlindMint product implementation for mystery/gacha-style NFT mints.
@@ -86,8 +90,6 @@ export class BlindMintProduct implements IBlindMintProduct {
   onchainData?: BlindMintOnchainData;
 
   // Internal state
-  private _creatorContract: Address;
-  private _extensionAddress: Address;
   private _platformFee?: Money;
   private _httpRPCs?: Record<number, string>;
 
@@ -104,7 +106,7 @@ export class BlindMintProduct implements IBlindMintProduct {
    * @internal
    */
   constructor(
-    instanceData: InstanceData<BlindMintPublicData>,
+    instanceData: PublicInstance<BlindMintPublicDataResponse>,
     previewData: InstancePreview,
     options: {
       httpRPCs?: Record<number, string>;
@@ -114,7 +116,7 @@ export class BlindMintProduct implements IBlindMintProduct {
     this._httpRPCs = httpRPCs;
 
     // Validate app ID
-    if (instanceData.appId !== AppId.BLIND_MINT_1155) {
+    if (instanceData.appId !== (AppId.BLIND_MINT_1155 as number)) {
       throw new ClientSDKError(
         ErrorCode.INVALID_INPUT,
         `Invalid app ID for BlindMint. Expected ${AppId.BLIND_MINT_1155}, received ${instanceData.appId}`,
@@ -122,16 +124,20 @@ export class BlindMintProduct implements IBlindMintProduct {
       );
     }
 
-    const publicData = instanceData.publicData;
-
     // Store instance data with properly typed publicData
-    this.data = instanceData;
+    this.data = {
+      ...instanceData,
+      publicData: {
+        ...instanceData.publicData,
+        contract: convertManifoldContractToContract(
+          instanceData.publicData.contract,
+          instanceData.creator.slug || '',
+        ),
+      },
+    };
     this.previewData = previewData;
 
     this.id = instanceData.id;
-
-    this._creatorContract = publicData.contract.contractAddress;
-    this._extensionAddress = publicData.extensionAddress1155.value;
   }
 
   // =============================================================================
@@ -248,14 +254,21 @@ export class BlindMintProduct implements IBlindMintProduct {
   async preparePurchase(
     params: PreparePurchaseParams<BlindMintPayload>,
   ): Promise<PreparedPurchase> {
-    const { address, payload, account } = params;
+    const { userAddress, recipientAddress, payload, account } = params;
     const quantity = payload?.quantity || 1;
     const networkId = this.data.publicData.network;
-    const walletAddress = address;
+    const walletAddress = account ? await account.getAddress() : userAddress;
+    const mintRecipient = recipientAddress || walletAddress;
 
-    if (!validateAddress(walletAddress)) {
+    if (!walletAddress || !validateAddress(walletAddress)) {
       throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Invalid wallet address', {
         walletAddress,
+      });
+    }
+
+    if (!mintRecipient || !validateAddress(mintRecipient)) {
+      throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Invalid recipient wallet address', {
+        recipientAddress: mintRecipient,
       });
     }
 
@@ -281,7 +294,7 @@ export class BlindMintProduct implements IBlindMintProduct {
     }
 
     // Check allocations
-    const allocations = await this.getAllocations({ recipientAddress: walletAddress });
+    const allocations = await this.getAllocations({ recipientAddress: mintRecipient });
     if (!allocations.isEligible) {
       throw new ClientSDKError(ErrorCode.NOT_ELIGIBLE, allocations.reason || 'Not eligible');
     }
@@ -370,16 +383,10 @@ export class BlindMintProduct implements IBlindMintProduct {
                 confirmations: options?.confirmations || 1,
               });
 
-              const receiptInfo = confirmation.receipt;
-              const blockNumber = receiptInfo?.blockNumber ?? confirmation.blockNumber;
-              const gasUsedValue = receiptInfo?.gasUsed ?? confirmation.gasUsed;
+              const transactionReceipt = this._buildTransactionReceipt(confirmation, networkId);
 
               return {
-                networkId,
-                step: approvalStep.id,
-                txHash: confirmation.hash,
-                blockNumber,
-                gasUsed: gasUsedValue ? BigInt(gasUsedValue) : undefined,
+                transactionReceipt,
               };
             },
           };
@@ -411,6 +418,25 @@ export class BlindMintProduct implements IBlindMintProduct {
       .filter(([address]) => address !== ethers.constants.AddressZero)
       .map(([, cost]) => cost);
 
+    // Build Cost structure (reuse the already computed values)
+    const resolvedNativeCost = nativeCost ?? (await Money.zero({ networkId, provider }));
+
+    const totalUsdValue =
+      (productCost.formattedUSD ? parseFloat(productCost.formattedUSD) : 0) +
+      (platformFee.formattedUSD ? parseFloat(platformFee.formattedUSD) : 0);
+
+    const cost: Cost = {
+      totalUSD: totalUsdValue > 0 ? totalUsdValue.toFixed(2) : '0',
+      total: {
+        native: resolvedNativeCost,
+        erc20s: erc20Costs,
+      },
+      breakdown: {
+        product: productCost,
+        platformFee,
+      },
+    };
+
     // Build mint step
     const mintCost: { native?: Money; erc20s?: Money[] } = {};
     if (nativeCost) mintCost.native = nativeCost;
@@ -425,13 +451,13 @@ export class BlindMintProduct implements IBlindMintProduct {
       execute: async (account: IAccount, options?: TransactionStepExecuteOptions) => {
         // This will handle network switch and adding custom network to user wallet if needed
         await account.switchNetwork(networkId);
-        const address = await account.getAddress();
+        const minterAddress = await account.getAddress();
         const blindMintContract = contractFactory.createBlindMintContract(this._extensionAddress);
         const gasEstimate = await estimateGas({
           contract: blindMintContract,
           method: 'mintReserve',
           args: [this._creatorContract, this.id, quantity],
-          from: address,
+          from: minterAddress,
           value: nativePaymentValue,
           fallbackGas: ethers.BigNumber.from(300000),
         });
@@ -446,33 +472,15 @@ export class BlindMintProduct implements IBlindMintProduct {
         const confirmation = await account.sendTransactionWithConfirmation(txRequest, {
           confirmations: options?.confirmations || 1,
         });
-        const receiptInfo = confirmation.receipt;
-        const blockNumber = receiptInfo?.blockNumber ?? confirmation.blockNumber;
-        const gasUsedValue = receiptInfo?.gasUsed ?? confirmation.gasUsed;
+        const transactionReceipt = this._buildTransactionReceipt(confirmation, networkId);
 
         return {
-          networkId,
-          step: mintStep.id,
-          txHash: confirmation.hash,
-          blockNumber,
-          gasUsed: gasUsedValue ? BigInt(gasUsedValue) : undefined,
+          transactionReceipt,
         };
       },
     };
 
     steps.push(mintStep);
-
-    // Build Cost structure (reuse the already computed values)
-    const cost: Cost = {
-      total: {
-        native: nativeCost || (await Money.zero({ networkId, provider })),
-        erc20s: erc20Costs,
-      },
-      breakdown: {
-        product: productCost,
-        platformFee,
-      },
-    };
 
     return {
       cost,
@@ -481,12 +489,12 @@ export class BlindMintProduct implements IBlindMintProduct {
     };
   }
 
-  async purchase(params: PurchaseParams): Promise<Order> {
+  async purchase(params: PurchaseParams): Promise<Receipt> {
     const { account, preparedPurchase } = params;
     const walletAddress = await account.getAddress();
 
     // Execute all steps sequentially
-    const receipts: TransactionReceipt[] = [];
+    const receipts: Receipt[] = [];
 
     for (const step of preparedPurchase.steps) {
       try {
@@ -499,25 +507,100 @@ export class BlindMintProduct implements IBlindMintProduct {
           `Transaction failed at step ${step.id}: ${(error as Error).message}`,
           {
             step: step.id,
-            receipts, // Include successful receipts
+            receipts: receipts.map((item) => item.transactionReceipt),
             error: error as Error,
           },
         );
       }
     }
 
+    const finalReceipt = receipts[receipts.length - 1];
+    if (!finalReceipt) {
+      throw new ClientSDKError(
+        ErrorCode.TRANSACTION_FAILED,
+        'No transactions were executed during purchase',
+      );
+    }
+
+    if (finalReceipt.order) {
+      return finalReceipt;
+    }
+
     return {
-      receipts,
-      status: 'completed',
-      buyer: { walletAddress },
-      total: preparedPurchase.cost,
-      items: [],
+      transactionReceipt: finalReceipt.transactionReceipt,
+      order: {
+        recipientAddress: walletAddress,
+        total: preparedPurchase.cost,
+        items: [],
+      },
     };
   }
 
   // =============================================================================
   // HELPER METHODS
   // =============================================================================
+
+  private _buildTransactionReceipt(
+    response: UniversalTransactionResponse,
+    networkId: number,
+  ): TransactionReceipt {
+    const fallbackReceipt = (
+      response as {
+        receipt?: { blockNumber?: number; gasUsed?: string | number | bigint | ethers.BigNumber };
+      }
+    ).receipt;
+
+    const resolvedBlockNumber =
+      response.blockNumber ?? fallbackReceipt?.blockNumber ?? response.logs?.[0]?.blockNumber;
+
+    const rawGasUsed = response.gasUsed ?? fallbackReceipt?.gasUsed ?? undefined;
+
+    const normalizeGasUsed = (
+      value: string | number | bigint | ethers.BigNumber | undefined,
+    ): bigint | undefined => {
+      if (value === undefined) {
+        return undefined;
+      }
+
+      if (typeof value === 'bigint') {
+        return value;
+      }
+
+      if (ethers.BigNumber.isBigNumber(value)) {
+        return BigInt(value.toString());
+      }
+
+      if (typeof value === 'number') {
+        return BigInt(Math.trunc(value));
+      }
+
+      return BigInt(value);
+    };
+
+    return {
+      networkId,
+      txHash: response.hash,
+      blockNumber: resolvedBlockNumber,
+      gasUsed: normalizeGasUsed(rawGasUsed),
+    };
+  }
+
+  private _getContractInfo(): Contract {
+    const contractData = this.data.publicData.contract;
+    const explorer = (contractData as unknown as { explorer?: Contract['explorer'] }).explorer || {
+      etherscanUrl: '',
+    };
+    const normalizedSpec = contractData.spec?.toLowerCase?.() === 'erc721' ? 'erc721' : 'erc1155';
+
+    return {
+      name: contractData.name,
+      symbol: contractData.symbol,
+      contractAddress: contractData.contractAddress,
+      networkId: contractData.networkId,
+      spec: normalizedSpec as Contract['spec'],
+      explorer,
+    };
+  }
 
   private async _getClaimContract(): Promise<BlindMintClaimContract> {
     const networkId = this.data.publicData.network || 1;
@@ -681,14 +764,7 @@ export class BlindMintProduct implements IBlindMintProduct {
         address: this.data.creator.address || '',
         name: this.data.creator.name,
       },
-      contract: {
-        id: publicData.contract.id,
-        networkId: publicData.contract.networkId,
-        contractAddress: publicData.contract.contractAddress,
-        name: publicData.contract.name,
-        symbol: publicData.contract.symbol,
-        spec: publicData.contract.spec,
-      },
+      contract: this._getContractInfo(),
       networkId: publicData.network,
     };
   }
@@ -701,14 +777,13 @@ export class BlindMintProduct implements IBlindMintProduct {
   }
 
   async getPreviewMedia(): Promise<Media | undefined> {
-    // Use previewData for media
-    if (this.previewData.thumbnail) {
-      return {
-        image: this.previewData.thumbnail,
-        imagePreview: this.previewData.thumbnail,
-      };
-    }
-    return undefined;
+    const image = this.previewData.thumbnail;
+    const imagePreview = this.previewData.thumbnail;
+
+    return {
+      image,
+      imagePreview,
+    };
   }
 
   // =============================================================================
@@ -831,9 +906,13 @@ export class BlindMintProduct implements IBlindMintProduct {
     return mintInterface.encodeFunctionData('mintReserve', [creatorContract, instanceId, quantity]);
   }
 
-  /**
-   * Calculate gas limit with buffer for adapter transactions
-   */
+  private get _creatorContract(): Address {
+    return this.data.publicData.contract.contractAddress;
+  }
+
+  private get _extensionAddress(): Address {
+    return this.data.publicData.extensionAddress1155.value;
+  }
 }
 
 // Type guard

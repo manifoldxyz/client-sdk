@@ -4,7 +4,6 @@ import type {
   AllocationResponse,
   PreparePurchaseParams,
   PurchaseParams,
-  Order,
   ProductMetadata,
   ProductRule,
   ProductProvenance,
@@ -25,6 +24,12 @@ import type {
   AudienceType,
   EditionProduct as IEditionProduct,
   Contract,
+  Receipt,
+  TransactionReceipt,
+  TokenOrder,
+  TokenOrderItem,
+  Token,
+  EditionPublicDataResponse,
 } from '../types';
 import { AppType, AppId } from '../types/common';
 import type {
@@ -45,7 +50,13 @@ import manifoldApiClient from '../api/manifold-api';
 import { estimateGas } from '../utils/gas-estimation';
 import { Money } from '../libs/money';
 import type { Cost } from '../types/money';
-import type { TransactionReceipt } from '../types/purchase';
+import type { UniversalTransactionResponse } from '../types/account-adapter';
+import { convertManifoldContractToContract } from '../utils/common';
+
+type MintedTokenAllocation = {
+  tokenId: string;
+  quantity: number;
+};
 
 // EditionSpec import removed - not needed after refactoring
 
@@ -65,9 +76,6 @@ import type { TransactionReceipt } from '../types/purchase';
  * @public
  */
 export class EditionProduct implements IEditionProduct {
-  /**
-   * Unique instance ID for this product.
-   */
   readonly id: number;
 
   /**
@@ -106,7 +114,7 @@ export class EditionProduct implements IEditionProduct {
    * @internal
    */
   constructor(
-    instanceData: InstanceData<EditionPublicData>,
+    instanceData: InstanceData<EditionPublicDataResponse>,
     previewData: InstancePreview,
     options: {
       httpRPCs?: Record<number, string>;
@@ -125,7 +133,16 @@ export class EditionProduct implements IEditionProduct {
     }
 
     // Store instance data with properly typed publicData
-    this.data = instanceData;
+    this.data = {
+      ...instanceData,
+      publicData: {
+        ...instanceData.publicData,
+        contract: convertManifoldContractToContract(
+          instanceData.publicData.contract,
+          instanceData.creator.slug || '',
+        ),
+      },
+    };
     this.previewData = previewData;
 
     this.id = instanceData.id;
@@ -387,16 +404,10 @@ export class EditionProduct implements IEditionProduct {
                 confirmations: options?.confirmations || 1,
               });
 
-              const receiptInfo = confirmation.receipt;
-              const blockNumber = receiptInfo?.blockNumber ?? confirmation.blockNumber;
-              const gasUsedValue = receiptInfo?.gasUsed ?? confirmation.gasUsed;
+              const transactionReceipt = this._buildTransactionReceipt(confirmation);
 
               return {
-                networkId,
-                step: approvalStep.id,
-                txHash: confirmation.hash,
-                blockNumber,
-                gasUsed: gasUsedValue ? BigInt(gasUsedValue) : undefined,
+                transactionReceipt,
               };
             },
           };
@@ -445,6 +456,25 @@ export class EditionProduct implements IEditionProduct {
       .filter(([address]) => address !== ethers.constants.AddressZero)
       .map(([, cost]) => cost);
 
+    // Build Cost structure (reuse the already computed values)
+    const resolvedNativeCost = nativeCost ?? (await Money.zero({ networkId, provider }));
+
+    const totalUsdValue =
+      (productCost.formattedUSD ? parseFloat(productCost.formattedUSD) : 0) +
+      (platformFee.formattedUSD ? parseFloat(platformFee.formattedUSD) : 0);
+
+    const cost: Cost = {
+      totalUSD: totalUsdValue > 0 ? totalUsdValue.toFixed(2) : '0',
+      total: {
+        native: resolvedNativeCost,
+        erc20s: erc20Costs,
+      },
+      breakdown: {
+        product: productCost,
+        platformFee,
+      },
+    };
+
     // Build mint step
     const mintCost: { native?: Money; erc20s?: Money[] } = {};
     if (nativeCost) mintCost.native = nativeCost;
@@ -459,8 +489,8 @@ export class EditionProduct implements IEditionProduct {
       execute: async (account: IAccount, options?: TransactionStepExecuteOptions) => {
         // This will handle network switch and adding custom network to user wallet if needed
         await account.switchNetwork(networkId);
-        const address = await account.getAddress();
-        const mintToAddress = recipientAddress || address;
+        const walletAddress = await account.getAddress();
+        const mintToAddress = recipientAddress || walletAddress;
         // Generate merkle proofs if needed for allowlist
         const { mintIndices, merkleProofs } = await this._generateMintProofs(
           mintToAddress,
@@ -479,7 +509,7 @@ export class EditionProduct implements IEditionProduct {
             merkleProofs,
             mintToAddress,
           ],
-          from: address,
+          from: walletAddress,
           value: nativePaymentValue,
         });
 
@@ -503,33 +533,24 @@ export class EditionProduct implements IEditionProduct {
           confirmations: options?.confirmations || 1,
         });
 
-        const receiptInfo = confirmation.receipt;
-        const blockNumber = receiptInfo?.blockNumber ?? confirmation.blockNumber;
-        const gasUsedValue = receiptInfo?.gasUsed ?? confirmation.gasUsed;
+        const transactionReceipt = this._buildTransactionReceipt(confirmation);
+        const logs = confirmation.logs ?? [];
+        const mintedAllocations = this._parseMintedTokensFromLogs(
+          logs,
+          walletAddress,
+          mintToAddress,
+        );
+
+        const order = this._buildTokenOrder(mintToAddress, mintedAllocations, cost);
 
         return {
-          networkId,
-          step: mintStep.id,
-          txHash: confirmation.hash,
-          blockNumber,
-          gasUsed: gasUsedValue ? BigInt(gasUsedValue) : undefined,
+          transactionReceipt,
+          order,
         };
       },
     };
 
     steps.push(mintStep);
-
-    // Build Cost structure (reuse the already computed values)
-    const cost: Cost = {
-      total: {
-        native: nativeCost || (await Money.zero({ networkId, provider })),
-        erc20s: erc20Costs,
-      },
-      breakdown: {
-        product: productCost,
-        platformFee,
-      },
-    };
 
     return {
       cost,
@@ -538,12 +559,11 @@ export class EditionProduct implements IEditionProduct {
     };
   }
 
-  async purchase(params: PurchaseParams): Promise<Order> {
+  async purchase(params: PurchaseParams): Promise<Receipt> {
     const { account, preparedPurchase } = params;
-    const walletAddress = await account.getAddress();
 
     // Execute all steps sequentially
-    const receipts: TransactionReceipt[] = [];
+    const receipts: Receipt[] = [];
 
     for (const step of preparedPurchase.steps) {
       try {
@@ -556,20 +576,22 @@ export class EditionProduct implements IEditionProduct {
           `Transaction failed at step ${step.id}: ${(error as Error).message}`,
           {
             step: step.id,
-            receipts, // Include successful receipts
+            receipts: receipts.map((item) => item.transactionReceipt),
             error: error as Error,
           },
         );
       }
     }
 
-    return {
-      receipts,
-      status: 'completed',
-      buyer: { walletAddress },
-      total: preparedPurchase.cost,
-      items: [],
-    };
+    const finalReceipt = receipts[receipts.length - 1];
+    if (!finalReceipt) {
+      throw new ClientSDKError(
+        ErrorCode.TRANSACTION_FAILED,
+        'No transactions were executed during purchase',
+      );
+    }
+
+    return finalReceipt;
   }
 
   // =============================================================================
@@ -887,19 +909,283 @@ export class EditionProduct implements IEditionProduct {
   }
 
   async getPreviewMedia(): Promise<Media | undefined> {
-    // Use previewData for media
-    if (this.previewData.thumbnail) {
-      return {
-        image: this.previewData.thumbnail,
-        imagePreview: this.previewData.thumbnail,
-      };
-    }
-    return undefined;
+    const image = this.data.publicData.asset.image || this.previewData.thumbnail;
+    const imagePreview = this.data.publicData.asset.image_preview || this.previewData.thumbnail;
+    const animation = this.data.publicData.asset.animation;
+    const animationPreview = this.data.publicData.asset.animation_preview;
+
+    return {
+      image,
+      imagePreview,
+      animation,
+      animationPreview,
+    };
   }
 
   // =============================================================================
   // HELPER METHODS
   // =============================================================================
+
+  private _buildTransactionReceipt(response: UniversalTransactionResponse): TransactionReceipt {
+    const resolvedBlockNumber = response.blockNumber;
+
+    const rawGasUsed = response.gasUsed;
+
+    const normalizeGasUsed = (
+      value: string | number | bigint | ethers.BigNumber | undefined,
+    ): bigint | undefined => {
+      if (value === undefined) {
+        return undefined;
+      }
+
+      if (typeof value === 'bigint') {
+        return value;
+      }
+
+      if (ethers.BigNumber.isBigNumber(value)) {
+        return BigInt(value.toString());
+      }
+
+      if (typeof value === 'number') {
+        return BigInt(Math.trunc(value));
+      }
+
+      return BigInt(value);
+    };
+
+    return {
+      networkId: response.chainId,
+      txHash: response.hash,
+      blockNumber: resolvedBlockNumber,
+      gasUsed: normalizeGasUsed(rawGasUsed),
+    };
+  }
+
+  private _parseMintedTokensFromLogs(
+    logs: UniversalTransactionResponse['logs'],
+    walletAddress: string,
+    recipientAddress: string,
+  ): MintedTokenAllocation[] {
+    if (!logs || logs.length === 0) {
+      return [];
+    }
+
+    const contractAddress = this.contract.contractAddress.toLowerCase();
+    const zeroAddress = ethers.constants.AddressZero.toLowerCase();
+    const targetAddresses = new Set([walletAddress.toLowerCase(), recipientAddress.toLowerCase()]);
+
+    const allocations: MintedTokenAllocation[] = [];
+    const contractSpec = this.contract.spec.toLowerCase();
+
+    if (contractSpec === 'erc721') {
+      const iface = new ethers.utils.Interface([
+        'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
+      ]);
+
+      for (const log of logs) {
+        if (!log.topics?.length) {
+          continue;
+        }
+        if (log.address?.toLowerCase() !== contractAddress) {
+          continue;
+        }
+
+        try {
+          const parsed = iface.parseLog({
+            topics: log.topics,
+            data: log.data,
+          });
+
+          const from = (parsed.args.from as string).toLowerCase();
+          if (from !== zeroAddress) {
+            continue;
+          }
+
+          const to = (parsed.args.to as string).toLowerCase();
+          if (!targetAddresses.has(to)) {
+            continue;
+          }
+          if (parsed?.args?.tokenId) {
+            const tokenId = (parsed.args.tokenId as bigint).toString();
+            allocations.push({ tokenId, quantity: 1 });
+          }
+        } catch {
+          // Non-transfer logs will fail to parse - ignore gracefully
+        }
+      }
+
+      return allocations;
+    }
+
+    const iface = new ethers.utils.Interface([
+      'event TransferSingle(address indexed operator, address indexed from, address indexed to, uint256 id, uint256 value)',
+      'event TransferBatch(address indexed operator, address indexed from, address indexed to, uint256[] ids, uint256[] values)',
+    ]);
+
+    for (const log of logs) {
+      if (log.address?.toLowerCase() !== contractAddress) {
+        continue;
+      }
+
+      try {
+        const parsed = iface.parseLog({
+          topics: log.topics,
+          data: log.data,
+        });
+
+        const from = (parsed.args.from as string).toLowerCase();
+        if (from !== zeroAddress) {
+          continue;
+        }
+
+        const to = (parsed.args.to as string).toLowerCase();
+        if (!targetAddresses.has(to)) {
+          continue;
+        }
+
+        if (parsed.name === 'TransferSingle') {
+          const tokenId = (parsed.args.id as bigint).toString();
+          const quantity = Number((parsed.args.id as bigint).toString());
+          if (!Number.isNaN(quantity) && quantity > 0) {
+            allocations.push({ tokenId, quantity });
+          }
+        } else if (parsed.name === 'TransferBatch') {
+          const ids = Array.from(
+            parsed.args.ids as unknown as Iterable<ethers.BigNumber | bigint | number | string>,
+          );
+          const values = Array.from(
+            // eslint-disable-next-line @typescript-eslint/unbound-method
+            parsed.args.values as unknown as Iterable<ethers.BigNumber | bigint | number | string>,
+          );
+
+          ids.forEach((idValue, index) => {
+            const tokenId = idValue.toString();
+            const rawQuantity = values[index];
+            const quantityString =
+              rawQuantity instanceof ethers.BigNumber
+                ? rawQuantity.toString()
+                : typeof rawQuantity === 'bigint'
+                  ? rawQuantity.toString()
+                  : typeof rawQuantity === 'number'
+                    ? rawQuantity.toString()
+                    : (rawQuantity?.toString?.() ?? '0');
+            const quantity = Number(quantityString);
+
+            if (!Number.isNaN(quantity) && quantity > 0) {
+              allocations.push({ tokenId, quantity });
+            }
+          });
+        }
+      } catch {
+        // Ignore logs that aren't ERC1155 transfer events
+      }
+    }
+
+    return allocations;
+  }
+
+  private _buildTokenOrder(
+    recipientAddress: string,
+    allocations: MintedTokenAllocation[],
+    cost: Cost,
+  ): TokenOrder {
+    const totalQuantity = allocations.reduce((sum, allocation) => sum + allocation.quantity, 0);
+    if (totalQuantity <= 0) {
+      return {
+        recipientAddress,
+        total: cost,
+        items: [],
+      };
+    }
+
+    const perUnitCost = this._divideCost(cost, totalQuantity);
+
+    const items: TokenOrderItem[] = allocations.map((allocation) => ({
+      quantity: allocation.quantity,
+      token: this._buildToken(allocation.tokenId),
+      total: this._scaleCost(perUnitCost, allocation.quantity),
+    }));
+
+    return {
+      recipientAddress,
+      total: cost,
+      items,
+    };
+  }
+
+  private _buildToken(tokenId: string): Token {
+    return {
+      networkId: this.data.publicData.network,
+      contract: this.contract,
+      tokenId,
+      explorerUrl: this.contract.explorer,
+      media: this._getTokenMedia(),
+    };
+  }
+
+  private _getTokenMedia(): Media {
+    const asset = this.data.publicData.asset;
+    const fallbackImage =
+      asset.image || asset.image_url || this.previewData.thumbnail || asset.animation || '';
+    const fallbackPreview = asset.image_preview || this.previewData.thumbnail || fallbackImage;
+
+    return {
+      image: fallbackImage,
+      imagePreview: fallbackPreview,
+      animation: asset.animation,
+      animationPreview: asset.animation_preview,
+    };
+  }
+
+  private _divideCost(cost: Cost, divisor: number): Cost {
+    if (divisor <= 0) {
+      throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Divisor must be greater than zero');
+    }
+
+    const divideUsd = (value: string): string => {
+      const numeric = parseFloat(value || '0');
+      if (!Number.isFinite(numeric)) {
+        return '0';
+      }
+      const divided = numeric / divisor;
+      return divided === 0 ? '0' : divided.toFixed(2);
+    };
+
+    return {
+      totalUSD: divideUsd(cost.totalUSD),
+      total: {
+        native: cost.total.native.divideInt(divisor),
+        erc20s: cost.total.erc20s.map((money) => money.divideInt(divisor)),
+      },
+      breakdown: {
+        product: cost.breakdown.product.divideInt(divisor),
+        platformFee: cost.breakdown.platformFee.divideInt(divisor),
+      },
+    };
+  }
+
+  private _scaleCost(cost: Cost, scalar: number): Cost {
+    const scaleUsd = (value: string): string => {
+      const numeric = parseFloat(value || '0');
+      if (!Number.isFinite(numeric) || scalar === 0) {
+        return '0';
+      }
+      const scaled = numeric * scalar;
+      return scaled === 0 ? '0' : scaled.toFixed(2);
+    };
+
+    return {
+      totalUSD: scaleUsd(cost.totalUSD),
+      total: {
+        native: cost.total.native.multiply(scalar),
+        erc20s: cost.total.erc20s.map((money) => money.multiply(scalar)),
+      },
+      breakdown: {
+        product: cost.breakdown.product.multiply(scalar),
+        platformFee: cost.breakdown.platformFee.multiply(scalar),
+      },
+    };
+  }
 
   private _applyGasBuffer(gasEstimate: ethers.BigNumber, gasBuffer?: GasBuffer): ethers.BigNumber {
     if (!gasBuffer) {

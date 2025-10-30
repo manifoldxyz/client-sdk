@@ -4,7 +4,7 @@ description: purchase
 
 # purchase
 
-**purchase(params)** → [Order](../../../reference/order.md)
+**purchase(params)** → [Receipt](../../../reference/receipt.md)
 
 Initiates a purchase for the specified product. &#x20;
 
@@ -19,20 +19,26 @@ This method may trigger multiple write transactions (e.g., token approval and mi
 | callbacks        | [TransactionCallbacks](../../../reference/transactioncallbacks.md) | ❌        | Purchase callbacks for handling different stages                                                        |
 | confirmations    | number                                                             | ❌        | Number of confirmation blocks (Default 1)                                                               |
 
-#### Returns: [Order](../../../reference/order.md)
+#### Returns: [Receipt](../../../reference/receipt.md)
+
+The receipt contains the confirmed transaction metadata under `transactionReceipt` and, when applicable, an `order` object with parsed token details for the mint that was executed.
 
 #### Example
 
-```jsx
-const results = await product.**purchase**({
+```tsx
+const receipt = await product.purchase({
   account,
-  preparedPurchase
-  });
-if (!simulation.eligibility.isEligible) {
-  console.log('Cannot mint:', simulation.eligibility.reason);  
-  return;
+  preparedPurchase,
+});
+
+console.log('Mint transaction:', receipt.transactionReceipt.txHash);
+
+if (receipt.order) {
+  console.log('Recipient:', receipt.order.recipientAddress);
+  for (const item of receipt.order.items) {
+    console.log(`Minted token ${item.token.tokenId} x${item.quantity}`);
+  }
 }
-console.log('Total cost:', simulation.totalCost.formatted);
 ```
 
 [**Errors**](https://www.notion.so/Manifold-Client-SDK-Complete-Developer-Guide-2676b055ee58800abc38ccd30cdfca70?pvs=21)

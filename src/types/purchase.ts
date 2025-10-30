@@ -1,6 +1,7 @@
 import type { Address } from './common';
 import type { Cost, Money } from './money';
 import type { IAccount } from './account-adapter';
+import type { Token } from './product';
 
 export interface PreparePurchaseParams<T> {
   userAddress: Address;
@@ -19,13 +20,6 @@ export interface GasBuffer {
 export interface EditionPayload {
   quantity: number;
   redemptionCode?: string;
-}
-
-export interface BurnRedeemPayload {
-  tokens?: Array<{
-    contract: { networkId: number; address: string; spec: 'erc721' | 'erc1155' };
-    tokenId: string;
-  }>;
 }
 
 export interface BlindMintPayload {
@@ -148,10 +142,7 @@ export interface TransactionStep {
    *
    * @throws {ClientSDKError} On transaction failure or rejection
    */
-  execute: (
-    adapter: IAccount,
-    options?: TransactionStepExecuteOptions,
-  ) => Promise<TransactionReceipt>;
+  execute: (adapter: IAccount, options?: TransactionStepExecuteOptions) => Promise<Receipt>;
 
   /** Optional detailed description of what this step does */
   description?: string;
@@ -177,31 +168,29 @@ export interface PurchaseParams {
   preparedPurchase: PreparedPurchase;
 }
 
-export interface Order {
-  receipts: TransactionReceipt[];
-  status: OrderStatus;
-  buyer: { walletAddress: string };
+export type Receipt = {
+  transactionReceipt: TransactionReceipt;
+  order?: TokenOrder;
+};
+
+export type TokenOrder = Order & {
+  items: TokenOrderItem[];
+};
+
+export type TokenOrderItem = {
   total: Cost;
-  items?: OrderItem[];
-}
+  token: Token;
+  quantity: number;
+};
 
-export interface OrderItem {
-  status: OrderStatus;
+export type Order = {
+  recipientAddress: string;
   total: Cost;
-  token?: {
-    contract: { networkId: number; address: string; spec: 'erc721' | 'erc1155' };
-    tokenId: string;
-    explorer: { etherscanUrl: string; manifoldUrl?: string; openseaUrl?: string };
-  };
-}
+};
 
-export type OrderStatus = 'pending' | 'confirmed' | 'cancelled' | 'failed' | 'completed';
-
-export interface TransactionReceipt {
+export type TransactionReceipt = {
   networkId: number;
-  step: string;
   txHash: string;
   blockNumber?: number;
   gasUsed?: bigint;
-  status?: string;
-}
+};

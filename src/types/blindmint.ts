@@ -10,13 +10,15 @@ import type {
   ProductRule,
   ProductProvenance,
   ProductInventory,
+  Contract,
+  ManifoldContract,
 } from './product';
 import type {
   BlindMintPayload,
   PreparePurchaseParams,
   PreparedPurchase,
   PurchaseParams,
-  Order,
+  Receipt,
 } from './purchase';
 import type { Money } from '../libs/money';
 import type { Cost } from './money';
@@ -50,11 +52,18 @@ export interface BlindMintOnchainData {
   startingTokenId: string;
 }
 
+export type BlindMintPublicData = Omit<BlindMintPublicDataResponse, 'contract'> & {
+  /**
+   * Smart contract details for the NFT.
+   */
+  contract: Contract;
+};
+
 /**
  * BlindMint Public Data - off-chain configuration
  * This is the main public data structure for BlindMint products
  */
-export interface BlindMintPublicData {
+export interface BlindMintPublicDataResponse {
   /** Display name for the mint */
   name: string;
   /** Description of the mint */
@@ -62,14 +71,7 @@ export interface BlindMintPublicData {
   /** Network ID where the contract is deployed */
   network: number;
   /** Contract details */
-  contract: {
-    id: number;
-    name: string;
-    symbol: string;
-    contractAddress: string;
-    networkId: number;
-    spec: string;
-  };
+  contract: ManifoldContract;
   /** Claim extension contract address */
   extensionAddress1155: {
     value: Address;
@@ -88,12 +90,6 @@ export interface BlindMintPublicData {
   tierProbabilities: BlindMintTierProbability[];
   /** Pool of available tokens */
   pool: BlindMintPool[];
-  /** Preview media for the collection */
-  previewMedia?: Media;
-  /** Collection thumbnail */
-  thumbnail?: string;
-  /** Optional attributes for filtering/display */
-  attributes?: Record<string, unknown>;
 }
 
 export interface GachaTier {
@@ -157,14 +153,14 @@ export interface BlindMintProduct extends BaseProduct<BlindMintPublicData> {
   /** Product type identifier */
   type: AppType.BLIND_MINT;
   /** Instance data with BlindMint-specific public data */
-  data: PublicInstance<BlindMintPublicData> & { publicData: BlindMintPublicData };
+  data: PublicInstance<BlindMintPublicData>;
   /** Cached on-chain data */
   onchainData?: BlindMintOnchainData;
 
   // Core product methods (matching Product interface)
   getAllocations(params: AllocationParams): Promise<AllocationResponse>;
   preparePurchase(params: PreparePurchaseParams<BlindMintPayload>): Promise<PreparedPurchase>;
-  purchase(params: PurchaseParams): Promise<Order>;
+  purchase(params: PurchaseParams): Promise<Receipt>;
   getStatus(): Promise<ProductStatus>;
   getPreviewMedia(): Promise<Media | undefined>;
   getMetadata(): Promise<ProductMetadata>;

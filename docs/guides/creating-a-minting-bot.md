@@ -2,11 +2,29 @@
 
 The SDK can be used on the server side, enabling use cases such as running a [minting bot ](https://help.manifold.xyz/en/articles/11509060-bankrbot)
 
-## Complete Examples Available
+## Example Scripts
 
-Full working examples with comprehensive error handling, monitoring, and batch operations are available in the `/examples/server-side/` directory:
-- **`blindmint-bot.ts`** - Complete BlindMint automated minting bot with retry logic
-- **`edition-bot.ts`** - Complete Edition automated minting bot with monitoring capabilities
+Two ready-to-run bots live in this repository:
+
+- **Edition**: `examples/edition/minting-bot`
+- **Blind Mint**: `examples/blindmint/minting-bot`
+
+Each script demonstrates the most direct path to minting—`preparePurchase` followed by `product.purchase()`—so you don’t have to orchestrate transaction steps manually.
+
+### Running an example
+
+1. From the repository root:
+   ```bash
+   npm install
+   npm run build
+   ```
+2. Inside the example directory:
+   ```bash
+   npm install
+   cp .env.example .env
+   npm run start
+   ```
+3. Fill in the environment variables before running. Each script logs the transaction hashes returned in the order receipts.
 
 ## Basic Example
 
@@ -15,7 +33,9 @@ import { createClient, createAccountEthers5, isBlindMintProduct, isEditionProduc
 import { ethers } from "ethers";
 
 const client = createClient({
-  httpRPCs: { 1: process.env.MAINNET_RPC! },
+  httpRPCs: {
+    [Number(process.env.NETWORK_ID!)]: process.env.RPC_URL!
+  },
 });
 
 const product = await client.getProduct('INSTANCE_ID');
@@ -35,21 +55,23 @@ if (isEditionProduct(product)) {
   throw new Error('Unsupported product type');
 }
 
-const wallet = new ethers.Wallet(<wallet-private-key>)
-const account = createAccountEthers5(client, provider: { wallet })
+const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL!);
+const wallet = new ethers.Wallet(process.env.WALLET_PRIVATE_KEY!, provider);
+const account = createAccountEthers5(client, { wallet });
+
 try {
   const prepared = await product.preparePurchase({
     address: wallet.address,
     payload: { quantity: 1 },
   });
-  
+
   const order = await product.purchase({
     account,
     preparedPurchase: prepared,
   });
   console.log(order.status, order.receipts.map((r) => r.txHash));
-catch (error) {
-  console.log(`Unable to execute transaction: ${error.message}`)
+} catch (error) {
+  console.log(`Unable to execute transaction: ${(error as Error).message}`);
 }
 ```
 
@@ -68,7 +90,7 @@ catch (error) {
 Monitor products and automatically mint when they become active:
 
 ```typescript
-// See examples/server-side/edition-bot.ts for full implementation
+// Extend the basic example in examples/edition/minting-bot for monitoring features
 async function monitorAndMint(instanceId: string) {
   while (true) {
     const product = await client.getProduct(instanceId);
@@ -88,7 +110,7 @@ async function monitorAndMint(instanceId: string) {
 Mint for multiple wallets efficiently:
 
 ```typescript
-// See examples/server-side/ for full implementation
+// Adapt this pattern on top of the existing minting bot examples
 const wallets = ['privateKey1', 'privateKey2', 'privateKey3'];
 for (const privateKey of wallets) {
   const wallet = new ethers.Wallet(privateKey, provider);
@@ -103,10 +125,10 @@ for (const privateKey of wallets) {
 # Required
 WALLET_PRIVATE_KEY=your_private_key_here
 INSTANCE_ID=your_product_instance_id
+NETWORK_ID=8453
+RPC_URL=https://base-mainnet.g.alchemy.com/v2/YOUR_KEY
 
 # RPC Endpoints
-MAINNET_RPC=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
-BASE_RPC=https://base-mainnet.g.alchemy.com/v2/YOUR_KEY
 
 # Optional
 MINT_QUANTITY=1
@@ -116,7 +138,7 @@ MAX_RETRIES=3
 
 ## Resources
 
-* **[Complete BlindMint Bot Example](../../examples/server-side/blindmint-bot.ts)** - Full implementation with pools, tiers, and reveal handling
-* **[Complete Edition Bot Example](../../examples/server-side/edition-bot.ts)** - Full implementation with monitoring and promo codes
-* **[Server-Side Examples README](../../examples/server-side/README.md)** - Setup and deployment guide
+* **[Edition Minting Bot](../../examples/edition/minting-bot/README.md)** - Minimal Edition minting script
+* **[Blind Minting Bot](../../examples/blindmint/minting-bot/README.md)** - Minimal Blind Mint minting script
+* **[Examples Overview](../../examples/README.md)** - Directory of all SDK examples
 * See method documentation for detailed error descriptions

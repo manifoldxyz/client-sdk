@@ -281,3 +281,5 @@ export interface TransactionRequest {
   gasPrice?: BigNumber;
   from?: Address;
 }
+
+export type ContractSpec = 'erc721' | 'erc1155';

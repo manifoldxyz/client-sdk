@@ -95,11 +95,23 @@ export interface UniversalTransactionResponse {
   nonce?: number;
 
   /** Chain ID where transaction was sent */
-  chainId?: number;
+  chainId: number;
 
   /** Normalized receipt details when available */
-  receipt?: TransactionConfirmationResult;
+  logs: Log[];
 }
+
+export type Log = {
+  address: string;
+  blockHash: string;
+  blockNumber: number;
+  data: string;
+  logIndex: number;
+  transactionHash: string;
+  transactionIndex: number;
+  removed: boolean;
+  topics: string[];
+};
 
 /**
  * Normalized transaction confirmation result returned by adapters

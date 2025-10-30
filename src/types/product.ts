@@ -4,11 +4,12 @@ import type {
   PreparedPurchase,
   PurchaseParams,
   PreparePurchaseParams,
-  Order,
   EditionPayload,
+  Receipt,
 } from './purchase';
 import type { BlindMintProduct } from './blindmint';
 import type { EditionOnchainData } from './edition';
+import type { ContractSpec } from './contracts';
 
 /**
  * Base interface for all Manifold product types.
@@ -74,12 +75,19 @@ export interface Creator {
   name?: string;
 }
 
+export type EditionPublicData = Omit<EditionPublicDataResponse, 'contract'> & {
+  /**
+   * Smart contract details for the NFT.
+   */
+  contract: Contract;
+};
+
 /**
  * Public configuration data for Edition products.
  *
  * @public
  */
-export interface EditionPublicData {
+export type EditionPublicDataResponse = {
   /**
    * Title of the Edition product.
    */
@@ -103,7 +111,7 @@ export interface EditionPublicData {
   /**
    * Smart contract details for the NFT.
    */
-  contract: Contract;
+  contract: ManifoldContract;
 
   extensionAddress721: {
     value: string;
@@ -120,7 +128,7 @@ export interface EditionPublicData {
   instanceAllowlist?: {
     merkleTreeId?: number;
   };
-}
+};
 
 // BlindMintPublicData moved to blindmint.ts
 
@@ -161,7 +169,7 @@ export interface Media {
   /**
    * Full resolution image URL.
    */
-  image: string;
+  image?: string;
 
   /**
    * Thumbnail/preview image URL.
@@ -179,17 +187,11 @@ export interface Media {
   animationPreview?: string;
 }
 
-/**
- * Smart contract information for an NFT.
- *
- * @public
- */
-export interface Contract {
+export interface ManifoldContract {
   /**
-   * Contract identifier.
+   * Manifold Contract ID.
    */
   id: number;
-
   /**
    * Contract name (e.g., "Cool Cats").
    */
@@ -213,7 +215,44 @@ export interface Contract {
   /**
    * Token specification: 'erc721' or 'erc1155'.
    */
-  spec: string;
+  spec: ContractSpec;
+}
+
+/**
+ * Smart contract information for an NFT.
+ *
+ * @public
+ */
+export interface Contract {
+  /**
+   * Contract name (e.g., "Cool Cats").
+   */
+  name: string;
+
+  /**
+   * Token symbol (e.g., "COOL").
+   */
+  symbol: string;
+
+  /**
+   * Ethereum contract address.
+   */
+  contractAddress: string;
+
+  /**
+   * Network ID where contract is deployed.
+   */
+  networkId: number;
+
+  /**
+   * Token specification: 'erc721' or 'erc1155'.
+   */
+  spec: ContractSpec;
+
+  /**
+   * Explorer links for the contract.
+   */
+  explorer: Explorer;
 }
 
 /**
@@ -279,9 +318,9 @@ export interface EditionProduct extends BaseProduct<EditionPublicData> {
   /**
    * Execute a purchase transaction.
    * @param params - Purchase execution parameters
-   * @returns Order details with transaction receipts
+   * @returns Receipt details including transaction and minted token information
    */
-  purchase(params: PurchaseParams): Promise<Order>;
+  purchase(params: PurchaseParams): Promise<Receipt>;
 
   /**
    * Get current product status (active, paused, completed, upcoming).
@@ -360,7 +399,8 @@ export interface Token {
   networkId: number;
   contract: Contract;
   tokenId: string;
-  explorer: Explorer;
+  explorerUrl: Explorer;
+  media: Media;
 }
 
 // Money type is now exported from common.ts to avoid circular dependencies

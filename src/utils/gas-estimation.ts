@@ -1,4 +1,4 @@
-import { ethers } from 'ethers';
+import type { ethers } from 'ethers';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 
 export interface GasEstimationParams {
@@ -15,14 +15,7 @@ export interface GasEstimationParams {
  * Can be reused across all product types
  */
 export async function estimateGas(params: GasEstimationParams): Promise<ethers.BigNumber> {
-  const {
-    contract,
-    method,
-    args,
-    from,
-    value,
-    fallbackGas = ethers.BigNumber.from(200000),
-  } = params;
+  const { contract, method, args, from, value, fallbackGas } = params;
 
   try {
     // Check if the method exists on the contract
@@ -47,8 +40,11 @@ export async function estimateGas(params: GasEstimationParams): Promise<ethers.B
 
     return gasEstimate;
   } catch (error) {
-    console.warn(`Gas estimation failed for ${method}, using fallback:`, error);
-    return fallbackGas;
+    if (fallbackGas) {
+      console.warn(`Gas estimation failed for ${method}, using fallback:`, error);
+      return fallbackGas;
+    }
+    throw error;
   }
 }
 

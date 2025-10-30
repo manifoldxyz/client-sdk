@@ -1,5 +1,10 @@
 import type { ClientConfig, ManifoldClient, WorkspaceProductsOptions } from '../types/client';
-import type { Product, InstanceData, BlindMintPublicData, EditionPublicData } from '../types/';
+import type {
+  Product,
+  InstanceData,
+  BlindMintPublicDataResponse,
+  EditionPublicDataResponse,
+} from '../types/';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import { AppId } from '../types/common';
 import { BlindMintProduct } from '../products/blindmint';
@@ -24,7 +29,7 @@ import manifoldApiClient from '../api/manifold-api';
  */
 function isBlindMintInstanceData(
   instanceData: InstanceData<unknown>,
-): instanceData is InstanceData<BlindMintPublicData> {
+): instanceData is InstanceData<BlindMintPublicDataResponse> {
   return (instanceData.appId as AppId) === AppId.BLIND_MINT_1155;
 }
 
@@ -45,7 +50,7 @@ function isBlindMintInstanceData(
  */
 function isEditionInstanceData(
   instanceData: InstanceData<unknown>,
-): instanceData is InstanceData<EditionPublicData> {
+): instanceData is InstanceData<EditionPublicDataResponse> {
   return (instanceData.appId as AppId) === AppId.EDITION;
 }
 

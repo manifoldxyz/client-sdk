@@ -256,6 +256,33 @@ export class Money implements MoneyData {
   }
 
   /**
+   * Divide by an integer amount (flooring the quotient to avoid fractional wei)
+   */
+  divideInt(divisor: number): Money {
+    if (!Number.isInteger(divisor) || divisor <= 0) {
+      throw new ClientSDKError(
+        ErrorCode.INVALID_INPUT,
+        `Divisor must be a positive integer, received ${divisor}`,
+      );
+    }
+
+    const dividedValue = this.value.div(divisor);
+    const formattedUSD =
+      this.formattedUSD !== undefined
+        ? (parseFloat(this.formattedUSD) / divisor).toFixed(2)
+        : undefined;
+
+    return Money.fromData({
+      value: dividedValue,
+      decimals: this.decimals,
+      erc20: this.erc20,
+      symbol: this.symbol,
+      formattedUSD,
+      networkId: this.networkId,
+    });
+  }
+
+  /**
    * Compare to another Money amount (must be same currency)
    * Returns: -1 if this < other, 0 if equal, 1 if this > other
    */

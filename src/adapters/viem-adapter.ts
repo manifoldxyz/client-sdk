@@ -374,6 +374,17 @@ class ViemAccount implements IAccount {
       from: receipt.from,
       to: (receipt.to as string) || '',
       chainId,
+      logs: receipt.logs.map((log) => ({
+        address: log.address,
+        blockHash: log.blockHash,
+        blockNumber: Number(log.blockNumber),
+        data: log.data,
+        logIndex: Number(log.logIndex),
+        transactionHash: log.transactionHash,
+        transactionIndex: Number(log.transactionIndex),
+        removed: log.removed,
+        topics: log.topics,
+      })),
     };
 
     return response;

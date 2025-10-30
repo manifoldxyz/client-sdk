@@ -140,19 +140,21 @@ class Ethers5Account implements IAccount {
   ): Promise<UniversalTransactionResponse> {
     const confirmations = options.confirmations ?? 1;
     const { chainId } = request;
-
     try {
       const provider = await this._getProvider(chainId);
       const ethersRequest = this._convertToEthersRequest(request);
       const tx = await provider.sendTransaction(ethersRequest);
-      const receipt = await tx.wait(confirmations);
-      return this._convertToUniversalResponse(tx, receipt);
-    } catch (error) {
-      const replacementReceipt = await this._handleReplacementTransaction(error, confirmations);
-      if (replacementReceipt) {
-        return this._createResponseFromReceipt(replacementReceipt, request, chainId);
+      try {
+        const receipt = await tx.wait(confirmations);
+        return this._convertToUniversalResponse(tx, receipt);
+      } catch (error) {
+        const replacementReceipt = await this._handleReplacementTransaction(error, confirmations);
+        if (replacementReceipt) {
+          return this._convertToUniversalResponse(tx, replacementReceipt);
+        }
+        throw error;
       }
-
+    } catch (error) {
       throw this._wrapError(error, 'sendTransactionWithConfirmation', { request, confirmations });
     }
   }
@@ -382,6 +384,17 @@ class Ethers5Account implements IAccount {
       confirmations: txResponse.confirmations,
       nonce: txResponse.nonce,
       chainId: txResponse.chainId,
+      logs: receipt.logs.map((log) => ({
+        address: log.address,
+        topics: log.topics,
+        data: log.data,
+        logIndex: log.logIndex,
+        transactionHash: log.transactionHash,
+        transactionIndex: log.transactionIndex,
+        blockHash: log.blockHash,
+        blockNumber: log.blockNumber,
+        removed: log.removed,
+      })),
     };
 
     if (txResponse.blockNumber) {
@@ -428,25 +441,6 @@ class Ethers5Account implements IAccount {
     }
 
     return null;
-  }
-
-  private _createResponseFromReceipt(
-    receipt: ethers.providers.TransactionReceipt,
-    request: UniversalTransactionRequest,
-    networkId: number,
-  ): UniversalTransactionResponse {
-    return {
-      hash: receipt.transactionHash,
-      from: receipt.from,
-      to: receipt.to,
-      blockNumber: receipt.blockNumber,
-      blockHash: receipt.blockHash,
-      gasUsed: receipt.gasUsed.toString(),
-      effectiveGasPrice: receipt.effectiveGasPrice.toString(),
-      confirmations: receipt.confirmations,
-      nonce: request.nonce,
-      chainId: networkId,
-    };
   }
 
   /**

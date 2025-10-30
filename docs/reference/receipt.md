@@ -1,9 +1,6 @@
 # Receipt
 
-| Field     | Type                                            | Required | Description                                                    |
-| --------- | ----------------------------------------------- | -------- | -------------------------------------------------------------- |
-| networkId | number                                          | ✅        | Network ID where the order was placed                          |
-| txHash    | string                                          | ✅        | The transaction hash of the order                              |
-| step      | [TransactionStep](transactionstep.md)           | ✅        | Corresponding transaction step returned from `preparePurchase` |
-| txReceipt | [**TransactionReceipt**](transactionreceipt.md) | ❌        | The transaction receipt                                        |
-
+| Field                | Type                                                  | Required | Description                                                                 |
+| -------------------- | ----------------------------------------------------- | -------- | --------------------------------------------------------------------------- |
+| transactionReceipt   | [TransactionReceipt](transactionreceipt.md)           | ✅        | Normalized transaction metadata (hash, block number, gas usage)            |
+| order                | [TokenOrder](order.md)                                | ❌        | Parsed mint results including tokens, quantities, and cost allocations     |

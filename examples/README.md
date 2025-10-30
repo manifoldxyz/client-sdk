@@ -7,16 +7,14 @@ This directory contains comprehensive examples demonstrating various ways to int
 ```
 examples/
 ├── blindmint/              # BlindMint product examples (mystery/gacha NFTs)
-│   ├── rainbowkit-mint/   # Web app with RainbowKit wallet connection
+│   ├── minting-bot/      # Headless Blind Minting bot
+│   ├── rainbowkit-mint/  # Web app with RainbowKit wallet connection
 │   └── step-by-step-mint/ # Transparent step-by-step transaction flow
 │
 ├── edition/                # Edition product examples (fixed/open editions)
-│   ├── rainbowkit-mint/   # Web app with RainbowKit wallet connection
+│   ├── minting-bot/      # Headless Edition minting bot
+│   ├── rainbowkit-mint/  # Web app with RainbowKit wallet connection
 │   └── step-by-step-mint/ # Transparent step-by-step transaction flow
-│
-└── server-side/            # Server-side minting bots
-    ├── blindmint-bot.ts    # Automated BlindMint minting
-    └── edition-bot.ts      # Automated Edition minting
 ```
 
 ## 🎯 Product Types
@@ -44,7 +42,7 @@ Fixed or open edition NFT drops with specific quantities:
 ### 2. Choose Your Implementation
 - **RainbowKit Examples**: Full web app with wallet UI
 - **Step-by-Step Examples**: Transparent transaction execution
-- **Server-Side Bots**: Automated minting without UI
+- **Minting Bots**: Headless scripts for automation or backend usage
 
 ### 3. Follow Example-Specific Setup
 Each example has its own README with detailed instructions.
@@ -79,29 +77,29 @@ npm install
 npm run dev
 ```
 
-## 🤖 Server-Side Examples
+## 🤖 Minting Bots
 
-Automated minting bots for backend operations:
+Automated minting scripts for backend operations:
 - No browser required
-- Scheduled minting
-- Batch operations
-- Monitoring capabilities
+- Works with private keys or hosted wallets
+- Suitable for cron jobs, workers, or CLI usage
 
-**Setup:**
+**Setup (Edition or Blind Mint):**
 ```bash
-cd examples/server-side
+cd examples/[edition|blindmint]/minting-bot
 npm install
-npx ts-node [blindmint-bot.ts|edition-bot.ts]
+cp .env.example .env
+npm run start
 ```
 
 ## 📋 Feature Comparison
 
-| Feature | RainbowKit | Step-by-Step | Server-Side |
-|---------|------------|--------------|-------------|
+| Feature | RainbowKit | Step-by-Step | Minting Bot |
+|---------|------------|--------------|------------|
 | Wallet UI | ✅ | ✅ | ❌ |
 | Browser Required | ✅ | ✅ | ❌ |
 | Transaction Visibility | Basic | Full | Logs |
-| Batch Minting | ❌ | ❌ | ✅ |
+| Batch Minting | ❌ | ❌ | ✅ (with customization) |
 | Automation | ❌ | ❌ | ✅ |
 | User Interaction | Required | Required | None |
 | Best For | End users | Power users | Automation |
@@ -173,7 +171,7 @@ const order = await product.purchase({
 3. Implement error handling and retry logic
 
 ### Advanced
-1. Study **Server-Side examples** for automation
+1. Study **Minting bot examples** for automation
 2. Implement batch minting operations
 3. Build monitoring and alerting systems
 4. Create custom integrations
@@ -191,7 +189,7 @@ const order = await product.purchase({
 - Add retry mechanisms
 - Monitor transaction status
 - Log all operations
-- Secure private keys
+- Secure private keys and use managed secrets
 
 ### Performance
 - Cache product data when possible

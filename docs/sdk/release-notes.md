@@ -10,6 +10,7 @@
 * Updated playground documentation with Edition product examples and output
 * Fixed TypeScript error in BlindMintProduct allocation quantity check
 * Improved playground test output with proper product-specific icons and formatting
+* Updated Edition and BlindMint purchase flows to return structured receipts with parsed token order details and transaction metadata
 
 ### October 27, 2025 (0.1.0-beta.4)
 
