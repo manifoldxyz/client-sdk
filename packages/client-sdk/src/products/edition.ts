@@ -374,11 +374,28 @@ export class EditionProduct implements IEditionProduct {
         }
 
         if (currentAllowance.lt(totalCost.raw)) {
+          const gasEstimate = await estimateGas({
+            contract: erc20Contract,
+            method: 'approve',
+            args: [this._extensionAddress, totalCost.raw],
+            from: user,
+          });
+
           const approvalStep: TransactionStep = {
             id: `approve-${totalCost.symbol.toLowerCase()}`,
             name: `Approve ${totalCost.symbol} Spending`,
             type: 'approve',
             description: `Approve ${totalCost.formatted} ${totalCost.symbol}`,
+            transactionData: {
+              value: BigInt('0'),
+              contractAddress: tokenAddress,
+              transactionData: this._buildApprovalData(
+                this._extensionAddress,
+                totalCost.raw.toString(),
+              ),
+              gasEstimate: BigInt(gasEstimate.toString()), // Will be updated with actual estimate
+              networkId,
+            },
             execute: async (account: IAccount, options?: TransactionStepExecuteOptions) => {
               await account.switchNetwork(networkId);
               const address = await account.getAddress();
@@ -387,9 +404,7 @@ export class EditionProduct implements IEditionProduct {
                 method: 'approve',
                 args: [this._extensionAddress, totalCost.raw],
                 from: address,
-                fallbackGas: ethers.BigNumber.from(200000),
               });
-
               const gasLimit = this._applyGasBuffer(gasEstimate, params.gasBuffer).toString();
 
               const txRequest: UniversalTransactionRequest = {
@@ -479,12 +494,41 @@ export class EditionProduct implements IEditionProduct {
     if (nativeCost) mintCost.native = nativeCost;
     if (erc20Costs.length > 0) mintCost.erc20s = erc20Costs;
 
+    const editionContract = await this._getClaimContract();
+    // Generate merkle proofs if needed for allowlist
+    const { mintIndices, merkleProofs } = await this._generateMintProofs(recipient, quantity);
+
+    // estimate gas
+    const gasEstimate = await estimateGas({
+      contract: editionContract,
+      method: 'mintProxy',
+      args: [this._creatorContract, this.id, quantity, mintIndices, merkleProofs, recipient],
+      from: user,
+      value: nativePaymentValue,
+    });
+
+    const mintData = this._buildMintData(
+      this._creatorContract,
+      this.id,
+      quantity,
+      mintIndices,
+      merkleProofs,
+      recipient,
+    );
+
     const mintStep: TransactionStep = {
       id: 'mint',
       name: 'Mint Edition NFTs',
       type: 'mint',
       description: `Mint ${quantity} NFT(s)`,
       cost: mintCost,
+      transactionData: {
+        contractAddress: this._extensionAddress,
+        value: BigInt(nativePaymentValue.toString()),
+        transactionData: mintData, // Will be populated with actual mint data
+        gasEstimate: BigInt(gasEstimate.toString()), // Default estimate, will be updated
+        networkId,
+      },
       execute: async (account: IAccount, options?: TransactionStepExecuteOptions) => {
         // This will handle network switch and adding custom network to user wallet if needed
         await account.switchNetwork(networkId);
@@ -495,7 +539,15 @@ export class EditionProduct implements IEditionProduct {
           mintToAddress,
           quantity,
         );
-        const editionContract = await this._getClaimContract();
+
+        const mintData = this._buildMintData(
+          this._creatorContract,
+          this.id,
+          quantity,
+          mintIndices,
+          merkleProofs,
+          mintToAddress,
+        );
 
         const gasEstimate = await estimateGas({
           contract: editionContract,
@@ -515,14 +567,7 @@ export class EditionProduct implements IEditionProduct {
         const gasLimit = this._applyGasBuffer(gasEstimate, params.gasBuffer).toString();
         const txRequest: UniversalTransactionRequest = {
           to: this._extensionAddress,
-          data: this._buildMintData(
-            this._creatorContract,
-            this.id,
-            quantity,
-            mintIndices,
-            merkleProofs,
-            mintToAddress,
-          ),
+          data: mintData,
           value: nativePaymentValue.toString(),
           gasLimit,
           chainId: networkId,
