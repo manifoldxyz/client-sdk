@@ -4,17 +4,17 @@ Individual transaction step within a purchase flow. Represents a single blockcha
 
 ## Fields
 
-| Field                                                      | Type                    | Required | Description                                                                |
-| ---------------------------------------------------------- | ----------------------- | -------- | -------------------------------------------------------------------------- |
-| id                                                         | string                  | ✅       | Unique identifier for this step                                           |
-| name                                                       | string                  | ✅       | Human-readable step name (e.g., "Approve USDC", "Mint NFT")               |
-| type                                                       | TransactionStepType     | ✅       | Type of transaction: `'mint'` \| `'approve'`                              |
-| [transactionData](../sdk/transaction-steps/transactionData.md) | TransactionData    | ✅       | Raw transaction data for custom execution                                 |
-| [execute](../sdk/transaction-steps/execute.md)            | function                | ✅       | Executes this transaction step                                            |
-| description                                                | string                  | ❌       | Optional detailed description of what this step does                      |
-| cost                                                       | object                  | ❌       | Cost breakdown for this specific step                                     |
-| cost.native                                                | Money                   | ❌       | Native token cost (ETH, etc.)                                             |
-| cost.erc20s                                                | Money[]                 | ❌       | ERC20 token costs                                                         |
+| Field                                                          | Type                | Required | Description                                                 |
+| -------------------------------------------------------------- | ------------------- | -------- | ----------------------------------------------------------- |
+| id                                                             | string              | ✅       | Unique identifier for this step                             |
+| name                                                           | string              | ✅       | Human-readable step name (e.g., "Approve USDC", "Mint NFT") |
+| type                                                           | TransactionStepType | ✅       | Type of transaction: `'mint'` \| `'approve'`                |
+| [transactionData](../sdk/transaction-steps/transactionData.md) | TransactionData     | ✅       | Raw transaction data for custom execution                   |
+| [execute](../sdk/transaction-steps/execute.md)                 | function            | ✅       | Executes this transaction step                              |
+| description                                                    | string              | ❌       | Optional detailed description of what this step does        |
+| cost                                                           | object              | ❌       | Cost breakdown for this specific step                       |
+| cost.native                                                    | Money               | ❌       | Native token cost (ETH, etc.)                               |
+| cost.erc20s                                                    | Money[]             | ❌       | ERC20 token costs                                           |
 
 ## Common Step Types
 
@@ -24,25 +24,6 @@ Individual transaction step within a purchase flow. Represents a single blockcha
 ## Usage
 
 Steps should be executed in order, as later steps may depend on earlier ones.
-
-### Example: Manual Step Execution
-
-```typescript
-// Manual step execution with user confirmation
-const step = preparedPurchase.steps[0];
-
-if (step.type === 'approve') {
-  const confirmed = await showApprovalModal({
-    token: step.cost?.erc20s?.[0],
-    spender: step.transactionData.contractAddress
-  });
-
-  if (confirmed) {
-    const receipt = await step.execute(adapter);
-    console.log('Approval TX:', receipt.txHash);
-  }
-}
-```
 
 ### Example: Iterating Through Steps
 
