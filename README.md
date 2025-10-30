@@ -1,6 +1,6 @@
 # Manifold Client SDK Monorepo
 
-This repository is now managed as a pnpm workspace powered by Turborepo. It contains:
+This repository is managed as a pnpm workspace powered by Turborepo. It contains:
 
 - `@manifoldxyz/client-sdk` – the TypeScript SDK and related tooling
 - `@manifoldxyz/examples` – example applications demonstrating SDK usage
@@ -12,7 +12,7 @@ pnpm install
 pnpm build
 ```
 
-Common scripts leverage Turborepo to run tasks across packages:
+Common scripts to run tasks across packages:
 
 - `pnpm dev` – run all available `dev` scripts in watch mode
 - `pnpm lint` – run linting for packages that define a `lint` script
