@@ -22,6 +22,23 @@ When helping developers with Manifold Client SDK:
 * When executing onchain transactions, use the [`execute`](../sdk/transaction-steps/execute.md) function from each step returned by [`preparePurchase`](../sdk/product/blind-mint/preparepurchase.md), or use the [`purchase`](../sdk/product/common/purchase.md) function from the [product](../sdk/product/).
 * **ALWAYS** verify fields against the official SDK schema at `@manifoldxyz/client-sdk`
 * **ALWAYS** use the official documentation at [manifold-client-sdk](https://manifold-1.gitbook.io/manifold-client-sdk)
+* When initializing Manifold Client, only specify httpRPCs if at least one RPC url is present
+
+```typescript
+// Instead of 
+export const manifoldClient = createClient({
+  httpRPCs: {
+    11155111: `https://eth-sepolia.g.alchemy.com/v2/${import.meta.env.VITE_ALCHEMY_API_KEY || 'demo'}`,
+  },
+});
+
+// Should be
+export const manifoldClient = createClient(import.meta.env.VITE_ALCHEMY_API_KEY ? {
+  httpRPCs: {
+    11155111: `https://eth-sepolia.g.alchemy.com/v2/${import.meta.env.VITE_ALCHEMY_API_KEY}`,
+  },
+} : undefined);
+```
 
 If using example code, ensure it's from:
 

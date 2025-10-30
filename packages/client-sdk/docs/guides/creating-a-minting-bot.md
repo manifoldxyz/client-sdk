@@ -1,6 +1,6 @@
-# Creating a Minting Bot
+# Creating a minting bot
 
-The SDK can be used on the server side, enabling use cases such as running a [minting bot ](https://help.manifold.xyz/en/articles/11509060-bankrbot)
+The SDK can be used on the server side, enabling use cases such as running a [minting bot](https://help.manifold.xyz/en/articles/11509060-bankrbot)
 
 ## Example Scripts
 
@@ -29,12 +29,17 @@ Each script demonstrates the most direct path to minting—`preparePurchase` fol
 ## Basic Example
 
 ```ts
-import { createClient, createAccountEthers5, isBlindMintProduct, isEditionProduct } from '@manifoldxyz/client-sdk';
-import { ethers } from "ethers";
+import {
+  createClient,
+  createAccountEthers5,
+  isBlindMintProduct,
+  isEditionProduct,
+} from '@manifoldxyz/client-sdk';
+import { ethers } from 'ethers';
 
 const client = createClient({
   httpRPCs: {
-    [Number(process.env.NETWORK_ID!)]: process.env.RPC_URL!
+    [Number(process.env.NETWORK_ID!)]: process.env.RPC_URL!,
   },
 });
 
@@ -69,7 +74,10 @@ try {
     account,
     preparedPurchase: prepared,
   });
-  console.log(order.status, order.receipts.map((r) => r.txHash));
+  console.log(
+    order.status,
+    order.receipts.map((r) => r.txHash),
+  );
 } catch (error) {
   console.log(`Unable to execute transaction: ${(error as Error).message}`);
 }
@@ -77,47 +85,12 @@ try {
 
 ## Best Practices
 
-* **Type Validation**: Use [isBlindMintProduct](../sdk/product/blind-mint/isblindmintproduct.md) or [isEditionProduct](../sdk/product/edition-product/iseditionproduct.md) for proper TypeScript typings
-* **Status Checks**: Always run [getStatus](../sdk/product/common/getstatus.md) before attempting purchases
-* **Error Handling**: Properly handle [ClientSDKError](../reference/clientsdkerror.md) codes
-* **Gas Management**: Monitor gas prices and set appropriate limits
-* **Retry Logic**: Implement retry mechanisms for transient failures
-* **Security**: Never commit private keys, use environment variables
-
-## Advanced Features
-
-### Monitoring and Auto-Minting
-Monitor products and automatically mint when they become active:
-
-```typescript
-// Extend the basic example in examples/edition/minting-bot for monitoring features
-async function monitorAndMint(instanceId: string) {
-  while (true) {
-    const product = await client.getProduct(instanceId);
-    const status = await product.getStatus();
-    
-    if (status === 'active') {
-      // Execute mint
-      return await executeMint(product);
-    }
-    
-    await sleep(60000); // Check every minute
-  }
-}
-```
-
-### Batch Minting for Airdrops
-Mint for multiple wallets efficiently:
-
-```typescript
-// Adapt this pattern on top of the existing minting bot examples
-const wallets = ['privateKey1', 'privateKey2', 'privateKey3'];
-for (const privateKey of wallets) {
-  const wallet = new ethers.Wallet(privateKey, provider);
-  // Execute mint for each wallet with proper error handling
-  await mintWithRetry(wallet);
-}
-```
+- **Type Validation**: Use [isBlindMintProduct](../sdk/product/blind-mint/isblindmintproduct.md) or [isEditionProduct](../sdk/product/edition-product/iseditionproduct.md) for proper TypeScript typings
+- **Status Checks**: Always run [getStatus](../sdk/product/common/getstatus.md) before attempting purchases
+- **Error Handling**: Properly handle [ClientSDKError](../reference/clientsdkerror.md) codes
+- **Gas Management**: Monitor gas prices and set appropriate limits
+- **Retry Logic**: Implement retry mechanisms for transient failures
+- **Security**: Never commit private keys, use environment variables
 
 ## Environment Configuration
 
@@ -138,7 +111,7 @@ MAX_RETRIES=3
 
 ## Resources
 
-* **[Edition Minting Bot](../../examples/edition/minting-bot/README.md)** - Minimal Edition minting script
-* **[Blind Minting Bot](../../examples/blindmint/minting-bot/README.md)** - Minimal Blind Mint minting script
-* **[Examples Overview](../../examples/README.md)** - Directory of all SDK examples
-* See method documentation for detailed error descriptions
+- **[Edition Minting Bot](../../examples/edition/minting-bot/README.md)** - Minimal Edition minting script
+- **[Blind Minting Bot](../../examples/blindmint/minting-bot/README.md)** - Minimal Blind Mint minting script
+- **[Examples Overview](../../examples/README.md)** - Directory of all SDK examples
+- See method documentation for detailed error descriptions

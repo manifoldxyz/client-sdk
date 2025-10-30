@@ -20,12 +20,7 @@ Create an account representation from [Viem Wallet Client](https://viem.sh/docs/
 import { createClient, isBlindMintProduct, createAccountViem } from '@manifoldxyz/client-sdk';
 import { walletClient } from './client.ts';
 
-const client = createClient({
-  httpRPCs: {
-    1: 'https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY',
-    8453: 'https://base-mainnet.infura.io/v3/YOUR_KEY',
-  },
-});
+const client = createClient();
 // Grab product
 const product = await client.getProduct('4150231280');
 // Check product is of type you expect 

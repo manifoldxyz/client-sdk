@@ -78,12 +78,7 @@ export default function Home() {
 a. Create a [Manifold Client](../../sdk/manifold-client/)
 
 ```typescript
-const client = createClient({
-  httpRPCs: {
-    1: process.env.NEXT_PUBLIC_RPC_URL_MAINNET,
-    8453: process.env.NEXT_PUBLIC_RPC_URL_BASE
-  }
-});
+const client = createClient();
 ```
 
 b. Create an [Account](../../reference/account.md) representing the connected user.
@@ -131,8 +126,6 @@ const order = await product.purchase({
     preparedPurchase,
 });
 ```
-
-
 
 Best practices:
 

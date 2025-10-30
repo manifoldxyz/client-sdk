@@ -16,11 +16,7 @@ Fetches detailed product information.
 
 <pre class="language-jsx"><code class="lang-jsx">import { isBlindMintProduct, createClient } from '@manifoldxyz/client-sdk';
 <strong>
-</strong>const client = createClient({
-  httpRPCs: {
-    1: 'https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY',
-  },
-});
+</strong>const client = createClient();
 
 <strong>const product = await client.getProduct('4150231280');
 </strong>console.log(`AppType: ${product.type}`);
