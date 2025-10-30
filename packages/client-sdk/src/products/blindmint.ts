@@ -257,18 +257,19 @@ export class BlindMintProduct implements IBlindMintProduct {
     const { userAddress, recipientAddress, payload, account } = params;
     const quantity = payload?.quantity || 1;
     const networkId = this.data.publicData.network;
-    const walletAddress = account ? await account.getAddress() : userAddress;
-    const mintRecipient = recipientAddress || walletAddress;
 
-    if (!walletAddress || !validateAddress(walletAddress)) {
+    const user = account ? await account.getAddress() : userAddress;
+    const recipient = recipientAddress || user;
+
+    if (!user || !validateAddress(user)) {
       throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Invalid wallet address', {
-        walletAddress,
+        user,
       });
     }
 
-    if (!mintRecipient || !validateAddress(mintRecipient)) {
+    if (!recipient || !validateAddress(recipient)) {
       throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Invalid recipient wallet address', {
-        recipientAddress: mintRecipient,
+        recipientAddress: recipient,
       });
     }
 
@@ -294,7 +295,7 @@ export class BlindMintProduct implements IBlindMintProduct {
     }
 
     // Check allocations
-    const allocations = await this.getAllocations({ recipientAddress: mintRecipient });
+    const allocations = await this.getAllocations({ recipientAddress: recipient });
     if (!allocations.isEligible) {
       throw new ClientSDKError(ErrorCode.NOT_ELIGIBLE, allocations.reason || 'Not eligible');
     }
@@ -342,8 +343,8 @@ export class BlindMintProduct implements IBlindMintProduct {
       if (totalCost.isERC20()) {
         const erc20Contract = contractFactory.createERC20Contract(tokenAddress);
         const [balance, currentAllowance] = await Promise.all([
-          erc20Contract.balanceOf(walletAddress),
-          erc20Contract.allowance(walletAddress, this._extensionAddress),
+          erc20Contract.balanceOf(user),
+          erc20Contract.allowance(user, this._extensionAddress),
         ]);
 
         if (balance.lt(totalCost.raw)) {
@@ -354,11 +355,28 @@ export class BlindMintProduct implements IBlindMintProduct {
         }
 
         if (currentAllowance.lt(totalCost.raw)) {
+          const gasEstimate = await estimateGas({
+            contract: erc20Contract,
+            method: 'approve',
+            args: [this._extensionAddress, totalCost.raw],
+            from: user,
+          });
+
           const approvalStep: TransactionStep = {
             id: `approve-${totalCost.symbol.toLowerCase()}`,
             name: `Approve ${totalCost.symbol} Spending`,
             type: 'approve',
             description: `Approve ${totalCost.formatted} ${totalCost.symbol}`,
+            transactionData: {
+              value: BigInt('0'),
+              contractAddress: tokenAddress,
+              transactionData: this._buildApprovalData(
+                this._extensionAddress,
+                totalCost.raw.toString(),
+              ),
+              gasEstimate: BigInt(gasEstimate.toString()), // Will be updated with actual estimate
+              networkId,
+            },
             execute: async (account: IAccount, options?: TransactionStepExecuteOptions) => {
               await account.switchNetwork(networkId);
               const address = await account.getAddress();
@@ -441,17 +459,34 @@ export class BlindMintProduct implements IBlindMintProduct {
     if (nativeCost) mintCost.native = nativeCost;
     if (erc20Costs.length > 0) mintCost.erc20s = erc20Costs;
 
+    const blindMintContract = contractFactory.createBlindMintContract(this._extensionAddress);
+
+    const gasEstimate = await estimateGas({
+      contract: blindMintContract,
+      method: 'mintReserve',
+      args: [this._creatorContract, this.id, quantity],
+      from: recipient,
+      value: nativePaymentValue,
+    });
+
     const mintStep: TransactionStep = {
       id: 'mint',
       name: 'Mint BlindMint NFTs',
       type: 'mint',
       description: `Mint ${quantity} random NFT(s)`,
       cost: mintCost,
+      transactionData: {
+        contractAddress: this._extensionAddress,
+        value: BigInt(nativePaymentValue.toString()),
+        transactionData: this._buildMintData(this._creatorContract, this.id, quantity),
+        gasEstimate: BigInt(gasEstimate.toString()), // Default estimate, will be updated
+        networkId,
+      },
       execute: async (account: IAccount, options?: TransactionStepExecuteOptions) => {
         // This will handle network switch and adding custom network to user wallet if needed
         await account.switchNetwork(networkId);
         const minterAddress = await account.getAddress();
-        const blindMintContract = contractFactory.createBlindMintContract(this._extensionAddress);
+
         const gasEstimate = await estimateGas({
           contract: blindMintContract,
           method: 'mintReserve',
@@ -459,6 +494,7 @@ export class BlindMintProduct implements IBlindMintProduct {
           from: minterAddress,
           value: nativePaymentValue,
         });
+
         const gasLimit = this._applyGasBuffer(gasEstimate, params.gasBuffer).toString();
         const txRequest: UniversalTransactionRequest = {
           to: this._extensionAddress,

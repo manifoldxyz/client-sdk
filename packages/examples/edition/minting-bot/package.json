@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/index.ts",
+    "start:custom": "tsx src/custom-transaction.ts",
     "build": "tsc --project tsconfig.json"
   },
   "dependencies": {

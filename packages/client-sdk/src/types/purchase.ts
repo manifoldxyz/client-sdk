@@ -38,9 +38,6 @@ export interface PreparedPurchase {
   /** Total cost breakdown including fees */
   cost: Cost;
 
-  /** Raw transaction data (optional for adapter-based flows) */
-  transactionData?: TransactionData;
-
   /**
    * Individual transaction steps that need to be executed.
    *
@@ -68,14 +65,12 @@ export interface PreparedPurchase {
    */
   steps: TransactionStep[];
 
-  /** Estimated gas cost (optional) */
-  gasEstimate?: Money;
-
   /** Whether the wallet is eligible to purchase */
   isEligible: boolean;
 }
 
 export interface TransactionData {
+  value: bigint;
   contractAddress: string;
   transactionData: string;
   gasEstimate: bigint;
@@ -132,6 +127,9 @@ export interface TransactionStep {
 
   /** Type of transaction */
   type: TransactionStepType;
+
+  /** Raw transaction data */
+  transactionData: TransactionData;
 
   /**
    * Executes this transaction step.
