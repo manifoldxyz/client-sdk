@@ -52,7 +52,7 @@ export default function Home() {
 }
 ```
 
-3. Implement the [MintButton.tsx](../../../examples/step-by-step-mint/src/components/MintButton.tsx)
+3. Implement the [MintButton.tsx](../../../../../examples/step-by-step-mint/src/components/MintButton.tsx)
 
 On button click, initialize the client, fetch the product, and call `preparePurchase` to get the steps.
 
@@ -138,7 +138,7 @@ b. Execute the step by calling the [execute](../../sdk/transaction-steps/execute
   
 </code></pre>
 
-c. Render the [StepModal](../../../examples/step-by-step-mint/src/components/StepModal.tsx)
+c. Render the [StepModal](../../../../../examples/step-by-step-mint/src/components/StepModal.tsx)
 
 ```tsx
   {preparedPurchase && (
