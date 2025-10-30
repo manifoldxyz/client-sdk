@@ -1,5 +1,9 @@
 # Release Notes
 
+### October 28, 2025 (0.2.1-beta.2)
+
+* Updated React minting guide to reference the Edition RainbowKit example and document displaying token media with on-chain supply details
+
 ### October 27, 2025 (0.1.0-beta.5)
 
 * **NEW: Enhanced Playground Testing** - Added comprehensive Edition product testing to playground
