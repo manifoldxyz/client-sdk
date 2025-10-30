@@ -19,6 +19,7 @@ import type {
   PreparedPurchase,
   PurchaseParams,
   Receipt,
+  TokenOrder,
 } from './purchase';
 import type { Money } from '../libs/money';
 import type { Cost } from './money';
@@ -160,7 +161,7 @@ export interface BlindMintProduct extends BaseProduct<BlindMintPublicData> {
   // Core product methods (matching Product interface)
   getAllocations(params: AllocationParams): Promise<AllocationResponse>;
   preparePurchase(params: PreparePurchaseParams<BlindMintPayload>): Promise<PreparedPurchase>;
-  purchase(params: PurchaseParams): Promise<Receipt>;
+  purchase(params: PurchaseParams): Promise<Omit<Receipt, 'order'> & { order: TokenOrder }>;
   getStatus(): Promise<ProductStatus>;
   getPreviewMedia(): Promise<Media | undefined>;
   getMetadata(): Promise<ProductMetadata>;

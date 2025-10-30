@@ -1,6 +1,9 @@
 import 'dotenv/config';
-import { createClient, createAccountEthers5, isEditionProduct } from '@manifoldxyz/client-sdk';
-import { ethers } from 'ethers';
+import { createClient, createAccountViem, isEditionProduct } from '@manifoldxyz/client-sdk';
+import { createWalletClient, custom, http } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
+import { sepolia } from 'viem/chains'
+ 
 
 function getEnv(name: string): string {
   const value = process.env[name];
@@ -40,15 +43,21 @@ async function main() {
     throw new Error(`Product ${instanceId} is not an Edition product.`);
   }
 
-  const wallet = new ethers.Wallet(privateKey);
-  const account = createAccountEthers5(client, { wallet });
-  const minterAddress = await wallet.getAddress();
+  const wallet = privateKeyToAccount(privateKey as `0x${string}`); 
+  const walletClient = createWalletClient({
+    account: wallet, 
+    chain: sepolia,
+    transport: http(rpcUrl),
+  })
+  const account = createAccountViem({walletClient});
+
+  const minterAddress = await account.getAddress();
   console.log(`👤 Using wallet ${minterAddress}`);
 
   console.log('🧪 Preparing purchase...');
   const preparedPurchase = await product.preparePurchase({
     userAddress: minterAddress,
-    payload: { quantity },
+    payload: { quantity },  
     account,
   });
 

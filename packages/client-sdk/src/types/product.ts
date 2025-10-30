@@ -6,6 +6,7 @@ import type {
   PreparePurchaseParams,
   EditionPayload,
   Receipt,
+  TokenOrder,
 } from './purchase';
 import type { BlindMintProduct } from './blindmint';
 import type { EditionOnchainData } from './edition';
@@ -320,7 +321,7 @@ export interface EditionProduct extends BaseProduct<EditionPublicData> {
    * @param params - Purchase execution parameters
    * @returns Receipt details including transaction and minted token information
    */
-  purchase(params: PurchaseParams): Promise<Receipt>;
+  purchase(params: PurchaseParams): Promise<Omit<Receipt, 'order'> & { order: TokenOrder }>;
 
   /**
    * Get current product status (active, paused, completed, upcoming).

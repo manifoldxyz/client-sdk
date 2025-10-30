@@ -10,11 +10,11 @@
   "dependencies": {
     "@manifoldxyz/client-sdk": "workspace:*",
     "dotenv": "^16.4.5",
-    "ethers": "^5.7.2"
+    "viem": "^2.38.5"
   },
   "devDependencies": {
+    "@types/node": "^20.17.9",
     "tsx": "^4.6.2",
-    "typescript": "^5.4.3",
-    "@types/node": "^20.17.9"
+    "typescript": "^5.4.3"
   }
 }

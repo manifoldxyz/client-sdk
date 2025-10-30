@@ -487,9 +487,8 @@ export class BlindMintProduct implements IBlindMintProduct {
     };
   }
 
-  async purchase(params: PurchaseParams): Promise<Receipt> {
+  async purchase(params: PurchaseParams) {
     const { account, preparedPurchase } = params;
-    const walletAddress = await account.getAddress();
 
     // Execute all steps sequentially
     const receipts: Receipt[] = [];
@@ -513,24 +512,16 @@ export class BlindMintProduct implements IBlindMintProduct {
     }
 
     const finalReceipt = receipts[receipts.length - 1];
-    if (!finalReceipt) {
+    if (!finalReceipt?.order) {
       throw new ClientSDKError(
         ErrorCode.TRANSACTION_FAILED,
-        'No transactions were executed during purchase',
+        'No order details found in final receipt',
       );
-    }
-
-    if (finalReceipt.order) {
-      return finalReceipt;
     }
 
     return {
       transactionReceipt: finalReceipt.transactionReceipt,
-      order: {
-        recipientAddress: walletAddress,
-        total: preparedPurchase.cost,
-        items: [],
-      },
+      order: finalReceipt.order,
     };
   }
 

@@ -558,7 +558,7 @@ export class EditionProduct implements IEditionProduct {
     };
   }
 
-  async purchase(params: PurchaseParams): Promise<Receipt> {
+  async purchase(params: PurchaseParams) {
     const { account, preparedPurchase } = params;
 
     // Execute all steps sequentially
@@ -583,14 +583,17 @@ export class EditionProduct implements IEditionProduct {
     }
 
     const finalReceipt = receipts[receipts.length - 1];
-    if (!finalReceipt) {
+    if (!finalReceipt?.order) {
       throw new ClientSDKError(
         ErrorCode.TRANSACTION_FAILED,
-        'No transactions were executed during purchase',
+        'Unable to obtain order details from purchase transaction',
       );
     }
 
-    return finalReceipt;
+    return {
+      transactionReceipt: finalReceipt.transactionReceipt,
+      order: finalReceipt.order,
+    };
   }
 
   // =============================================================================
