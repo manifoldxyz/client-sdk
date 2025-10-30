@@ -200,9 +200,9 @@ const order = await product.purchase({
 
 ## 📖 Documentation Links
 
-- [Manifold Client SDK Docs](../README.md)
+- [Manifold Client SDK Docs](https://manifoldxyz.gitbook.io/manifold-client-sdk)
 - [Manifold Studio](https://studio.manifold.xyz/)
-- [Creating a Minting Bot Guide](../docs/guides/creating-a-minting-bot.md)
+- [Creating a Minting Bot Guide](https://manifoldxyz.gitbook.io/manifold-client-sdk/guides/creating-a-minting-bot)
 
 ## 🤝 Contributing
 
