@@ -26,14 +26,6 @@ Catch the error, show context to users, and allow retries. Transaction steps exp
 
 <details>
 
-<summary><strong>Can I fetch multiple products?</strong> </summary>
-
-Use `client.getProductsByWorkspace(workspaceId, options)`.
-
-</details>
-
-<details>
-
 <summary><strong>Where do I file issues?</strong> </summary>
 
 [GitHub Issues](https://github.com/manifoldxyz/client-sdk) or Manifold support.
