@@ -1,0 +1,20 @@
+{
+  "name": "@manifoldxyz/example-blindmint-minting-bot",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc --project tsconfig.json"
+  },
+  "dependencies": {
+    "@manifoldxyz/client-sdk": "workspace:*",
+    "dotenv": "^16.4.5",
+    "ethers": "^5.7.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.6.2",
+    "typescript": "^5.4.3",
+    "@types/node": "^20.17.9"
+  }
+}
