@@ -1,27 +1,32 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with the Manifold Client SDK monorepo.
 
-## Development Commands
+## Workspace Commands (run from repo root)
+- `pnpm install` - Install workspace dependencies
+- `pnpm build` - Run `turbo run build` across all packages
+- `pnpm lint` - Run lint tasks through Turbo
+- `pnpm test` - Run test tasks across the workspace
+- `pnpm clean` - Trigger each package's clean script
 
-### Build & Development
-- `npm install` - Install dependencies
-- `npm run build` - Build the SDK distribution files
-- `npm run dev` - Build in watch mode for development
-- `npm run clean` - Clean distribution directory
+## Package: `@manifoldxyz/client-sdk`
+- `pnpm --filter @manifoldxyz/client-sdk install` - Install dependencies just for the SDK package
+- `pnpm --filter @manifoldxyz/client-sdk run build` - Build the SDK distribution files
+- `pnpm --filter @manifoldxyz/client-sdk run dev` - Build in watch mode for development
+- `pnpm --filter @manifoldxyz/client-sdk run clean` - Clean the distribution directory
 
 ### Testing
-- `npm test` or `npm run test` - Run all tests with Vitest
-- `npm test [filter]` - Run specific tests matching the filter
-- `npm run test:coverage` - Run tests with coverage report
+- `pnpm --filter @manifoldxyz/client-sdk run test` - Run all tests with Vitest
+- `pnpm --filter @manifoldxyz/client-sdk run test -- [pattern]` - Run specific tests matching the pattern
+- `pnpm --filter @manifoldxyz/client-sdk run test:coverage` - Run tests with coverage report
 
 ### Code Quality
-- `npm run lint` - Run ESLint on TypeScript files
-- `npm run lint:fix` - Auto-fix ESLint issues
-- `npm run typecheck` - Run TypeScript type checking
+- `pnpm --filter @manifoldxyz/client-sdk run lint` - Run ESLint on TypeScript files
+- `pnpm --filter @manifoldxyz/client-sdk run lint:fix` - Auto-fix ESLint issues
+- `pnpm --filter @manifoldxyz/client-sdk run typecheck` - Run TypeScript type checking
 
 ### Examples & Playground
-- `npm run playground` - Run the interactive playground for testing the SDK
+- `pnpm --filter @manifoldxyz/client-sdk run playground` - Run the interactive playground for testing the SDK
 
 ## Architecture Overview
 
@@ -81,7 +86,7 @@ Tests are located in `tests/` directory using Vitest:
 - Unit tests for utilities and core functionality
 - Mock-based testing for API interactions
 - Test files follow `*.test.ts` naming convention
-- Run specific tests with filters: `npm test validation`
+- Run specific tests with filters: `pnpm --filter @manifoldxyz/client-sdk run test -- --grep validation`
 
 ## Distribution
 

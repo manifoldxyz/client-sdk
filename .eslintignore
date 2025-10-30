@@ -1,7 +1,0 @@
-dist/
-coverage/
-node_modules/
-**/node_modules/
-gachapon-widgets/
-examples/
-tests/

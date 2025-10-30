@@ -1,0 +1,34 @@
+{
+  "name": "@manifoldxyz/example-edition-step-by-step-mint-example",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "lint:fix": "next lint --fix"
+  },
+  "dependencies": {
+    "@manifoldxyz/client-sdk": "workspace:*",
+    "@rainbow-me/rainbowkit": "^2.2.1",
+    "@tanstack/react-query": "^5.64.2",
+    "next": "14.2.18",
+    "react": "^18",
+    "react-dom": "^18",
+    "viem": "^2.21.58",
+    "wagmi": "^2.13.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.18",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.18",
+    "typescript": "^5",
+    "fake-indexeddb": "^5.0.1"
+  }
+}
