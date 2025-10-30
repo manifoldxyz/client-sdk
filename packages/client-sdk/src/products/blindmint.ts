@@ -367,7 +367,6 @@ export class BlindMintProduct implements IBlindMintProduct {
                 method: 'approve',
                 args: [this._extensionAddress, totalCost.raw],
                 from: address,
-                fallbackGas: ethers.BigNumber.from(200000),
               });
 
               const gasLimit = this._applyGasBuffer(gasEstimate, params.gasBuffer).toString();
@@ -459,7 +458,6 @@ export class BlindMintProduct implements IBlindMintProduct {
           args: [this._creatorContract, this.id, quantity],
           from: minterAddress,
           value: nativePaymentValue,
-          fallbackGas: ethers.BigNumber.from(300000),
         });
         const gasLimit = this._applyGasBuffer(gasEstimate, params.gasBuffer).toString();
         const txRequest: UniversalTransactionRequest = {
@@ -729,7 +727,6 @@ export class BlindMintProduct implements IBlindMintProduct {
       args: [this._creatorContract, this.id, quantity, mintIndices, merkleProofs],
       from,
       value,
-      fallbackGas: ethers.BigNumber.from(200000),
     });
   }
 
