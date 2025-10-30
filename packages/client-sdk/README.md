@@ -4,6 +4,8 @@ The Manifold Storefront SDK enables **headless purchasing and display** of Manif
 
 Head to [studio.manifold.xyz](https://studio.manifold.xyz/) to launch your product, then build your own UI and use the SDK to seamlessly integrate product purchasing into your application.
 
+[Full Documentation](https://manifoldxyz.gitbook.io/manifold-client-sdk)
+
 ## ✨ Features
 
 - **No API keys required** - Works out of the box
@@ -11,7 +13,6 @@ Head to [studio.manifold.xyz](https://studio.manifold.xyz/) to launch your produ
 - **Wallet agnostic** - Works with ethers and viem
 - **Support for multiple product types**:
   - Edition
-  - Burn/Redeem
   - Blind Mint
 - **Complete purchase flow**:
   - Product data fetching
@@ -59,7 +60,7 @@ let preparedPurchase;
 
 try {
   preparedPurchase = await product.preparePurchase({
-    address,
+    userAddress: address,
     payload: {
       quantity: 1,
     },
@@ -93,14 +94,12 @@ Creates a new SDK client instance.
 
 **Parameters:**
 
-- `debug` (boolean, optional): Enable debug logs
 - `httpRPCs` (object, optional): Custom RPC URLs by network ID
 
 **Example:**
 
 ```typescript
 const client = createClient({
-  debug: true,
   httpRPCs: {
     1: 'https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY',
   },
@@ -117,7 +116,7 @@ Fetches detailed product information.
 
 - `instanceIdOrUrl` (string): Manifold instance ID or Manifold Product URL
 
-**Returns:** `EditionProduct | BurnRedeemProduct | BlindMintProduct`
+**Returns:** `EditionProduct | BlindMintProduct`
 
 **Example:**
 
@@ -125,29 +124,6 @@ Fetches detailed product information.
 const product = await client.getProduct('4150231280');
 // or
 const product = await client.getProduct('https://manifold.xyz/@creator/id/12345');
-```
-
-#### `client.getProductsByWorkspace(workspaceId, options?)`
-
-Fetches products from a workspace.
-
-**Parameters:**
-
-- `workspaceId` (string): Workspace identifier
-- `options` (object, optional):
-  - `limit` (number): Result limit (1-100)
-  - `offset` (number): Offset results
-  - `sort` ('latest' | 'oldest'): Sort order
-  - `networkId` (number): Filter by network
-  - `type` ('edition' | 'burn-redeem' | 'blind-mint'): Filter by type
-
-**Example:**
-
-```typescript
-const products = await client.getProductsByWorkspace('workspace123', {
-  limit: 10,
-  sort: 'latest',
-});
 ```
 
 ### Product Methods
@@ -182,7 +158,7 @@ Simulates purchase to check eligibility and get total cost.
 
 **Parameters:**
 
-- `address` (string): The address making the purchase
+- `userAddress` (string): The address making the purchase
 - `recipientAddress` (string, optional): If different than `address`
 - `networkId` (number, optional): Force transaction on specific network
 - `payload` (object, optional): Product-specific parameters
@@ -216,17 +192,6 @@ interface EditionProduct {
   price: bigint;
   startTime?: Date;
   endTime?: Date;
-  // ... base properties
-}
-```
-
-### Burn/Redeem Product
-
-```typescript
-interface BurnRedeemProduct {
-  type: 'burn-redeem';
-  burnTokens: BurnToken[];
-  redeemTokens: RedeemToken[];
   // ... base properties
 }
 ```
@@ -282,5 +247,5 @@ MIT © Manifold
 ## 🔗 Links
 
 - [Manifold Studio](https://studio.manifold.xyz/)
-- [Documentation](https://docs.manifold.xyz/)
+- [Documentation](https://manifoldxyz.gitbook.io/manifold-client-sdk)
 - [GitHub](https://github.com/manifoldxyz/client-sdk)
