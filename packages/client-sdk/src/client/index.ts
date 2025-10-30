@@ -176,7 +176,6 @@ export function createClient(config?: ClientConfig): ManifoldClient {
           `Product type ${instanceData.appId} is not yet supported`,
         );
       } catch (error) {
-        console.log('error', error);
         // Re-throw SDK errors
         if (error instanceof ClientSDKError) {
           throw error;

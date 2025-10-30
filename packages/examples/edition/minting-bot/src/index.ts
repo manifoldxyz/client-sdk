@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { createClient, createAccountViem, isEditionProduct } from '@manifoldxyz/client-sdk';
+import { createClient, createAccountViem, isEditionProduct, ClientSDKError } from '@manifoldxyz/client-sdk';
 import { createWalletClient, custom, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { sepolia } from 'viem/chains'
@@ -89,7 +89,8 @@ async function main() {
   }
 }
 
-main().catch((error) => {
+main().catch((error: any) => {
   console.error('❌ Minting failed:', error);
+  console.error(`details`, error.details?.error.details?.originalError)
   process.exit(1);
 });

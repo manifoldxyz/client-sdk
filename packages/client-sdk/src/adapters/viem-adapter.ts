@@ -130,10 +130,7 @@ class ViemAccount implements IAccount {
   async getBalance(networkId: number, tokenAddress?: string): Promise<Money> {
     try {
       // Switch to the requested network if needed
-      const currentNetworkId = await this.getConnectedNetworkId();
-      if (currentNetworkId !== networkId) {
-        await this.switchNetwork(networkId);
-      }
+      await this.switchNetwork(networkId);
 
       if (!tokenAddress || tokenAddress === '0x0000000000000000000000000000000000000000') {
         // Get native token balance using viem
@@ -206,6 +203,11 @@ class ViemAccount implements IAccount {
    * @throws {ClientSDKError} When network switch fails or is rejected
    */
   async switchNetwork(chainId: number): Promise<void> {
+    // First check if there is a need to switch
+    const currentConnectedNetwork = await this.getConnectedNetworkId();
+    if (currentConnectedNetwork === chainId) {
+      return;
+    }
     try {
       // Use viem's switchChain action
       await this._walletClient.switchChain({ id: chainId });
