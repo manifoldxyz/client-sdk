@@ -17,16 +17,13 @@ Create an account representation from [Viem Wallet Client](https://viem.sh/docs/
 {% tabs %}
 {% tab title="index.ts" %}
 ```typescript
-import { createClient, isBlindMintProduct, createAccountViem } from '@manifoldxyz/client-sdk';
+import { createClient,BlindMintProduct, createAccountViem } from '@manifoldxyz/client-sdk';
 import { walletClient } from './client.ts';
 
 const client = createClient();
 // Grab product
-const product = await client.getProduct('4150231280');
-// Check product is of type you expect 
-if (!isBlindMintProduct(product)) {
-  throw new Error('Is not a blind mint instance')
-}
+const product = await client.getProduct('4150231280') as BlindMintProduct;
+
 const prepared = await product.preparePurchase({
   address: '0xBuyer',
   payload: { quantity: 1 },

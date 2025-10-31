@@ -5,7 +5,7 @@ Calling [getProduct](../manifold-client/getproduct.md) returns a product object 
 | Field       | Type                                            | Required | Description                        |
 | ----------- | ----------------------------------------------- | -------- | ---------------------------------- |
 | **id**      | string                                          | ✅        | Instance ID                        |
-| type        | [AppType](../../reference/apptype.md)           | ✅        | `edition`                          |
+| type        | [AppType](../../reference/apptype.md)           | ✅        | Type of the product                |
 | data        | [InstanceData](../../reference/instancedata.md) | ✅        | Product offchain data              |
 | previewData | [PreviewData](../../reference/previewdata.md)   | ✅        | Return preview data of the product |
 

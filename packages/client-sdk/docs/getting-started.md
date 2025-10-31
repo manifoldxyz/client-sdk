@@ -26,48 +26,26 @@ npm install @manifoldxyz/client-sdk
 {% tabs %}
 {% tab title="index.ts" %}
 ```typescript
-import { createClient, isBlindMintProduct, isEditionProduct, createAccountViem } from '@manifoldxyz/client-sdk';
+import { createClient, EditionProduct, isBlindMintProduct, isEditionProduct, createAccountViem } from '@manifoldxyz/client-sdk';
 import { walletClient } from './walletClient.ts';
 
 const client = createClient();
 
 // Fetch product
-const product = await client.getProduct('4150231280');
+const product = await client.getProduct('4150231280') as EditionProduct; // Edition product
 
-// Handle different product types
-if (isEditionProduct(product)) {
-  // Edition product - NFT drops with fixed/open editions
-  const prepared = await product.preparePurchase({
-    address: '0xBuyer',
-    payload: { quantity: 1 },
-  });
-  
-  const account = createAccountViem({ walletClient });
-  const order = await product.purchase({
-    account,
-    preparedPurchase: prepared,
-  });
-  const txHash = order.receipts[0]?.txHash;
-  console.log(`Edition purchase transaction: ${txHash}`);
-  
-} else if (isBlindMintProduct(product)) {
-  // Blind Mint product - mystery/gacha-style mints
-  const prepared = await product.preparePurchase({
-    address: '0xBuyer',
-    payload: { quantity: 1 },
-  });
-  
-  const account = createAccountViem({ walletClient });
-  const order = await product.purchase({
-    account,
-    preparedPurchase: prepared,
-  });
-  const txHash = order.receipts[0]?.txHash;
-  console.log(`Blind mint transaction: ${txHash}`);
-  
-} else {
-  throw new Error('Unsupported product type');
-}
+const prepared = await product.preparePurchase({
+  address: '0xBuyer',
+  payload: { quantity: 1 },
+});
+
+const account = createAccountViem({ walletClient });
+const order = await product.purchase({
+  account,
+  preparedPurchase: prepared,
+});
+const txHash = order.receipts[0]?.txHash;
+console.log(`Edition purchase transaction: ${txHash}`);
 ```
 {% endtab %}
 

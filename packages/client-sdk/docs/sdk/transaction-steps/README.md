@@ -14,9 +14,10 @@ Other scenarios include cross-chain purchases (bridge, then mint) or batch opera
 ### 1. Built-in Execution (Recommended)
 
 For **user-facing apps**, the SDK separates transactions into explicit steps. This gives you:
-- Progress tracking for multi-step flows
-- Fine-grained error handling per transaction
-- Safer UX - users approve each step individually
+
+* Progress tracking for multi-step flows
+* Fine-grained error handling per transaction
+* Safer UX - users approve each step individually
 
 The [preparePurchase](../product/blind-mint/preparepurchase.md) function returns [TransactionStep](./) objects. Call [execute](execute.md) on each step to submit the transaction. The SDK automatically skips unnecessary steps (e.g., if approval is already granted).
 
@@ -26,13 +27,14 @@ For **server-side apps** or **agentic flows**, call [purchase](../product/common
 
 Each `TransactionStep` includes a [transactionData](transactionData.md) field containing raw blockchain transaction data. This enables custom transaction execution for advanced use cases:
 
-- **EIP-7702 Support**: Account abstraction and smart contract wallets
-- **Custom Gas Management**: Implement your own gas strategies
-- **Transaction Infrastructure**: Integrate with existing systems
-- **Batch Transactions**: Combine multiple transactions
-- **Custom Error Handling**: Implement retry logic
+* **EIP-7702 Support**: Account abstraction and smart contract wallets
+* **Custom Gas Management**: Implement your own gas strategies
+* **Transaction Infrastructure**: Integrate with existing systems
+* **Batch Transactions**: Combine multiple transactions
+* **Custom Error Handling**: Implement retry logic
 
 Example:
+
 ```typescript
 // Prepare purchase normally
 const preparedPurchase = await product.preparePurchase({
@@ -56,5 +58,5 @@ for (const step of preparedPurchase.steps) {
 
 ## Available Documentation
 
-- [execute](execute.md) - Built-in execution method for transaction steps
-- [transactionData](transactionData.md) - Raw transaction data for custom execution
+* [execute](execute.md) - Built-in execution method for transaction steps
+* [TransactionData](../../reference/transactiondata.md) - Raw transaction data for custom execution

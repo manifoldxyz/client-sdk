@@ -17,10 +17,10 @@ Creates an account representation from an **Ethers v5** signer or wallet.\
 
 #### Example
 
-<pre class="language-jsx"><code class="lang-jsx">import { createAccountEthers5, createClient } from '@manifoldxyz/client-sdk';
+<pre class="language-jsx"><code class="lang-jsx">import { createAccountEthers5, createClient, EditionProduct } from '@manifoldxyz/client-sdk';
 
 const client = createClient();
-<strong>const product = await client.getProduct('4150231280');
+<strong>const product = await client.getProduct('4150231280') as EditionProduct;
 </strong>const prepared = await product.preparePurchase({
   address: wallet.address,
   payload: {

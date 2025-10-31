@@ -12,16 +12,15 @@ This method may trigger multiple write transactions (e.g., token approval and mi
 
 #### Parameters
 
-| Parameter        | Type                                                               | Required | Description                                                                                             |
-| ---------------- | ------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------- |
-| account          | [Account](../../../reference/account.md)                           | ✅        | Buyer’s account                                                                                         |
-| preparedPurchase | [PreparedPurchase](../../../reference/preparedpurchase.md)         | ✅        | Prepared transaction object returned from [preparePurchase](../edition-product/preparepurchase.md) call |
-| callbacks        | [TransactionCallbacks](../../../reference/transactioncallbacks.md) | ❌        | Purchase callbacks for handling different stages                                                        |
-| confirmations    | number                                                             | ❌        | Number of confirmation blocks (Default 1)                                                               |
+| Parameter        | Type                                                       | Required | Description                                                                                             |
+| ---------------- | ---------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------- |
+| account          | [Account](../../../reference/account.md)                   | ✅        | Buyer’s account                                                                                         |
+| preparedPurchase | [PreparedPurchase](../../../reference/preparedpurchase.md) | ✅        | Prepared transaction object returned from [preparePurchase](../edition-product/preparepurchase.md) call |
+| confirmations    | number                                                     | ❌        | Number of confirmation blocks (Default 1)                                                               |
 
 #### Returns: [Receipt](../../../reference/receipt.md)
 
-The receipt contains the confirmed transaction metadata under `transactionReceipt` and, when applicable, an `order` object with parsed token details for the mint that was executed.
+The receipt contains the confirmed transaction metadata under `transactionReceipt` and an `order` object with parsed token details for the mint that was executed.
 
 #### Example
 

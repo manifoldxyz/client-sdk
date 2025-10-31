@@ -10,43 +10,42 @@ The repository includes a complete example at [examples/rainbowkit-mint](https:/
 
 The edition RainbowKit example showcases how to:
 
-- Connect wallets with RainbowKit + wagmi
-- Mint [Edition products](../../reference/editionproduct.md) through the Manifold Client SDK
-- Run on Next.js 14 with the App Router and TypeScript
-- Display mint progress, costs, and errors in the UI
-- Complete example at [examples/rainbowkit-mint](https://github.com/manifoldxyz/client-sdk/tree/main/packages/examples/edition/rainbowkit-mint)
+* Connect wallets with RainbowKit + wagmi
+* Mint [Edition products](../../reference/editionproduct.md) through the Manifold Client SDK
+* Run on Next.js 14 with the App Router and TypeScript
+* Display mint progress, costs, and errors in the UI
+* Complete example at [examples/rainbowkit-mint](https://github.com/manifoldxyz/client-sdk/tree/main/packages/examples/edition/rainbowkit-mint)
 
 **Quick start**
 
-1. **Install workspace dependencies**
+1.  **Install workspace dependencies**
 
-   ```bash
-   pnpm install
-   ```
+    ```bash
+    pnpm install
+    ```
+2.  **Create environment variables**
 
-2. **Create environment variables**
+    ```bash
+    cp .env.example \
+       env.local
+    ```
 
-   ```bash
-   cp packages/examples/edition/rainbowkit-mint/.env.example \
-      packages/examples/edition/rainbowkit-mint/.env.local
-   ```
+    Fill in:
 
-   Fill in:
+    ```env
+    NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
+    NEXT_PUBLIC_INSTANCE_ID=your_edition_instance_id
+    ```
 
-   ```env
-   NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
-   NEXT_PUBLIC_INSTANCE_ID=your_edition_instance_id
-   ```
-
-   `NEXT_PUBLIC_INSTANCE_ID` must point to an Edition product you published in Manifold Studio.
-
+    `NEXT_PUBLIC_INSTANCE_ID` must point to an Edition product you published in Manifold Studio.\
+    `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is optional but required if you want to support [WalletConnect](https://dashboard.reown.com/sign-in) wallets.
 3. **Launch the example**
 
-   ```bash
-   pnpm --filter @manifoldxyz/example-edition-rainbowkit-example dev
-   ```
+```bash
+pnpm dev
+```
 
-   Visit `http://localhost:3000` and connect a wallet with RainbowKit’s `ConnectButton`.
+Visit `http://localhost:3000` and connect a wallet with RainbowKit’s `ConnectButton`.
 
 **Key implementation steps**
 
@@ -71,7 +70,7 @@ export default function Home() {
 }
 ```
 
-2. Implement Minting Logic in [MintButton.tsx](https://github.com/manifoldxyz/client-sdk/blob/main/packages/examples/edition/rainbowkit-mint/src/components/MintButton.tsx)
+2. Implement Minting Logic in [MintButton.tsx](../../../../examples/edition/rainbowkit-mint/src/components/MintButton.tsx)
 
 ```typescript
 'use client';
@@ -114,10 +113,7 @@ const account = createAccountViem({
 c. Fetch the product and verify its type
 
 ```typescript
-const product = await client.getProduct(INSTANCE_ID);
-if (!isEditionProduct(product)) {
-  throw new Error('Is not a blind mint instance');
-}
+const product = await client.getProduct(INSTANCE_ID) as EditionProduct;
 ```
 
 d. Check the product status to ensure it’s still active
@@ -151,10 +147,9 @@ const order = await product.purchase({
 
 Key points:
 
-- `createAccountViem` wraps wagmi’s wallet client so the SDK can sign and send transactions on the user’s behalf.
-- Always gate functionality behind the appropriate type guard (`isEditionProduct`) before calling edition-specific helpers.
-- `preparePurchase` performs all eligibility checks (allowlists, supply, promo codes) and returns the total cost breakdown. Supply the same `account` so balance checks run against the connected wallet.
-- `purchase` executes the transaction sequence (ERC-20 approvals, mint, etc.) and returns a [Receipt](../../reference/receipt.md) with the final transaction hash and minted tokens.
+* `createAccountViem` wraps wagmi’s wallet client so the SDK can sign and send transactions on the user’s behalf.
+* `preparePurchase` performs all eligibility checks (allowlists, supply, promo codes) and returns the total cost breakdown. Supply the same `account` so balance checks run against the connected wallet.
+* `purchase` executes the transaction sequence (ERC-20 approvals, mint, etc.) and returns a [Receipt](../../reference/receipt.md) with the final transaction hash and minted tokens.
 
 **Display token media and on-chain stats**
 
@@ -162,10 +157,6 @@ You can enrich the UI with product art and live supply data directly from the SD
 
 ```typescript
 const product = await client.getProduct(instanceId);
-
-if (!isEditionProduct(product)) {
-  throw new Error('Edition product required');
-}
 
 // Off-chain media and metadata (safe to render immediately)
 const { asset, title, contract } = product.data.publicData;
@@ -203,8 +194,7 @@ return (
 
 Best practices:
 
-- **Validate product type** using [isEditionProduct](../../sdk/product/blind-mint/isblindmintproduct.md) or [isEditionProduct](../../sdk/product/edition-product/iseditionproduct.md) to ensure proper TypeScript typings.
-- **Check status** with [getStatus](../../sdk/product/common/getstatus.md) before attempting a purchase to verify the product is active.
-- **Handle** [**ClientSDKError**](../../reference/clientsdkerror.md) **codes** for common cases such as ineligibility, sold-out items, or insufficient funds.
-- Call [`getAllocations`](../../sdk/product/common/getallocations.md) when you need to show remaining allowlist spots.
-- Inspect [`Receipt.order`](../../reference/order.md) to display which tokens were minted after `purchase`.
+* **Check status** with [getStatus](../../sdk/product/common/getstatus.md) before attempting a purchase to verify the product is active.
+* **Handle** [**ClientSDKError**](../../reference/clientsdkerror.md) **codes** for common cases such as ineligibility, sold-out items, or insufficient funds.
+* Call [`getAllocations`](../../sdk/product/common/getallocations.md) when you need to show remaining allowlist spots.
+* Inspect [`Receipt.order`](../../reference/order.md) to display which tokens were minted after `purchase`.

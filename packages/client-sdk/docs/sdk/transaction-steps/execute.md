@@ -6,11 +6,10 @@ description: Handles the execution of a specific step.
 
 **execute(params)** → [Receipt](../../reference/receipt.md)
 
-| Parameter     | Type                                                            | Required | Description                                      |
-| ------------- | --------------------------------------------------------------- | -------- | ------------------------------------------------ |
-| account       | [Account](../../reference/account.md)                           | ✅        | Buyer’s account                                  |
-| callbacks     | [TransactionCallbacks](../../reference/transactioncallbacks.md) | ❌        | Purchase callbacks for handling different stages |
-| confirmations | number                                                          | ❌        | Number of confirmation blocks (Default 1)        |
+| Parameter     | Type                                  | Required | Description                               |
+| ------------- | ------------------------------------- | -------- | ----------------------------------------- |
+| account       | [Account](../../reference/account.md) | ✅        | Buyer’s account                           |
+| confirmations | number                                | ❌        | Number of confirmation blocks (Default 1) |
 
 #### Returns: [Receipt](../../reference/receipt.md)
 
