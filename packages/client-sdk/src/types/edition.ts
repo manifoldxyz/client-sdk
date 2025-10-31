@@ -1,6 +1,33 @@
-import type { AudienceType } from './product';
 import type { Money } from './money';
 import type * as ethers from 'ethers';
+import type { PublicInstance } from '@manifoldxyz/studio-apps-client-public';
+import type { AppType, ProductStatus } from './common';
+import type {
+  BaseProduct,
+  ManifoldContract,
+  Contract,
+  Asset,
+  Media,
+  ProductMetadata,
+  ProductInventory,
+  ProductRule,
+  ProductProvenance,
+  AllocationParams,
+  AllocationResponse,
+} from './product';
+import type {
+  PreparedPurchase,
+  PurchaseParams,
+  PreparePurchaseParams,
+  EditionPayload,
+  Receipt,
+  TokenOrder,
+} from './purchase';
+
+/**
+ * Audience type enum
+ */
+export type AudienceType = 'None' | 'Allowlist' | 'RedemptionCode';
 
 /**
  * Token specification enum for Edition products
@@ -8,6 +35,149 @@ import type * as ethers from 'ethers';
 export enum EditionSpec {
   ERC721 = 'ERC721',
   ERC1155 = 'ERC1155',
+}
+
+/**
+ * Public configuration data for Edition products.
+ *
+ * @public
+ */
+export type EditionPublicDataResponse = {
+  /**
+   * Title of the Edition product.
+   */
+  title: string;
+
+  /**
+   * Description of the Edition product.
+   */
+  description?: string;
+
+  /**
+   * Primary media asset for the Edition.
+   */
+  asset: Asset;
+
+  /**
+   * Network ID where the product is deployed.
+   */
+  network: number;
+
+  /**
+   * Smart contract details for the NFT.
+   */
+  contract: ManifoldContract;
+
+  extensionAddress721: {
+    value: string;
+    version: number;
+  };
+  extensionAddress1155: {
+    value: string;
+    version: number;
+  };
+
+  /**
+   * Allowlist configuration for the Edition.
+   */
+  instanceAllowlist?: {
+    merkleTreeId?: number;
+  };
+};
+
+export type EditionPublicData = Omit<EditionPublicDataResponse, 'contract'> & {
+  /**
+   * Smart contract details for the NFT.
+   */
+  contract: Contract;
+};
+
+/**
+ * Edition product type for standard NFT mints.
+ *
+ * Edition products allow creators to sell fixed or open edition NFTs
+ * with optional allowlists, redemption codes, and pricing tiers.
+ *
+ * @public
+ */
+export interface EditionProduct extends BaseProduct<EditionPublicData> {
+  /**
+   * Product type identifier.
+   */
+  type: AppType.EDITION;
+
+  /**
+   * Off-chain product data.
+   */
+  data: PublicInstance<EditionPublicData>;
+
+  /**
+   * On-chain data (pricing, supply, etc.). Populated after calling fetchOnchainData().
+   */
+  onchainData?: EditionOnchainData;
+
+  /**
+   * Check allocation eligibility for a wallet address.
+   * @param params - Parameters including recipient address
+   * @returns Allocation details including eligibility and quantity
+   */
+  getAllocations(params: AllocationParams): Promise<AllocationResponse>;
+
+  /**
+   * Prepare a purchase transaction with eligibility check and cost calculation.
+   * @param params - Purchase parameters including address and quantity
+   * @returns Prepared transaction details with cost breakdown
+   */
+  preparePurchase(params: PreparePurchaseParams<EditionPayload>): Promise<PreparedPurchase>;
+
+  /**
+   * Execute a purchase transaction.
+   * @param params - Purchase execution parameters
+   * @returns Receipt details including transaction and minted token information
+   */
+  purchase(params: PurchaseParams): Promise<Omit<Receipt, 'order'> & { order: TokenOrder }>;
+
+  /**
+   * Get current product status (active, paused, completed, upcoming).
+   * @returns Current product status
+   */
+  getStatus(): Promise<ProductStatus>;
+
+  /**
+   * Get preview media for the product.
+   * @returns Media URLs for preview
+   */
+  getPreviewMedia(): Promise<Media | undefined>;
+
+  /**
+   * Get product metadata (name, description).
+   * @returns Product metadata
+   */
+  getMetadata(): Promise<ProductMetadata>;
+
+  /**
+   * Get inventory information (supply, minted count).
+   * @returns Inventory details
+   */
+  getInventory(): Promise<ProductInventory>;
+
+  /**
+   * Get product rules (dates, limits, restrictions).
+   * @returns Product rule configuration
+   */
+  getRules(): Promise<ProductRule>;
+
+  /**
+   * Get provenance information (creator, contract details).
+   * @returns Provenance details
+   */
+  getProvenance(): Promise<ProductProvenance>;
+
+  /**
+   * Fetch and populate on-chain data.
+   * @returns On-chain data including pricing and supply
+   */
+  fetchOnchainData(): Promise<EditionOnchainData>;
 }
 
 /**

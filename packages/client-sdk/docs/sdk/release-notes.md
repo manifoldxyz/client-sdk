@@ -1,5 +1,10 @@
 # Release Notes
 
+### October 31, 2025 (0.2.1-beta.5)
+
+* Refactored type organization: moved all Edition-related types from `product.ts` to `edition.ts` for better code organization
+* Maintained backward compatibility through re-exports in `product.ts`
+
 ### October 31, 2025 (0.2.1-beta.4)
 
 * Added support for [Edition product](product/edition-product/)
