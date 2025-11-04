@@ -45,7 +45,7 @@ This roadmap outlines what the Manifold SDK team is currently developing, whatâ€
 - ### Mint Button & Product Display Widgets
   - **Why**: Reduce setup friction for creators and non-technical users.
   - **What**: Offer lightweight embeddable widgets (via script or iframe) that enable minting and product display without code.
-  - **Status/Target**: **End of November 2025**.
+  - **Status/Target**: **Early December 2025**.
   - **Community**: Collecting feedback on embed customization and accessibility.
 
 ---
@@ -55,7 +55,7 @@ This roadmap outlines what the Manifold SDK team is currently developing, whatâ€
 - ### Product Creation SDKs
   - **Why**: Developers increasingly want to create and manage products (Edition, Blind Mint, etc.) programmatically.
   - **What**: Define and release an SDK spec to support full product creation flows, including configuration, deployment, and metadata management.
-  - **Status/Target**: **Early December 2025**.
+  - **Status/Target**: **End of December 2025**.
   - **Community**: **Great opportunity** for early adopters â€” help shape the spec, test the API, and validate developer ergonomics.
 
 ---
