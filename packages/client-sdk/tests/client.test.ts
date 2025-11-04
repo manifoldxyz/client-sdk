@@ -52,7 +52,7 @@ describe('createClient', () => {
     BlindMintProductMock.mockClear();
   });
 
-  it('creates client without RPCs', () => {
+  it('creates client', () => {
     const client = createClient();
     expect(client).toBeDefined();
     expect(createProviderMock).not.toHaveBeenCalled();

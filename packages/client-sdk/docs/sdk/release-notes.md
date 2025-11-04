@@ -1,12 +1,5 @@
 # Release Notes
 
-### November 4, 2025 (0.3.0-beta.1)
-
-- **Breaking Change**: Removed `httpRPCs` parameter from client configuration and adapters
-- The SDK now uses Manifold Bridge Provider as a fallback for RPC connections
-- Simplified client initialization - no RPC URLs required
-- Updated account adapter interfaces to remove client dependency
-
 ### October 31, 2025 (0.2.1-beta.4)
 
 - Added support for [Edition product](product/edition-product/)
