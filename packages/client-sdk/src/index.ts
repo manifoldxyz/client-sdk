@@ -3,11 +3,11 @@
  *
  * # Manifold Client SDK
  *
- * The official TypeScript SDK for integrating Manifold NFT products into your application.
+ * The official TypeScript SDK for integrating Manifold products into your application.
  *
  * ## Features
  * - 🚀 No API keys required
- * - 📦 Support for Edition, Burn/Redeem, and BlindMint products
+ * - 📦 Support for Edition and BlindMint products
  * - 💳 Complete purchase flow with eligibility checking
  * - 🔗 Multi-chain support (Ethereum, Base, Optimism, Shape)
  * - 🔌 Wallet agnostic (ethers v5/v6, viem)
@@ -19,12 +19,7 @@
  * import { createClient } from '@manifoldxyz/client-sdk';
  *
  * // Initialize client
- * const client = createClient({
- *   httpRPCs: {
- *     1: "https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY",
- *     8453: "https://base-mainnet.infura.io/v3/YOUR_KEY"
- *   }
- * });
+ * const client = createClient();
  *
  * // Fetch product
  * const product = await client.getProduct('4150231280');
@@ -50,7 +45,6 @@
  *
  * ### Product Types
  * - **Edition**: Standard NFT editions with optional allowlists
- * - **Burn/Redeem**: Exchange existing tokens for new ones
  * - **BlindMint**: Mystery/gacha-style random NFT mints
  *
  * ### Wallet Adapters
@@ -59,7 +53,7 @@
  * - Ethers v6: `ethers6Adapter`
  * - Viem: `viemAdapter`
  *
- * @see {@link https://manifold.xyz} for more information
+ * @see {@link https://docs.manifold.xyz/client-sdk} for more information
  * @see {@link https://studio.manifold.xyz} to create products
  *
  * @module @manifoldxyz/client-sdk

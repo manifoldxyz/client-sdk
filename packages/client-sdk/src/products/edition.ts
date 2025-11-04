@@ -99,30 +99,18 @@ export class EditionProduct implements IEditionProduct {
   onchainData?: EditionOnchainData;
 
   // Internal state
-  private _httpRPCs?: Record<number, string>;
 
   /**
    * Creates a new EditionProduct instance.
    *
    * @param instanceData - Product instance data from the API
    * @param previewData - Preview data for the product
-   * @param options - Configuration options
-   * @param options.httpRPCs - Custom RPC endpoints by network ID
    *
    * @throws {ClientSDKError} If the app ID doesn't match EDITION
    *
    * @internal
    */
-  constructor(
-    instanceData: InstanceData<EditionPublicDataResponse>,
-    previewData: InstancePreview,
-    options: {
-      httpRPCs?: Record<number, string>;
-    } = {},
-  ) {
-    const { httpRPCs } = options;
-    this._httpRPCs = httpRPCs;
-
+  constructor(instanceData: InstanceData<EditionPublicDataResponse>, previewData: InstancePreview) {
     // Validate app ID
     if (instanceData.appId !== AppId.EDITION) {
       throw new ClientSDKError(
@@ -190,7 +178,6 @@ export class EditionProduct implements IEditionProduct {
       const networkId = this.data.publicData.network;
       const provider = await createProvider({
         networkId,
-        customRpcUrls: this._httpRPCs,
       });
 
       // Fetch standard mint fee
@@ -322,7 +309,6 @@ export class EditionProduct implements IEditionProduct {
     const onchainData = await this.fetchOnchainData();
     const provider = await createProvider({
       networkId,
-      customRpcUrls: this._httpRPCs,
     });
 
     // Calculate costs
@@ -681,7 +667,6 @@ export class EditionProduct implements IEditionProduct {
     // Use configured providers (READ operations)
     const provider = await createProvider({
       networkId,
-      customRpcUrls: this._httpRPCs,
     });
 
     const factory = new ContractFactoryClass({
@@ -707,7 +692,6 @@ export class EditionProduct implements IEditionProduct {
     const networkId = this.data.publicData.network;
     const provider = await createProvider({
       networkId,
-      customRpcUrls: this._httpRPCs,
     });
 
     // Create Money object which will fetch all metadata automatically

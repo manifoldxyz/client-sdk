@@ -35,12 +35,7 @@ npm install @manifoldxyz/client-sdk
 ```typescript
 import { createClient } from '@manifoldxyz/client-sdk';
 
-const client = createClient({
-  httpRPCs: {
-    1: 'https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY',
-    8453: 'https://base-mainnet.infura.io/v3/YOUR_KEY',
-  },
-});
+const client = createClient();
 ```
 
 ### 2. Get Product Data
@@ -94,16 +89,13 @@ Creates a new SDK client instance.
 
 **Parameters:**
 
-- `httpRPCs` (object, optional): Custom RPC URLs by network ID
+- `config` (object, optional): Configuration options
+  - `debug` (boolean, optional): Enable debug logging
 
 **Example:**
 
 ```typescript
-const client = createClient({
-  httpRPCs: {
-    1: 'https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY',
-  },
-});
+const client = createClient();
 ```
 
 ### Client Methods

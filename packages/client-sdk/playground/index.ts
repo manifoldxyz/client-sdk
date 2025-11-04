@@ -22,17 +22,6 @@ const getEnvVar = (key: string, defaultValue?: string): string => {
   return value;
 };
 
-const getNetworkRPCs = (): Record<number, string> => {
-  const rpcs: Record<number, string> = {};
-
-  if (process.env.ETH_MAINNET_RPC) rpcs[1] = process.env.ETH_MAINNET_RPC;
-  if (process.env.BASE_RPC) rpcs[8453] = process.env.BASE_RPC;
-  if (process.env.OPTIMISM_RPC) rpcs[10] = process.env.OPTIMISM_RPC;
-  if (process.env.SHAPE_RPC) rpcs[360] = process.env.SHAPE_RPC;
-  if (process.env.SEPOLIA_RPC) rpcs[11155111] = process.env.SEPOLIA_RPC;
-
-  return rpcs;
-};
 
 interface ProductTestOptions {
   address: string;
@@ -204,7 +193,6 @@ async function main() {
 
   // Load configuration from environment
   const debug = process.env.DEBUG === 'true';
-  const httpRPCs = getNetworkRPCs();
   const testNetworkId = parseInt(getEnvVar('TEST_NETWORK_ID', '11155111'));
   const testInstanceId = getEnvVar('TEST_INSTANCE_ID', '4149776624');
   const privateKey = process.env.TEST_PRIVATE_KEY;
@@ -214,7 +202,6 @@ async function main() {
   console.log(`   Debug: ${debug}`);
   console.log(`   Test Network: ${testNetworkId}`);
   console.log(`   Test Instance: ${testInstanceId}`);
-  console.log(`   RPC Networks: ${Object.keys(httpRPCs).join(', ')}`);
 
   // Create wallet if private key provided
   let wallet: ethers.Wallet | undefined;
@@ -232,13 +219,11 @@ async function main() {
   const testAddress = wallet?.address || '0x000000000000000000000000000000000000dead';
 
   // Create client
-  const client = createClient({
-    httpRPCs,
-  });
+  const client = createClient();
 
   let account: IAccount | undefined;
   try {
-    account = createAccountEthers5(client,  {
+    account = createAccountEthers5({
       wallet
     })
   } catch (adapterError) {

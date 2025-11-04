@@ -39,11 +39,7 @@ import {
 } from '@manifoldxyz/client-sdk';
 import { ethers } from 'ethers';
 
-const client = createClient({
-  httpRPCs: {
-    [Number(process.env.NETWORK_ID!)]: process.env.RPC_URL!,
-  },
-});
+const client = createClient();
 
 const product = await client.getProduct('INSTANCE_ID');
 
@@ -60,7 +56,7 @@ if (!isEditionProduct(product)) {
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL!);
 const wallet = new ethers.Wallet(process.env.WALLET_PRIVATE_KEY!, provider);
-const account = createAccountEthers5(client, { wallet });
+const account = createAccountEthers5({ wallet });
 
 try {
   const prepared = await product.preparePurchase({

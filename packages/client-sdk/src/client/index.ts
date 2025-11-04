@@ -13,88 +13,31 @@ import { validateInstanceId, parseManifoldUrl } from '../utils/validation';
 import manifoldApiClient from '../api/manifold-api';
 
 /**
- * Type guard to check if instanceData is for BlindMint product type.
- *
- * @internal
- * @param instanceData - The instance data to check
- * @returns True if the instance data is for a BlindMint product
- *
- * @example
- * ```typescript
- * if (isBlindMintInstanceData(instanceData)) {
- *   // TypeScript now knows this is InstanceData<BlindMintPublicData>
- *   const blindMintData = instanceData.publicData;
- * }
- * ```
- */
-function isBlindMintInstanceData(
-  instanceData: InstanceData<unknown>,
-): instanceData is InstanceData<BlindMintPublicDataResponse> {
-  return (instanceData.appId as AppId) === AppId.BLIND_MINT_1155;
-}
-
-/**
- * Type guard to check if instanceData is for Edition product type.
- *
- * @internal
- * @param instanceData - The instance data to check
- * @returns True if the instance data is for an Edition product
- *
- * @example
- * ```typescript
- * if (isEditionInstanceData(instanceData)) {
- *   // TypeScript now knows this is InstanceData<EditionPublicData>
- *   const editionData = instanceData.publicData;
- * }
- * ```
- */
-function isEditionInstanceData(
-  instanceData: InstanceData<unknown>,
-): instanceData is InstanceData<EditionPublicDataResponse> {
-  return (instanceData.appId as AppId) === AppId.EDITION;
-}
-
-/**
  * Creates a new Manifold SDK client instance for interacting with Manifold products.
  *
  * The client provides methods to fetch product data, check eligibility, prepare purchases,
  * and execute transactions for NFT products on the Manifold platform.
  *
  * @param config - Optional configuration object for the client
- * @param config.httpRPCs - Custom RPC URLs by network ID. Required for transaction execution.
- *                          Example: `{ 1: "https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY" }`
  * @param config.debug - Enable debug logging for troubleshooting (default: false)
  *
  * @returns A configured ManifoldClient instance
  *
  * @example
  * ```typescript
- * // Basic client without custom RPCs (read-only operations)
+ * // Basic client
  * const client = createClient();
  *
- * // Client with custom RPC endpoints for transaction support
+ * // Client with debug logging enabled
  * const client = createClient({
- *   httpRPCs: {
- *     1: "https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY",
- *     8453: "https://base-mainnet.infura.io/v3/YOUR_KEY",
- *     10: "https://optimism-mainnet.infura.io/v3/YOUR_KEY"
- *   },
  *   debug: true // Enable debug logging
  * });
  * ```
  *
- * @remarks
- * - No API keys are required for basic product data fetching
- * - Custom RPC endpoints are required for purchase transactions
- * - The client automatically handles network switching for cross-chain purchases
- *
  * @public
  */
-export function createClient(config?: ClientConfig): ManifoldClient {
-  const httpRPCs = config?.httpRPCs ?? {};
-
+export function createClient(_config?: ClientConfig): ManifoldClient {
   return {
-    httpRPCs,
     /**
      * Fetches detailed product information from Manifold.
      *
@@ -156,18 +99,14 @@ export function createClient(config?: ClientConfig): ManifoldClient {
         if (isBlindMintInstanceData(instanceData)) {
           // TypeScript now knows instanceData is InstanceData<BlindMintPublicData>
           // Create BlindMintProduct with both instance and preview data
-          return new BlindMintProduct(instanceData, previewData, {
-            httpRPCs,
-          });
+          return new BlindMintProduct(instanceData, previewData);
         }
 
         // Create Edition product if it matches the app ID
         if (isEditionInstanceData(instanceData)) {
           // TypeScript now knows instanceData is InstanceData<EditionPublicData>
           // Create EditionProduct with both instance and preview data
-          return new EditionProduct(instanceData, previewData, {
-            httpRPCs,
-          });
+          return new EditionProduct(instanceData, previewData);
         }
 
         // For other product types, throw an error until implemented
@@ -249,4 +188,46 @@ export function createClient(config?: ClientConfig): ManifoldClient {
       );
     },
   };
+}
+
+/**
+ * Type guard to check if instanceData is for BlindMint product type.
+ *
+ * @internal
+ * @param instanceData - The instance data to check
+ * @returns True if the instance data is for a BlindMint product
+ *
+ * @example
+ * ```typescript
+ * if (isBlindMintInstanceData(instanceData)) {
+ *   // TypeScript now knows this is InstanceData<BlindMintPublicData>
+ *   const blindMintData = instanceData.publicData;
+ * }
+ * ```
+ */
+function isBlindMintInstanceData(
+  instanceData: InstanceData<unknown>,
+): instanceData is InstanceData<BlindMintPublicDataResponse> {
+  return (instanceData.appId as AppId) === AppId.BLIND_MINT_1155;
+}
+
+/**
+ * Type guard to check if instanceData is for Edition product type.
+ *
+ * @internal
+ * @param instanceData - The instance data to check
+ * @returns True if the instance data is for an Edition product
+ *
+ * @example
+ * ```typescript
+ * if (isEditionInstanceData(instanceData)) {
+ *   // TypeScript now knows this is InstanceData<EditionPublicData>
+ *   const editionData = instanceData.publicData;
+ * }
+ * ```
+ */
+function isEditionInstanceData(
+  instanceData: InstanceData<unknown>,
+): instanceData is InstanceData<EditionPublicDataResponse> {
+  return (instanceData.appId as AppId) === AppId.EDITION;
 }

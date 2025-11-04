@@ -17,20 +17,20 @@
  * ### Ethers v5
  * ```typescript
  * import { ethers } from 'ethers';
- * import { Ethers5Adapter } from '@manifoldxyz/client-sdk/adapters';
+ * import { createAccountEthers5 } from '@manifoldxyz/client-sdk/adapters';
  *
  * const provider = new ethers.providers.Web3Provider(window.ethereum);
  * const signer = provider.getSigner();
- * const adapter = new Ethers5Adapter(client, { signer });
+ * const adapter = createAccountEthers5({ signer });
  * ```
  *
  * ### Viem
  * ```typescript
  * import { createWalletClient } from 'viem';
- * import { ViemAdapter } from '@manifoldxyz/client-sdk/adapters';
+ * import { createAccountViem } from '@manifoldxyz/client-sdk/adapters';
  *
  * const walletClient = createWalletClient({ ... });
- * const adapter = new ViemAdapter(client, walletClient);
+ * const adapter = createAccountViem(walletClient);
  * ```
  */
 

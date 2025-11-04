@@ -91,15 +91,12 @@ export class BlindMintProduct implements IBlindMintProduct {
 
   // Internal state
   private _platformFee?: Money;
-  private _httpRPCs?: Record<number, string>;
 
   /**
    * Creates a new BlindMintProduct instance.
    *
    * @param instanceData - Product instance data from the API
    * @param previewData - Preview data for the product
-   * @param options - Configuration options
-   * @param options.httpRPCs - Custom RPC endpoints by network ID
    *
    * @throws {ClientSDKError} If the app ID doesn't match BLIND_MINT_1155
    *
@@ -108,13 +105,7 @@ export class BlindMintProduct implements IBlindMintProduct {
   constructor(
     instanceData: PublicInstance<BlindMintPublicDataResponse>,
     previewData: InstancePreview,
-    options: {
-      httpRPCs?: Record<number, string>;
-    } = {},
   ) {
-    const { httpRPCs } = options;
-    this._httpRPCs = httpRPCs;
-
     // Validate app ID
     if (instanceData.appId !== (AppId.BLIND_MINT_1155 as number)) {
       throw new ClientSDKError(
@@ -188,7 +179,6 @@ export class BlindMintProduct implements IBlindMintProduct {
       const networkId = this.data.publicData.network;
       const provider = await createProvider({
         networkId,
-        customRpcUrls: this._httpRPCs,
       });
 
       this._platformFee = await Money.create({
@@ -306,7 +296,6 @@ export class BlindMintProduct implements IBlindMintProduct {
     const onchainData = await this.fetchOnchainData();
     const provider = await createProvider({
       networkId,
-      customRpcUrls: this._httpRPCs,
     });
 
     // Calculate costs
@@ -633,7 +622,6 @@ export class BlindMintProduct implements IBlindMintProduct {
     // Use configured providers (READ operations)
     const provider = await createProvider({
       networkId,
-      customRpcUrls: this._httpRPCs,
     });
 
     const factory = new ContractFactoryClass({
@@ -668,7 +656,6 @@ export class BlindMintProduct implements IBlindMintProduct {
     const networkId = this.data.publicData.network;
     const provider = await createProvider({
       networkId,
-      customRpcUrls: this._httpRPCs,
     });
 
     // Create Money object which will fetch all metadata automatically

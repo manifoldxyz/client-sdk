@@ -8,9 +8,10 @@ Creates a new SDK client instance.
 
 #### Parameters
 
-| Parameter | Type                   | Required |                                      |
-| --------- | ---------------------- | -------- | ------------------------------------ |
-| httpRPCs  | {\[networkId]: string} | ❌        | Optional custom RPC URLs by network. |
+| Parameter | Type   | Required |                                          |
+| --------- | ------ | -------- | ---------------------------------------- |
+| config    | object | ❌        | Optional configuration object           |
+| └─ debug  | boolean| ❌        | Enable debug logging (default: false)   |
 
 #### Returns: ManifoldClient
 
@@ -22,8 +23,4 @@ Creates a new SDK client instance.
 
 ```jsx
 const client = createClient();
-  httpRPCs: {
-    1: 'https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY',
-  },
-});
 ```

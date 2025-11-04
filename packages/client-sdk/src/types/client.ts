@@ -1,4 +1,3 @@
-import type { HttpRPCs } from './common';
 import type { Product } from './product';
 
 /**
@@ -7,24 +6,6 @@ import type { Product } from './product';
  * @public
  */
 export interface ClientConfig {
-  /**
-   * Custom RPC endpoints for blockchain interactions.
-   * Map of network ID to RPC URL string.
-   *
-   * @remarks
-   * Required for transaction execution. Each network you want to support
-   * must have a corresponding RPC endpoint.
-   *
-   * @example
-   * ```typescript
-   * {
-   *   1: "https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY",
-   *   8453: "https://base-mainnet.infura.io/v3/YOUR_KEY"
-   * }
-   * ```
-   */
-  httpRPCs?: HttpRPCs;
-
   /**
    * Enable debug logging for SDK operations.
    * Useful for troubleshooting and development.
@@ -50,8 +31,6 @@ export interface ClientConfig {
  * @public
  */
 export interface ManifoldClient {
-  httpRPCs: HttpRPCs;
-
   /**
    * Fetches detailed product information from Manifold.
    *

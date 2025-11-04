@@ -22,14 +22,11 @@ vi.mock('../src/products/blindmint', () => {
   const BlindMintProductMock = vi.fn().mockImplementation(function (
     instanceData: unknown,
     previewData: unknown,
-    options: unknown,
   ) {
     // @ts-ignore
     this.instanceData = instanceData;
     // @ts-ignore
     this.previewData = previewData;
-    // @ts-ignore
-    this.options = options;
     // @ts-ignore
     this.type = 'blind-mint';
   });
@@ -55,26 +52,9 @@ describe('createClient', () => {
     BlindMintProductMock.mockClear();
   });
 
-  it('returns empty providers when no RPCs supplied', () => {
+  it('creates client without RPCs', () => {
     const client = createClient();
-    expect(client.httpRPCs).toEqual({});
-    expect(createProviderMock).not.toHaveBeenCalled();
-  });
-
-  it('creates providers for supplied httpRPCs', () => {
-    const client = createClient({
-      httpRPCs: {
-        1: 'https://mainnet.rpc',
-        10: 'https://optimism.rpc',
-      },
-    });
-
-    // Client just stores httpRPCs, doesn't create providers immediately
-    expect(client.httpRPCs).toEqual({
-      1: 'https://mainnet.rpc',
-      10: 'https://optimism.rpc',
-    });
-    // createProvider is not called during client creation
+    expect(client).toBeDefined();
     expect(createProviderMock).not.toHaveBeenCalled();
   });
 
@@ -118,12 +98,10 @@ describe('createClient', () => {
       previewData,
     });
 
-    const client = createClient({ httpRPCs: { 1: 'https://mainnet.rpc' } });
+    const client = createClient();
     const product = await client.getProduct('https://manifold.xyz/@creator/id/2526777015');
 
-    expect(BlindMintProductMock).toHaveBeenCalledWith(instanceData, previewData, {
-      httpRPCs: { 1: 'https://mainnet.rpc' },
-    });
+    expect(BlindMintProductMock).toHaveBeenCalledWith(instanceData, previewData);
     expect(getCompleteInstanceDataMock).toHaveBeenCalledWith('2526777015', {
       maxMediaWidth: 1024,
     });

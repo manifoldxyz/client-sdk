@@ -7,7 +7,6 @@ import type {
 } from '../types/account-adapter';
 import { Money } from '../libs/money';
 import { ClientSDKError, ErrorCode } from '../types/errors';
-import type { ManifoldClient } from '../types';
 import { createProvider, ensureConnectedNetwork } from '../utils';
 import type { Network } from '@manifoldxyz/js-ts-utils';
 
@@ -47,13 +46,11 @@ class Ethers5Account implements IAccount {
 
   private _signer: ethers.providers.JsonRpcSigner | undefined;
   private _wallet: ethers.Wallet | undefined;
-  private _client: ManifoldClient;
   _address: string | undefined;
 
   /**
    * Initialize adapter with ethers v5 provider or signer.
    *
-   * @param client - The ManifoldClient instance
    * @param provider - Provider configuration
    * @param provider.signer - ethers v5 JsonRpcSigner (for browser wallets)
    * @param provider.wallet - ethers v5 Wallet (for private key wallets)
@@ -66,23 +63,15 @@ class Ethers5Account implements IAccount {
    * ```typescript
    * // Browser wallet
    * const signer = provider.getSigner();
-   * const adapter = new Ethers5Adapter(client, { signer });
+   * const adapter = new Ethers5Adapter({ signer });
    *
    * // Private key wallet
    * const wallet = new ethers.Wallet(privateKey);
-   * const adapter = new Ethers5Adapter(client, { wallet });
+   * const adapter = new Ethers5Adapter({ wallet });
    * ```
    */
-  constructor(
-    client: ManifoldClient,
-    provider: {
-      signer?: ethers.providers.JsonRpcSigner;
-      wallet?: ethers.Wallet;
-    },
-  ) {
+  constructor(provider: { signer?: ethers.providers.JsonRpcSigner; wallet?: ethers.Wallet }) {
     const { signer, wallet } = provider;
-
-    this._client = client;
     if (!signer && !wallet) {
       throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Signer or wallet is required');
     }
@@ -295,7 +284,6 @@ class Ethers5Account implements IAccount {
     }
     // Make sure the wallet is connected to the proper rpc
     const provider = await createProvider({
-      customRpcUrls: this._client.httpRPCs,
       networkId,
       useBridge: false,
     });
@@ -624,14 +612,11 @@ class Ethers5Account implements IAccount {
   }
 }
 
-function createAccount(
-  client: ManifoldClient,
-  provider: {
-    signer?: ethers.providers.JsonRpcSigner;
-    wallet?: ethers.Wallet;
-  },
-) {
-  return new Ethers5Account(client, provider);
+function createAccount(provider: {
+  signer?: ethers.providers.JsonRpcSigner;
+  wallet?: ethers.Wallet;
+}) {
+  return new Ethers5Account(provider);
 }
 
 export { createAccount };
