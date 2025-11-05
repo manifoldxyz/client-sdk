@@ -1,6 +1,64 @@
-# Public Providers
+# Public Provider Adapters
 
 Public providers enable the SDK to perform read-only blockchain operations such as fetching balances, estimating gas, and reading smart contract data. They are required when initializing the Manifold Client.
+
+## Wagmi Public Provider
+
+**createPublicProviderWagmi(config)** → IPublicProvider
+
+Creates a public provider from a Wagmi config with automatic network management.
+
+#### Parameters
+
+| Parameter | Type | Required | Description |
+| --------- | ---- | -------- | ----------- |
+| config | Config | ✅ | Wagmi config with chains and transports |
+
+#### Returns: IPublicProvider
+
+#### Example
+
+```typescript
+import { createPublicProviderWagmi } from '@manifoldxyz/client-sdk';
+import { createConfig, http } from '@wagmi/core';
+import { mainnet, base, optimism } from '@wagmi/core/chains';
+
+// Create Wagmi config with multiple chains
+const config = createConfig({
+  chains: [mainnet, base, optimism],
+  transports: {
+    [mainnet.id]: http('YOUR_MAINNET_RPC_URL'),
+    [base.id]: http('YOUR_BASE_RPC_URL'),
+    [optimism.id]: http('YOUR_OPTIMISM_RPC_URL'),
+  },
+});
+
+// Create the public provider
+const publicProvider = createPublicProviderWagmi({ config });
+
+// Use with Manifold client
+const client = createClient({ publicProvider });
+```
+
+#### Example with Default HTTP Transports
+
+```typescript
+import { createPublicProviderWagmi } from '@manifoldxyz/client-sdk';
+import { createConfig, http } from '@wagmi/core';
+import { mainnet, base } from '@wagmi/core/chains';
+
+// Use default HTTP transports (public RPCs)
+const config = createConfig({
+  chains: [mainnet, base],
+  transports: {
+    [mainnet.id]: http(),
+    [base.id]: http(),
+  },
+});
+
+const publicProvider = createPublicProviderWagmi({ config });
+const client = createClient({ publicProvider });
+```
 
 ## Viem Public Provider
 

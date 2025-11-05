@@ -27,28 +27,44 @@ npm install @manifoldxyz/client-sdk
 {% tabs %}
 {% tab title="index.ts" %}
 ```typescript
-import { createClient, EditionProduct, isBlindMintProduct, isEditionProduct, createAccountViem, createPublicProviderViem } from '@manifoldxyz/client-sdk';
-import { walletClient, publicClient } from './walletClient.ts';
+import { createClient, EditionProduct, createPublicProviderWagmi, createAccountViem } from '@manifoldxyz/client-sdk';
+import { createConfig, http, getAccount, getWalletClient } from '@wagmi/core';
+import { mainnet } from '@wagmi/core/chains';
+
+// Create Wagmi config
+const config = createConfig({
+  chains: [mainnet],
+  transports: {
+    [mainnet.id]: http('YOUR_RPC_URL'), // or http() for public RPC
+  },
+});
 
 // Create a public provider for blockchain interactions
-const publicProvider = createPublicProviderViem({ 
-  1: publicClient // mainnet
-});
+const publicProvider = createPublicProviderWagmi({ config });
 
 // Initialize the Manifold client
 const client = createClient({ publicProvider });
 
 // Fetch product
-const product = await client.getProduct('4150231280') as EditionProduct; // Edition product
+const product = await client.getProduct('4150231280') as EditionProduct;
 
+// Get connected account from Wagmi
+const account = getAccount(config);
+if (!account.address) throw new Error('No wallet connected');
+
+// Prepare purchase
 const prepared = await product.preparePurchase({
-  address: '0xBuyer',
+  address: account.address,
   payload: { quantity: 1 },
 });
 
-const account = createAccountViem({ walletClient });
+// Get wallet client and create account adapter
+const walletClient = await getWalletClient(config);
+const accountAdapter = createAccountViem({ walletClient });
+
+// Execute purchase
 const order = await product.purchase({
-  account,
+  account: accountAdapter,
   preparedPurchase: prepared,
 });
 const txHash = order.receipts[0]?.txHash;
@@ -56,25 +72,22 @@ console.log(`Edition purchase transaction: ${txHash}`);
 ```
 {% endtab %}
 
-{% tab title="walletClient.ts" %}
+{% tab title="setup.ts" %}
 ```typescript
-import { createWalletClient, createPublicClient, custom, http } from 'viem'
-import { privateKeyToAccount } from 'viem/accounts'
-import { mainnet } from 'viem/chains'
+import { createConfig, http } from '@wagmi/core';
+import { mainnet } from '@wagmi/core/chains';
+import { injected } from '@wagmi/connectors';
 
-// Create public client for read operations
-export const publicClient = createPublicClient({
-  chain: mainnet,
-  transport: http('YOUR_RPC_URL') // or custom(window.ethereum) for browser
-})
-
-// Create wallet client for transactions
-const account = privateKeyToAccount('0x...') 
-export const walletClient = createWalletClient({
-  account, 
-  chain: mainnet,
-  transport: custom(window.ethereum)
-})
+// Create Wagmi config with injected connector (MetaMask, etc.)
+export const config = createConfig({
+  chains: [mainnet],
+  connectors: [
+    injected(),
+  ],
+  transports: {
+    [mainnet.id]: http('YOUR_RPC_URL'), // or http() for public RPC
+  },
+});
 ```
 {% endtab %}
 {% endtabs %}

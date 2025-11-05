@@ -45,5 +45,3 @@ lerna-debug.log*
 yarn.lock
 package-lock.json
 .turbo
-
-CONTEXT_PRIME.md

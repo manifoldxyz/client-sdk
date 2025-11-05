@@ -99,18 +99,14 @@ export default function Home() {
 a. Create a [Manifold Client](../../sdk/manifold-client/) with a public provider
 
 ```typescript
-import { createPublicProviderViem } from '@manifoldxyz/client-sdk';
-import { createPublicClient, custom } from 'viem';
-import { mainnet } from 'viem/chains';
+import { createClient, createPublicProviderWagmi } from '@manifoldxyz/client-sdk';
+import { useConfig } from 'wagmi';
 
-// Create a public provider for blockchain interactions
-const publicClient = createPublicClient({
-  chain: mainnet,
-  transport: custom(window.ethereum),
-});
-const publicProvider = createPublicProviderViem({ 
-  1: publicClient // mainnet
-});
+// Get the Wagmi config from your React context
+const config = useConfig();
+
+// Create a public provider using Wagmi config
+const publicProvider = createPublicProviderWagmi({ config });
 
 // Initialize the client
 const client = createClient({ publicProvider });
@@ -119,6 +115,13 @@ const client = createClient({ publicProvider });
 b. Create an [Account](../../reference/account.md) representing the connected user.
 
 ```typescript
+import { createAccountViem } from '@manifoldxyz/client-sdk';
+import { useWalletClient } from 'wagmi';
+
+// Get the wallet client from wagmi
+const { data: walletClient } = useWalletClient();
+
+// Create the account adapter
 const account = createAccountViem({
   walletClient,
 });

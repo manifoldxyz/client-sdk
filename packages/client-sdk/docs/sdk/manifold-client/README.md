@@ -20,7 +20,30 @@ Creates a new SDK client instance.
 | --------------------------- | -------- | ------------- |
 | [getProduct](getproduct.md) | function | Get a product |
 
-#### Example
+#### Example with Wagmi
+
+```typescript
+import { createClient, createPublicProviderWagmi } from '@manifoldxyz/client-sdk';
+import { createConfig, http } from '@wagmi/core';
+import { mainnet, base } from '@wagmi/core/chains';
+
+// Create Wagmi config with multiple chains
+const config = createConfig({
+  chains: [mainnet, base],
+  transports: {
+    [mainnet.id]: http('YOUR_MAINNET_RPC_URL'),
+    [base.id]: http('YOUR_BASE_RPC_URL'),
+  },
+});
+
+// Create the public provider
+const publicProvider = createPublicProviderWagmi({ config });
+
+// Initialize the Manifold client
+const client = createClient({ publicProvider });
+```
+
+#### Example with Viem
 
 ```typescript
 import { createClient, createPublicProviderViem } from '@manifoldxyz/client-sdk';
@@ -42,7 +65,7 @@ const publicProvider = createPublicProviderViem({
 const client = createClient({ publicProvider });
 ```
 
-#### Using Ethers v5
+#### Example with Ethers v5
 
 ```typescript
 import { createClient, createPublicProviderEthers5 } from '@manifoldxyz/client-sdk';

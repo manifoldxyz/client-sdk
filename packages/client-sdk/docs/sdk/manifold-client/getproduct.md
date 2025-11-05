@@ -14,16 +14,20 @@ Fetches detailed product information.
 
 #### Example
 
-<pre class="language-typescript"><code class="lang-typescript">import { isBlindMintProduct, createClient, createPublicProviderViem } from '@manifoldxyz/client-sdk';
-import { createPublicClient, http } from 'viem';
-import { mainnet } from 'viem/chains';
+<pre class="language-typescript"><code class="lang-typescript">import { isBlindMintProduct, createClient, createPublicProviderWagmi } from '@manifoldxyz/client-sdk';
+import { createConfig, http } from '@wagmi/core';
+import { mainnet } from '@wagmi/core/chains';
 <strong>
-</strong>// Setup public provider
-const publicClient = createPublicClient({
-  chain: mainnet,
-  transport: http('YOUR_RPC_URL')
+</strong>// Setup Wagmi config
+const config = createConfig({
+  chains: [mainnet],
+  transports: {
+    [mainnet.id]: http('YOUR_RPC_URL')
+  }
 });
-const publicProvider = createPublicProviderViem({ 1: publicClient });
+
+// Create public provider
+const publicProvider = createPublicProviderWagmi({ config });
 
 // Create client
 const client = createClient({ publicProvider });
