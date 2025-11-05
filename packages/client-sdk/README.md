@@ -8,9 +8,9 @@ Head to [studio.manifold.xyz](https://studio.manifold.xyz/) to launch your produ
 
 ## ✨ Features
 
-- **No API keys required** - Works out of the box
+- **No API keys or RPC URLs required** - Works out of the box with built-in fallback providers
 - **TypeScript first** - Full type safety and IntelliSense
-- **Wallet agnostic** - Works with ethers and viem
+- **Wallet agnostic** - Works with ethers v5 and viem
 - **Support for multiple product types**:
   - Edition
   - Blind Mint
@@ -21,6 +21,7 @@ Head to [studio.manifold.xyz](https://studio.manifold.xyz/) to launch your produ
   - Transaction preparation
   - Cross-chain support (coming soon)
   - Error handling
+- **Built-in provider fallbacks** - Automatic failover between multiple RPC endpoints
 
 ## 📦 Installation
 
@@ -35,6 +36,7 @@ npm install @manifoldxyz/client-sdk
 ```typescript
 import { createClient } from '@manifoldxyz/client-sdk';
 
+// No configuration needed - uses built-in public providers
 const client = createClient();
 ```
 
@@ -71,8 +73,16 @@ console.log(`Total cost: ${preparedPurchase.cost.total.formatted}`);
 ### 4. Execute Purchase
 
 ```typescript
+// Using ethers v5
+import { createAccountEthers5 } from '@manifoldxyz/client-sdk/adapters/ethers5';
+const account = createAccountEthers5({ signer });
+
+// Or using viem
+import { createAccountViem } from '@manifoldxyz/client-sdk/adapters/viem';
+const account = createAccountViem(walletClient);
+
 const order = await product.purchase({
-  account: walletAccount,
+  account,
   preparedPurchase,
 });
 
@@ -96,7 +106,12 @@ Creates a new SDK client instance.
 
 ```typescript
 const client = createClient();
+
+// With debug logging
+const client = createClient({ debug: true });
 ```
+
+> **Note:** The SDK no longer requires `httpRPCs` configuration. It automatically uses built-in public providers with fallback support.
 
 ### Client Methods
 
@@ -167,7 +182,7 @@ Executes the purchase transaction(s).
 
 **Parameters:**
 
-- `account`: Wallet account object
+- `account`: Wallet account adapter (see Wallet Adapters section)
 - `preparedPurchase`: Result from `preparePurchase()`
 
 **Returns:** `Order` with transaction receipts and status
@@ -197,6 +212,42 @@ interface BlindMintProduct {
   maxSupply?: number;
   // ... base properties
 }
+```
+
+## 🔌 Wallet Adapters
+
+The SDK supports multiple wallet libraries through adapters:
+
+### Ethers v5
+
+```typescript
+import { ethers } from 'ethers';
+import { createAccountEthers5 } from '@manifoldxyz/client-sdk/adapters/ethers5';
+
+// Using MetaMask or other browser wallet
+const provider = new ethers.providers.Web3Provider(window.ethereum);
+const signer = provider.getSigner();
+const account = createAccountEthers5({ signer });
+
+// Using a private key
+const wallet = new ethers.Wallet(privateKey, provider);
+const account = createAccountEthers5({ signer: wallet });
+```
+
+### Viem
+
+```typescript
+import { createWalletClient, http } from 'viem';
+import { mainnet } from 'viem/chains';
+import { createAccountViem } from '@manifoldxyz/client-sdk/adapters/viem';
+
+const walletClient = createWalletClient({
+  chain: mainnet,
+  transport: http(),
+  account: '0x...',
+});
+
+const account = createAccountViem(walletClient);
 ```
 
 ## 🧪 Testing
