@@ -553,7 +553,7 @@ export class BlindMintProduct implements IBlindMintProduct {
     if (!finalReceipt) {
       throw new ClientSDKError(ErrorCode.TRANSACTION_FAILED, 'No Receipt found');
     }
-    console.log('the receipts', finalReceipt);
+    
     return {
       transactionReceipt: finalReceipt.transactionReceipt,
       order: finalReceipt.order,

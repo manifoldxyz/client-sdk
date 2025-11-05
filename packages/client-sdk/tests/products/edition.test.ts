@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, MockedFunction } from 'vitest';
 import { EditionProduct, isEditionProduct } from '../../src/products/edition';
 import { AppId, AppType } from '../../src/types/common';
 import { ClientSDKError, ErrorCode } from '../../src/types/errors';
-import type { InstanceData, EditionPublicData, EditionOnchainData } from '../../src/types/product';
+import type { InstanceData, EditionPublicData } from '../../src/types/product';
 import type { InstancePreview } from '@manifoldxyz/studio-apps-client-public';
 import { Money } from '../../src/libs/money';
 import * as ethers from 'ethers';
@@ -35,27 +35,50 @@ const mockPublicProvider = {
   getTransactionReceipt: vi.fn(),
 };
 
+const normalizeClaimNumericFields = (claim: any) => {
+  const toNumberIfBigInt = (value: any) => (typeof value === 'bigint' ? Number(value) : value);
+  return {
+    ...claim,
+    totalMax:
+      claim.totalMax === null || claim.totalMax === undefined
+        ? claim.totalMax
+        : toNumberIfBigInt(claim.totalMax),
+    total: claim.total === undefined ? claim.total : toNumberIfBigInt(claim.total),
+    walletMax:
+      claim.walletMax === null || claim.walletMax === undefined
+        ? claim.walletMax
+        : toNumberIfBigInt(claim.walletMax),
+    storageProtocol:
+      claim.storageProtocol === undefined ? claim.storageProtocol : toNumberIfBigInt(claim.storageProtocol),
+    contractVersion:
+      claim.contractVersion === undefined ? claim.contractVersion : toNumberIfBigInt(claim.contractVersion),
+  };
+};
+
 // Helper to set up default mock responses
 const setupDefaultMocks = (overrides: any = {}) => {
   const now = Math.floor(Date.now() / 1000);
   mockPublicProvider.readContract.mockImplementation(async (args: any) => {
     if (args.functionName === 'getClaim') {
-      return overrides.getClaim || {
-        cost: 1000000000000000000n, // 1 ETH
-        erc20: ethers.constants.AddressZero,
-        totalMax: 1000n,
-        total: 100n,
-        walletMax: 5n,
-        startDate: BigInt(now - 3600), // 1 hour ago
-        endDate: BigInt(now + 3600), // 1 hour from now
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
-        signingAddress: '0x2222222222222222222222222222222222222222',
-        location: 'ipfs://QmXxx',
-        storageProtocol: 1n,
-        contractVersion: 7n,
-        identical: true,
-      };
+      const claim =
+        overrides.getClaim ||
+        normalizeClaimNumericFields({
+          cost: 1000000000000000000n, // 1 ETH
+          erc20: ethers.constants.AddressZero,
+          totalMax: 1000n,
+          total: 100n,
+          walletMax: 5n,
+          startDate: BigInt(now - 3600), // 1 hour ago
+          endDate: BigInt(now + 3600), // 1 hour from now
+          merkleRoot: ethers.constants.HashZero,
+          paymentReceiver: '0x1111111111111111111111111111111111111111',
+          signingAddress: '0x2222222222222222222222222222222222222222',
+          location: 'ipfs://QmXxx',
+          storageProtocol: 1n,
+          contractVersion: 7n,
+          identical: true,
+        });
+      return normalizeClaimNumericFields(claim);
     }
     if (args.functionName === 'MINT_FEE') {
       return overrides.MINT_FEE !== undefined ? overrides.MINT_FEE : 500000000000000000n;
@@ -335,7 +358,7 @@ describe('EditionProduct', () => {
       // Reset mock implementation
       mockPublicProvider.readContract.mockImplementation((args: any) => {
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             cost: 1000000000000000000n,
             erc20: ethers.constants.AddressZero,
             totalMax: 1000n,
@@ -345,7 +368,7 @@ describe('EditionProduct', () => {
             endDate: BigInt(Math.floor(Date.now() / 1000) + 3600),
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'MINT_FEE') return 500000000000000000n;
         if (args.functionName === 'MINT_FEE_MERKLE') return 690000000000000000n;
@@ -401,7 +424,7 @@ describe('EditionProduct', () => {
       const pastTime = Math.floor(Date.now() / 1000) - 3600;
       mockPublicProvider.readContract.mockImplementation((args: any) => {
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             totalMax: 1000n,
             total: 100n,
             startDate: BigInt(pastTime - 3600),
@@ -411,7 +434,7 @@ describe('EditionProduct', () => {
             walletMax: 5n,
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'MINT_FEE') return 0n;
         if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
@@ -427,7 +450,7 @@ describe('EditionProduct', () => {
       const now = Math.floor(Date.now() / 1000);
       mockPublicProvider.readContract.mockImplementation((args: any) => {
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             totalMax: 1000n,
             total: 1000n, // Sold out
             startDate: BigInt(now - 3600),
@@ -437,7 +460,7 @@ describe('EditionProduct', () => {
             walletMax: 5n,
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'MINT_FEE') return 0n;
         if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
@@ -455,7 +478,7 @@ describe('EditionProduct', () => {
       const now = Math.floor(Date.now() / 1000);
       mockPublicProvider.readContract.mockImplementation((args: any) => {
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             totalMax: 1000n,
             total: 100n,
             startDate: BigInt(now - 3600),
@@ -465,7 +488,7 @@ describe('EditionProduct', () => {
             walletMax: 5n,
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'MINT_FEE') return 0n;
         if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
@@ -497,7 +520,7 @@ describe('EditionProduct', () => {
       const now = Math.floor(Date.now() / 1000);
       mockPublicProvider.readContract.mockImplementation((args: any) => {
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             totalMax: 105n, // Only 5 left total
             total: 100n,
             startDate: BigInt(now - 3600),
@@ -507,7 +530,7 @@ describe('EditionProduct', () => {
             walletMax: 10n,
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'getTotalMints') return 2n;
         if (args.functionName === 'MINT_FEE') return 0n;
@@ -530,7 +553,7 @@ describe('EditionProduct', () => {
         }
         const now = Math.floor(Date.now() / 1000);
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             totalMax: 1000n,
             total: 100n,
             startDate: BigInt(now - 3600),
@@ -540,7 +563,7 @@ describe('EditionProduct', () => {
             walletMax: 5n,
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'MINT_FEE') return 0n;
         if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
@@ -564,7 +587,7 @@ describe('EditionProduct', () => {
       const now = Math.floor(Date.now() / 1000);
       mockPublicProvider.readContract.mockImplementation((args: any) => {
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             totalMax: 1000n,
             total: 100n,
             startDate: BigInt(now - 3600),
@@ -574,7 +597,7 @@ describe('EditionProduct', () => {
             walletMax: 5n,
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'MINT_FEE') return 500000000000000000n;
         if (args.functionName === 'MINT_FEE_MERKLE') return 690000000000000000n;
@@ -604,7 +627,7 @@ describe('EditionProduct', () => {
       const now = Math.floor(Date.now() / 1000);
       mockPublicProvider.readContract.mockImplementation((args: any) => {
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             totalMax: 1000n,
             total: 100n,
             startDate: BigInt(now - 3600),
@@ -614,7 +637,7 @@ describe('EditionProduct', () => {
             walletMax: 5n,
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'MINT_FEE') return 500000000000000000n;
         if (args.functionName === 'MINT_FEE_MERKLE') return 690000000000000000n;
@@ -654,7 +677,7 @@ describe('EditionProduct', () => {
       const futureTime = Math.floor(Date.now() / 1000) + 3600;
       mockPublicProvider.readContract.mockImplementation((args: any) => {
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             totalMax: 1000n,
             total: 0n,
             startDate: BigInt(futureTime), // Future
@@ -664,7 +687,7 @@ describe('EditionProduct', () => {
             walletMax: 5n,
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'MINT_FEE') return 500000000000000000n;
         if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
@@ -682,7 +705,7 @@ describe('EditionProduct', () => {
       const pastTime = Math.floor(Date.now() / 1000) - 3600;
       mockPublicProvider.readContract.mockImplementation((args: any) => {
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             totalMax: 1000n,
             total: 100n,
             startDate: BigInt(pastTime - 3600),
@@ -692,7 +715,7 @@ describe('EditionProduct', () => {
             walletMax: 5n,
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'MINT_FEE') return 500000000000000000n;
         if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
@@ -710,7 +733,7 @@ describe('EditionProduct', () => {
       const now = Math.floor(Date.now() / 1000);
       mockPublicProvider.readContract.mockImplementation((args: any) => {
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             totalMax: 1000n,
             total: 1000n, // Sold out
             startDate: BigInt(now - 3600),
@@ -720,7 +743,7 @@ describe('EditionProduct', () => {
             walletMax: 5n,
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'MINT_FEE') return 500000000000000000n;
         if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
@@ -739,7 +762,7 @@ describe('EditionProduct', () => {
       const now = Math.floor(Date.now() / 1000);
       mockPublicProvider.readContract.mockImplementation((args: any) => {
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             totalMax: 1000n,
             total: 100n,
             startDate: BigInt(now - 3600),
@@ -749,7 +772,7 @@ describe('EditionProduct', () => {
             walletMax: 5n,
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'balanceOf') return 1000000n; // Only 1 USDC
         if (args.functionName === 'MINT_FEE') return 0n;
@@ -804,7 +827,7 @@ describe('EditionProduct', () => {
       const now = Math.floor(Date.now() / 1000);
       mockPublicProvider.readContract.mockImplementation((args: any) => {
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             totalMax: 1000n,
             total: 100n,
             startDate: BigInt(now - 3600),
@@ -814,7 +837,7 @@ describe('EditionProduct', () => {
             walletMax: 5n,
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'allowance') return 10000000n; // 10 USDC
         if (args.functionName === 'balanceOf') return 10000000n;
@@ -1060,7 +1083,7 @@ describe('EditionProduct', () => {
       const now = Math.floor(Date.now() / 1000);
       mockPublicProvider.readContract.mockImplementation((args: any) => {
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             totalMax: 1000n,
             total: 100n,
             startDate: BigInt(now - 3600),
@@ -1070,7 +1093,7 @@ describe('EditionProduct', () => {
             walletMax: 5n,
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'MINT_FEE') return 0n;
         if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
@@ -1091,7 +1114,7 @@ describe('EditionProduct', () => {
         const now = Math.floor(Date.now() / 1000);
         mockPublicProvider.readContract.mockImplementation((args: any) => {
           if (args.functionName === 'getClaim') {
-            return {
+            return normalizeClaimNumericFields({
               totalMax: BigInt(Number.MAX_SAFE_INTEGER),
               total: 100n,
               startDate: BigInt(now - 3600),
@@ -1101,7 +1124,7 @@ describe('EditionProduct', () => {
               walletMax: 5n,
               merkleRoot: ethers.constants.HashZero,
               paymentReceiver: '0x1111111111111111111111111111111111111111',
-            };
+            });
           }
           if (args.functionName === 'MINT_FEE') return 0n;
           if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
@@ -1130,7 +1153,7 @@ describe('EditionProduct', () => {
         const now = Math.floor(Date.now() / 1000);
         mockPublicProvider.readContract.mockImplementation((args: any) => {
           if (args.functionName === 'getClaim') {
-            return {
+            return normalizeClaimNumericFields({
               totalMax: 1000n,
               total: 100n,
               startDate: BigInt(now - 3600),
@@ -1140,7 +1163,7 @@ describe('EditionProduct', () => {
               walletMax: 5n,
               merkleRoot: '0x1234567890123456789012345678901234567890123456789012345678901234',
               paymentReceiver: '0x1111111111111111111111111111111111111111',
-            };
+            });
           }
           if (args.functionName === 'MINT_FEE') return 0n;
           if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
@@ -1293,7 +1316,7 @@ describe('EditionProduct', () => {
       const now = Math.floor(Date.now() / 1000);
       mockPublicProvider.readContract.mockImplementation((args: any) => {
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             cost: 1000000000000000000n,
             erc20: ethers.constants.AddressZero,
             totalMax: 1000n,
@@ -1303,7 +1326,7 @@ describe('EditionProduct', () => {
             endDate: BigInt(now + 3600),
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'MINT_FEE') return 0n;
         if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
@@ -1320,7 +1343,7 @@ describe('EditionProduct', () => {
       const now = Math.floor(Date.now() / 1000);
       mockPublicProvider.readContract.mockImplementation((args: any) => {
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             cost: 0n, // Free mint
             erc20: ethers.constants.AddressZero,
             totalMax: 1000n,
@@ -1330,7 +1353,7 @@ describe('EditionProduct', () => {
             endDate: BigInt(now + 3600),
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'MINT_FEE') return 0n;
         if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
@@ -1355,7 +1378,7 @@ describe('EditionProduct', () => {
       const now = Math.floor(Date.now() / 1000);
       mockPublicProvider.readContract.mockImplementation((args: any) => {
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             cost: 1000000000000000000n,
             erc20: ethers.constants.AddressZero,
             totalMax: 0n, // Unlimited
@@ -1365,7 +1388,7 @@ describe('EditionProduct', () => {
             endDate: BigInt(now + 3600),
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'MINT_FEE') return 0n;
         if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
@@ -1386,7 +1409,7 @@ describe('EditionProduct', () => {
       const now = Math.floor(Date.now() / 1000);
       mockPublicProvider.readContract.mockImplementation((args: any) => {
         if (args.functionName === 'getClaim') {
-          return {
+          return normalizeClaimNumericFields({
             cost: largeNumber,
             erc20: ethers.constants.AddressZero,
             totalMax: 1000n,
@@ -1396,7 +1419,7 @@ describe('EditionProduct', () => {
             endDate: BigInt(now + 3600),
             merkleRoot: ethers.constants.HashZero,
             paymentReceiver: '0x1111111111111111111111111111111111111111',
-          };
+          });
         }
         if (args.functionName === 'MINT_FEE') return 0n;
         if (args.functionName === 'MINT_FEE_MERKLE') return 0n;

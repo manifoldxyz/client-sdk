@@ -43,7 +43,6 @@ import manifoldApiClient from '../api/manifold-api';
  */
 export function createClient(config: ClientConfig): ManifoldClient {
   const { publicProvider } = config;
-  console.log(`cewatreClient`, publicProvider);
   return {
     /**
      * Fetches detailed product information from Manifold.
@@ -111,7 +110,6 @@ export function createClient(config: ClientConfig): ManifoldClient {
 
         // Create Edition product if it matches the app ID
         if (isEditionInstanceData(instanceData)) {
-          console.log(`isEditionInstanceData`, publicProvider);
           // TypeScript now knows instanceData is InstanceData<EditionPublicData>
           // Create EditionProduct with both instance and preview data
           return new EditionProduct(instanceData, previewData, publicProvider);

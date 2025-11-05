@@ -8,7 +8,6 @@ Head to [studio.manifold.xyz](https://studio.manifold.xyz/) to launch your produ
 
 ## ✨ Features
 
-- **No API keys or RPC URLs required** - Works out of the box with built-in fallback providers
 - **TypeScript first** - Full type safety and IntelliSense
 - **Wallet agnostic** - Works with ethers v5 and viem
 - **Support for multiple product types**:
@@ -295,7 +294,6 @@ const account = createAccountEthers5({ signer });
 const wallet = new ethers.Wallet(privateKey, provider);
 const account = createAccountEthers5({ signer: wallet });
 ```
-
 
 ## 🧪 Testing
 

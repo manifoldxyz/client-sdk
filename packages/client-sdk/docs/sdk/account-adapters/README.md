@@ -4,10 +4,10 @@ The SDK requires two types of blockchain connections:
 
 ## Public Providers
 
-[Public providers](public-providers.md) enable read-only blockchain operations like fetching balances, estimating gas, and reading contracts. They are **required** when initializing the Manifold Client.
+[Public providers](../public-provider-adapters/README.md) enable read-only blockchain operations like fetching balances, estimating gas, and reading contracts. They are **required** when initializing the Manifold Client.
 
-- [Viem Public Provider](public-providers.md#viem-public-provider) - For Viem users
-- [Ethers v5 Public Provider](public-providers.md#ethers-v5-public-provider) - For Ethers v5 users
+- [Viem Public Provider](../public-provider-adapters/viem.md) - For Viem users
+- [Ethers v5 Public Provider](../public-provider-adapters/ethersv5.md) - For Ethers v5 users
 
 ## Account Adapters
 

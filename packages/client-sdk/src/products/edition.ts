@@ -136,7 +136,6 @@ export class EditionProduct implements IEditionProduct {
     };
     this.previewData = previewData;
     this.id = instanceData.id;
-    console.log('the public provider', publicProvider);
     this._publicProvider = publicProvider;
   }
 
