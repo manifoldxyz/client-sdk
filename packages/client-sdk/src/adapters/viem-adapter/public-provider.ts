@@ -1,9 +1,8 @@
 import type { IPublicProvider } from '../../types/account-adapter';
 import type { PublicClient } from 'viem';
 import { getBalance, readContract } from 'viem/actions';
-import { wrapError } from '../ethers5-adapter/utilts';
-import { ClientSDKError, ErrorCode } from '../../types';
 import { ERC20ABI } from '../../abis';
+import { executeWithProviderFallback } from '../utils/fallback';
 
 /**
  * Public provider implementation for viem
@@ -34,95 +33,38 @@ import { ERC20ABI } from '../../abis';
  * @public
  */
 export class ViemPublicProvider implements IPublicProvider {
-  private publicClients: Map<number, PublicClient>;
-  private fallbackProviders: Map<number, PublicClient>;
+  private publicClients: Map<number, PublicClient[]>;
 
   /**
    * Initialize the public client with viem public client(s).
    *
-   * @param publicClients - Map of network IDs to public clients for multi-network support
-   * @param fallbackProviders - Optional fallback providers when primary providers fail or are misconfigured
+   * @param publicClients - Map of network IDs to public clients (or arrays for fallback support)
    */
-  constructor(
-    publicClients: Record<number, PublicClient>,
-    fallbackProviders?: Record<number, PublicClient>,
-  ) {
+  constructor(publicClients: Record<number, PublicClient | PublicClient[]>) {
     this.publicClients = new Map(
-      Object.entries(publicClients).map(([networkId, client]) => [Number(networkId), client]),
-    );
-    this.fallbackProviders = new Map(
-      fallbackProviders
-        ? Object.entries(fallbackProviders).map(([networkId, client]) => [
-            Number(networkId),
-            client,
-          ])
-        : [],
+      Object.entries(publicClients).map(([networkId, client]) => [
+        Number(networkId),
+        Array.isArray(client) ? client : [client],
+      ]),
     );
   }
 
-  private async getClient(networkId: number): Promise<PublicClient> {
-    const primaryClient = this.publicClients.get(networkId);
-    const fallbackClient = this.fallbackProviders.get(networkId);
+  private async executeWithFallback<T>(
+    networkId: number,
+    operation: (client: PublicClient) => Promise<T>,
+  ): Promise<T> {
+    const clientList = this.publicClients.get(networkId) || [];
 
-    // If we have a primary client, try to validate it
-    if (primaryClient) {
-      try {
-        const chainId = await primaryClient.getChainId();
-        if (chainId === networkId) {
-          return primaryClient;
-        }
-        // Primary client is on wrong network, try fallback
-        if (fallbackClient) {
-          const fallbackChainId = await fallbackClient.getChainId();
-          if (fallbackChainId === networkId) {
-            return fallbackClient;
-          }
-        }
-        throw new ClientSDKError(
-          ErrorCode.WRONG_NETWORK,
-          `Primary client is on network ${chainId}, expected ${networkId}`,
-        );
-      } catch (error) {
-        // Primary client failed, try fallback
-        if (fallbackClient) {
-          try {
-            const fallbackChainId = await fallbackClient.getChainId();
-            if (fallbackChainId === networkId) {
-              return fallbackClient;
-            }
-          } catch {
-            // Fallback also failed
-          }
-        }
-        throw error;
-      }
-    }
-
-    // No primary client, try fallback
-    if (fallbackClient) {
-      try {
-        const fallbackChainId = await fallbackClient.getChainId();
-        if (fallbackChainId === networkId) {
-          return fallbackClient;
-        }
-        throw new ClientSDKError(
-          ErrorCode.WRONG_NETWORK,
-          `Fallback client is on network ${fallbackChainId}, expected ${networkId}`,
-        );
-      } catch (error) {
-        throw new ClientSDKError(
-          ErrorCode.UNSUPPORTED_NETWORK,
-          `Failed to connect to fallback provider for network ${networkId}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      }
-    }
-
-    throw new ClientSDKError(
-      ErrorCode.UNSUPPORTED_NETWORK,
-      `No public provider configured for network ${networkId}`,
-    );
+    return executeWithProviderFallback<PublicClient, T>({
+      networkId,
+      providers: clientList,
+      getChainId: async (client) => {
+        return await client.getChainId();
+      },
+      // Viem clients don't support network switching
+      switchNetwork: undefined,
+      operation,
+    });
   }
 
   /**
@@ -133,9 +75,9 @@ export class ViemPublicProvider implements IPublicProvider {
     networkId: number;
     tokenAddress?: string;
   }): Promise<bigint> {
-    const { address, networkId, tokenAddress } = params;
-    const client = await this.getClient(networkId);
-    try {
+    const { address, tokenAddress } = params;
+
+    return this.executeWithFallback(params.networkId, async (client) => {
       if (!tokenAddress || tokenAddress === '0x0000000000000000000000000000000000000000') {
         // Get native token balance using viem
         const balance = await getBalance(client, {
@@ -153,9 +95,7 @@ export class ViemPublicProvider implements IPublicProvider {
 
         return balance;
       }
-    } catch (error) {
-      throw wrapError(error, 'getBalance', params);
-    }
+    });
   }
 
   /**
@@ -170,9 +110,9 @@ export class ViemPublicProvider implements IPublicProvider {
     value?: bigint;
     networkId: number;
   }): Promise<bigint> {
-    const { contractAddress, abi, functionName, args = [], from, value, networkId } = params;
-    const client = await this.getClient(networkId);
-    try {
+    const { contractAddress, abi, functionName, args = [], from, value } = params;
+
+    return this.executeWithFallback(params.networkId, async (client) => {
       // Use viem's estimateContractGas
       const gasEstimate = await client.estimateContractGas({
         address: contractAddress as `0x${string}`,
@@ -184,9 +124,7 @@ export class ViemPublicProvider implements IPublicProvider {
       });
 
       return gasEstimate;
-    } catch (error) {
-      throw wrapError(error, 'estimateContractGas', params);
-    }
+    });
   }
 
   /**
@@ -199,10 +137,9 @@ export class ViemPublicProvider implements IPublicProvider {
     args?: readonly unknown[];
     networkId: number;
   }): Promise<T> {
-    const { contractAddress, abi, functionName, args = [], networkId } = params;
-    const client = await this.getClient(networkId);
+    const { contractAddress, abi, functionName, args = [] } = params;
 
-    try {
+    return this.executeWithFallback(params.networkId, async (client) => {
       // Use viem's readContract
       const result = await readContract(client, {
         address: contractAddress as `0x${string}`,
@@ -212,8 +149,6 @@ export class ViemPublicProvider implements IPublicProvider {
       });
 
       return result as T;
-    } catch (error) {
-      throw wrapError(error, 'readContract', params);
-    }
+    });
   }
 }

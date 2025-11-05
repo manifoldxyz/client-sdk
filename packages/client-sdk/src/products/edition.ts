@@ -136,6 +136,7 @@ export class EditionProduct implements IEditionProduct {
     };
     this.previewData = previewData;
     this.id = instanceData.id;
+    console.log('the public provider', publicProvider);
     this._publicProvider = publicProvider;
   }
 
@@ -205,7 +206,7 @@ export class EditionProduct implements IEditionProduct {
       return onchainData;
     } catch (error) {
       throw new ClientSDKError(ErrorCode.API_ERROR, 'Failed to fetch onchain data', {
-        error: (error as Error).message,
+        error,
       });
     }
   }
@@ -783,16 +784,12 @@ export class EditionProduct implements IEditionProduct {
 
     const spec = this.contract.spec as string;
     const isERC721 = spec.toLowerCase() === 'erc721';
-    
+
     // Build the base onchain data
     const baseData = {
-      totalMax:
-        claimData.totalMax === 0 ? null : claimData.totalMax,
+      totalMax: claimData.totalMax === 0 ? null : claimData.totalMax,
       total: claimData.total || 0,
-      walletMax:
-        claimData.walletMax === 0
-          ? null
-          : claimData.walletMax,
+      walletMax: claimData.walletMax === 0 ? null : claimData.walletMax,
       startDate: claimData.startDate ? convertDate(claimData.startDate) : null,
       endDate: claimData.endDate ? convertDate(claimData.endDate) : null,
       audienceType,

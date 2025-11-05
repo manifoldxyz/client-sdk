@@ -1,22 +1,27 @@
 'use client';
 
 import { useState } from 'react';
-import { useAccount, useWalletClient } from 'wagmi';
-import { createClient, createAccountViem, isEditionProduct, createPublicProviderViem } from '@manifoldxyz/client-sdk';
-import { createPublicClient, custom, PublicClient } from 'viem';
-import { mainnet, base, sepolia } from 'viem/chains';
+import { Transport, useAccount, useWalletClient } from 'wagmi';
+import { createClient, createAccountViem, isEditionProduct, createPublicProviderViem, createPublicProviderWagmi } from '@manifoldxyz/client-sdk';
+import { getPublicProvider } from '@/utils/common';
+import { Account, Chain, WalletClient } from 'viem';
 
-// Example Edition product instance ID - replace with your own
-const INSTANCE_ID = process.env.NEXT_PUBLIC_INSTANCE_ID || '4133757168';
+interface MintButtonProps {
+  instanceId?: string;
+}
 
-export function MintButton() {
+export function MintButton({ instanceId }: MintButtonProps = {}) {
+  // Use provided instanceId or fall back to env variable
+  const INSTANCE_ID = instanceId || process.env.NEXT_PUBLIC_INSTANCE_ID || '4133757168';
   const { address, isConnected } = useAccount();
-  const { data: walletClient } = useWalletClient();
+  const { data: walletClient} = useWalletClient();
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string>('');
   const [error, setError] = useState<string>('');
 
   const handleMint = async () => {
+    console.log('the wallet client', walletClient);
+    console.log('the address', address)
     if (!walletClient || !address) {
       setError('Please connect your wallet first');
       return;
@@ -28,28 +33,12 @@ export function MintButton() {
 
     try {
       // Create Manifold SDK client
-      const providers: Record<number, PublicClient> = {};
-      providers[8453] = createPublicClient({
-        chain: base,
-        transport: custom(window.ethereum),
-      }) as PublicClient;
-      providers[1] = createPublicClient({
-        chain: mainnet,
-        transport: custom(window.ethereum),
-      }) as PublicClient;
-      providers[11155111] = createPublicClient({
-        chain: sepolia,
-        transport: custom(window.ethereum),
-      }) as PublicClient;
-      
-      const publicProvider = createPublicProviderViem(providers);
       const client = createClient({
-        publicProvider,
+        publicProvider: getPublicProvider(),
       });
-      const viemClient = walletClient;
       // Create viem adapter from wallet client
       const account = createAccountViem({
-        walletClient: viemClient!,
+        walletClient: walletClient as WalletClient<Transport, Chain, Account>,
       })
 
       // Get product details

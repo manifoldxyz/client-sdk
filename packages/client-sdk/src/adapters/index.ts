@@ -11,6 +11,7 @@
  * - **Ethers v5**: Most widely used, works with MetaMask, WalletConnect, etc.
  * - **Ethers v6**: Latest version with improved TypeScript support
  * - **Viem**: Modern, lightweight alternative with great performance
+ * - **Wagmi**: React hooks for Ethereum with built-in state management
  *
  * ## Usage Examples
  *
@@ -32,6 +33,15 @@
  * const walletClient = createWalletClient({ ... });
  * const adapter = createAccountViem(walletClient);
  * ```
+ *
+ * ### Wagmi
+ * ```typescript
+ * import { createConfig, http } from '@wagmi/core';
+ * import { createAccountWagmi } from '@manifoldxyz/client-sdk/adapters';
+ *
+ * const config = createConfig({ ... });
+ * const adapter = createAccountWagmi({ config });
+ * ```
  */
 
 // =============================================================================
@@ -50,6 +60,10 @@ export {
   ViemAccount,
   ViemPublicProvider,
 } from './viem-adapter';
+export {
+  createPublicProvider as createPublicProviderWagmi,
+  WagmiPublicProvider,
+} from './wagmi-adapter';
 
 // =============================================================================
 // PUBLIC PROVIDER EXPORTS

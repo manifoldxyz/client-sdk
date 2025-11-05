@@ -1,9 +1,18 @@
-# Edition Product - Manifold SDK + RainbowKit Example
+# Edition Product - Manifold SDK + RainbowKit Example with Enhanced Display
 
-This is a minimal example demonstrating how to integrate the Manifold Client SDK with RainbowKit for wallet connection and Edition NFT minting.
+This example demonstrates how to integrate the Manifold Client SDK with RainbowKit for wallet connection and Edition NFT minting, featuring comprehensive product information display.
 
 ## Features
 
+### Product Display Capabilities
+- 🖼️ **NFT Image Display** - Shows the product artwork/media
+- 📊 **Live Supply Tracking** - Real-time minted count and remaining supply with visual progress bar
+- 💰 **Pricing Information** - Displays mint price and platform fees
+- ⏰ **Time-based Sales** - Shows start/end dates with live countdown timer
+- 🚦 **Status Indicators** - Visual feedback for product availability (active, paused, upcoming, sold out)
+- 🔢 **Wallet Limits** - Shows maximum mints per wallet
+
+### Core Functionality
 - 🌈 RainbowKit wallet connection
 - 🎨 Edition NFT minting via Manifold SDK
 - ⚡ Next.js 14 with App Router
@@ -51,12 +60,21 @@ Open [http://localhost:3000](http://localhost:3000) to see the app.
 
 ## How It Works
 
-### 1. **Wallet Connection (RainbowKit)**
+### 1. **Product Information Display (NEW)**
+   - The `ProductDisplay` component fetches and displays comprehensive product data:
+     - Product image from `asset` field
+     - On-chain data (price, supply, dates) via `fetchOnchainData()`
+     - Live inventory tracking via `getInventory()`
+     - Product rules and limitations via `getRules()`
+     - Real-time countdown timer for sale start/end
+     - Visual progress bar for minted vs available supply
+
+### 2. **Wallet Connection (RainbowKit)**
    - The app uses RainbowKit's `ConnectButton` component
    - Supports multiple wallets (MetaMask, WalletConnect, Coinbase, etc.)
    - Configured in `src/app/providers.tsx`
 
-### 2. **Edition Minting Process (Manifold SDK)**
+### 3. **Edition Minting Process (Manifold SDK)**
    - Located in `src/components/MintButton.tsx`
    - Steps:
      1. Create Manifold SDK client
@@ -67,11 +85,12 @@ Open [http://localhost:3000](http://localhost:3000) to see the app.
      6. Prepare purchase with quantity and optional promo code
      7. Execute purchase with wallet signing
 
-### 3. **Key Components**
+### 4. **Key Components**
 
+- **`ProductDisplay.tsx`** (NEW): Fetches and displays all product information
 - **`providers.tsx`**: Sets up RainbowKit, wagmi, and TanStack Query providers
 - **`MintButton.tsx`**: Main minting logic using Manifold SDK
-- **`page.tsx`**: Simple UI with connect wallet and mint buttons
+- **`page.tsx`**: Enhanced UI with product display and mint functionality
 
 ## Code Structure
 
@@ -80,10 +99,11 @@ examples/rainbowkit-mint/
 ├── src/
 │   ├── app/
 │   │   ├── layout.tsx      # Root layout with providers
-│   │   ├── page.tsx        # Main page with UI
+│   │   ├── page.tsx        # Enhanced main page with product display
 │   │   └── providers.tsx   # RainbowKit & wagmi setup
 │   └── components/
-│       └── MintButton.tsx  # Minting logic
+│       ├── ProductDisplay.tsx  # Product information display (NEW)
+│       └── MintButton.tsx      # Minting logic
 ├── .env.example            # Environment variables template
 ├── next.config.js          # Next.js configuration
 ├── package.json            # Dependencies
@@ -92,15 +112,38 @@ examples/rainbowkit-mint/
 
 ## Key Code Snippets
 
+### Fetching Product Display Information (NEW)
+
+```typescript
+// Fetch comprehensive product data
+const product = await client.getProduct(instanceId);
+
+// Get all product information
+const [status, onchainData, inventory, rules, metadata] = await Promise.all([
+  product.getStatus(),           // Active, paused, upcoming, completed
+  product.fetchOnchainData(),     // Price, supply, dates, limits
+  product.getInventory(),         // Minted count, available
+  product.getRules(),             // Restrictions and requirements
+  product.getMetadata(),          // Name, description
+]);
+
+// Extract image URLs
+const imageUrl = product.data.publicData?.asset?.image || 
+                product.previewData?.media?.image?.url;
+
+// Display price
+console.log(`Price: ${onchainData.cost?.formatted}`);
+
+// Display supply information
+console.log(`Minted: ${onchainData.total} / ${onchainData.totalMax || 'Unlimited'}`);
+```
+
 ### Creating the Manifold Client
 
 ```typescript
-const client = createClient({
-  httpRPCs: {
-    1: 'https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY',
-    8453: 'https://base-mainnet.infura.io/v3/YOUR_KEY',
-  }
-});
+// Now with built-in public providers - no RPC URLs needed!
+const publicProvider = createPublicProviderViem(providers);
+const client = createClient({ publicProvider });
 ```
 
 ### Creating an Account with wagmi

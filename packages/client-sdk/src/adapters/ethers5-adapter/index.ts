@@ -12,10 +12,9 @@ export function createAccount(provider: { signer?: providers.JsonRpcSigner; wall
 
 /**
  * Helper function to create an Ethers5PublicProvider
- * Supports both single provider and multi-network provider configurations
+ * Supports both single provider and multi-network provider configurations with fallback support
  *
- * @param config - Either a single provider or a map of network IDs to providers
- * @param fallbackProviders - Optional fallback providers when primary providers fail or are misconfigured
+ * @param config - Map of network IDs to providers (single provider or array of providers for fallback)
  * @returns Ethers5PublicProvider instance
  *
  * @example
@@ -27,18 +26,18 @@ export function createAccount(provider: { signer?: providers.JsonRpcSigner; wall
  * const publicClient = createPublicProvider(providers);
  *
  * @example
- * // With fallback providers
+ * // With fallback providers as arrays
  * const providers = {
- *   1: new ethers.providers.JsonRpcProvider('https://primary-rpc...'),
+ *   1: [
+ *     new ethers.providers.JsonRpcProvider('https://primary-rpc...'),
+ *     new ethers.providers.JsonRpcProvider('https://backup-rpc...'),
+ *   ],
+ *   8453: new ethers.providers.JsonRpcProvider('https://base...'),
  * };
- * const fallbackProviders = {
- *   1: new ethers.providers.JsonRpcProvider('https://backup-rpc...'),
- * };
- * const publicClient = createPublicProvider(providers, fallbackProviders);
+ * const publicClient = createPublicProvider(providers);
  */
 export function createPublicProvider(
-  config: Record<number, providers.JsonRpcProvider>,
-  fallbackProviders?: Record<number, providers.JsonRpcProvider>,
+  config: Record<number, providers.JsonRpcProvider | providers.JsonRpcProvider[]>,
 ): Ethers5PublicProvider {
-  return new Ethers5PublicProvider(config, fallbackProviders);
+  return new Ethers5PublicProvider(config);
 }

@@ -14,10 +14,9 @@ export const viemAdapter = createAccount;
 
 /**
  * Helper function to create a ViemPublicProvider
- * Supports both single client and multi-network client configurations
+ * Supports both single client and multi-network client configurations with fallback support
  *
- * @param config - Either a single PublicProvider or a map of network IDs to PublicClients
- * @param fallbackProviders - Optional fallback providers when primary providers fail or are misconfigured
+ * @param config - Map of network IDs to PublicClients (single client or array of clients for fallback)
  * @returns ViemPublicProvider instance
  *
  * @example
@@ -29,18 +28,18 @@ export const viemAdapter = createAccount;
  * const publicProvider = createPublicProvider(providers);
  *
  * @example
- * // With fallback providers
+ * // With fallback providers as arrays
  * const providers = {
- *   1: createPublicProvider({ chain: mainnet, transport: http('PRIMARY_RPC') }),
+ *   1: [
+ *     createPublicProvider({ chain: mainnet, transport: http('PRIMARY_RPC') }),
+ *     createPublicProvider({ chain: mainnet, transport: http('BACKUP_RPC') }),
+ *   ],
+ *   8453: createPublicProvider({ chain: base, ... }),
  * };
- * const fallbackProviders = {
- *   1: createPublicProvider({ chain: mainnet, transport: http('BACKUP_RPC') }),
- * };
- * const publicProvider = createPublicProvider(providers, fallbackProviders);
+ * const publicProvider = createPublicProvider(providers);
  */
 export function createPublicProvider(
-  config: Record<number, PublicClient>,
-  fallbackProviders?: Record<number, PublicClient>,
+  config: Record<number, PublicClient | PublicClient[]>,
 ): ViemPublicProvider {
-  return new ViemPublicProvider(config, fallbackProviders);
+  return new ViemPublicProvider(config);
 }

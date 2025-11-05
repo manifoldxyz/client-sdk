@@ -146,7 +146,8 @@ export interface TransactionConfirmationResult {
 export type AdapterType =
   | 'ethers5' // ethers.js v5.x
   | 'ethers6' // ethers.js v6.x
-  | 'viem'; // viem client
+  | 'viem' // viem client
+  | 'wagmi'; // wagmi config
 
 /**
  * Main account adapter interface that abstracts wallet operations across
