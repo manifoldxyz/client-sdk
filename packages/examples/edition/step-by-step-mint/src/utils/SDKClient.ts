@@ -1,9 +1,24 @@
-import { createClient } from '@manifoldxyz/client-sdk'
+import { createClient, createPublicProviderViem } from '@manifoldxyz/client-sdk'
+import { createPublicClient, custom, PublicClient } from 'viem'
+import { mainnet, base, sepolia } from 'viem/chains'
 
-const httpRPCs: Record<number, string> = {}
-if (process.env.NEXT_PUBLIC_ALCHEMY_API_KEY) {
-    httpRPCs[1] = `https://eth-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
-    httpRPCs[8453] = `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
+export function getClient() {
+    const providers: Record<number, PublicClient> = {};
+    providers[8453] = createPublicClient({
+      chain: base,
+      transport: custom(window.ethereum),
+    }) as PublicClient;
+    providers[1] = createPublicClient({
+      chain: mainnet,
+      transport: custom(window.ethereum),
+    }) as PublicClient;
+    providers[11155111] = createPublicClient({
+      chain: sepolia,
+      transport: custom(window.ethereum),
+    }) as PublicClient;
+    const publicProvider = createPublicProviderViem(providers);
+    return createClient({
+      publicProvider,
+    });
+
 }
-    
-export const client = createClient({ httpRPCs })

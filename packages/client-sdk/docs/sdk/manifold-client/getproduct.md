@@ -14,9 +14,19 @@ Fetches detailed product information.
 
 #### Example
 
-<pre class="language-jsx"><code class="lang-jsx">import { isBlindMintProduct, createClient } from '@manifoldxyz/client-sdk';
+<pre class="language-typescript"><code class="lang-typescript">import { isBlindMintProduct, createClient, createPublicProviderViem } from '@manifoldxyz/client-sdk';
+import { createPublicClient, http } from 'viem';
+import { mainnet } from 'viem/chains';
 <strong>
-</strong>const client = createClient();
+</strong>// Setup public provider
+const publicClient = createPublicClient({
+  chain: mainnet,
+  transport: http('YOUR_RPC_URL')
+});
+const publicProvider = createPublicProviderViem({ 1: publicClient });
+
+// Create client
+const client = createClient({ publicProvider });
 
 <strong>const product = await client.getProduct('4150231280');
 </strong>console.log(`AppType: ${product.type}`);

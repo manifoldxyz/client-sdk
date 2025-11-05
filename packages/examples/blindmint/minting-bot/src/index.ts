@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { createClient, createAccountEthers5, isBlindMintProduct } from '@manifoldxyz/client-sdk';
+import { createClient, createAccountEthers5, isBlindMintProduct, createPublicProviderEthers5 } from '@manifoldxyz/client-sdk';
 import { ethers } from 'ethers';
 
 function getEnv(name: string, required = true): string | undefined {
@@ -28,10 +28,10 @@ async function main() {
   }
 
   console.log(`🔄 Initializing client for network ${networkId}...`);
+  const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+  const publicProvider = createPublicProviderEthers5({ [networkId]: provider });
   const client = createClient({
-    httpRPCs: {
-      [networkId]: rpcUrl,
-    },
+    publicProvider,
   });
 
   console.log(`📦 Fetching product ${instanceId}...`);
@@ -40,9 +40,8 @@ async function main() {
     throw new Error(`Product ${instanceId} is not a Blind Mint product.`);
   }
 
-  const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
   const wallet = new ethers.Wallet(privateKey, provider);
-  const account = createAccountEthers5(client, { wallet });
+  const account = createAccountEthers5({ wallet });
   const minterAddress = await wallet.getAddress();
   console.log(`👤 Using wallet ${minterAddress}`);
 

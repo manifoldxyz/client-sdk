@@ -39,5 +39,21 @@
 // =============================================================================
 
 // Main adapter implementations
-export { createAccount as createAccountEthers5 } from './ethers5-adapter';
-export { createAccount as createAccountViem, viemAdapter } from './viem-adapter';
+export {
+  createAccount as createAccountEthers5,
+  createPublicProvider as createPublicProviderEthers5,
+} from './ethers5-adapter';
+export {
+  createAccount as createAccountViem,
+  createPublicProvider as createPublicProviderViem,
+  viemAdapter,
+  ViemAccount,
+  ViemPublicProvider,
+} from './viem-adapter';
+
+// =============================================================================
+// PUBLIC PROVIDER EXPORTS
+// =============================================================================
+
+// Export the interface for public providers
+export type { IPublicProvider } from '../types/account-adapter';

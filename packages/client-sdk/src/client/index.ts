@@ -18,25 +18,31 @@ import manifoldApiClient from '../api/manifold-api';
  * The client provides methods to fetch product data, check eligibility, prepare purchases,
  * and execute transactions for NFT products on the Manifold platform.
  *
- * @param config - Optional configuration object for the client
+ * @param config - Configuration object for the client
+ * @param config.publicProvider - Required provider for blockchain interactions
  * @param config.debug - Enable debug logging for troubleshooting (default: false)
  *
  * @returns A configured ManifoldClient instance
  *
  * @example
  * ```typescript
- * // Basic client
- * const client = createClient();
+ * // Using Ethers v5
+ * import { Ethers5PublicClient } from '@manifoldxyz/client-sdk/adapters';
+ * const provider = new ethers.providers.JsonRpcProvider('...');
+ * const publicProvider = new Ethers5PublicClient({ provider });
+ * const client = createClient({ publicProvider });
  *
- * // Client with debug logging enabled
- * const client = createClient({
- *   debug: true // Enable debug logging
- * });
+ * // Using Viem
+ * import { ViemPublicClient } from '@manifoldxyz/client-sdk/adapters';
+ * const publicClient = createPublicClient({ ... });
+ * const publicProvider = new ViemPublicClient({ publicClient });
+ * const client = createClient({ publicProvider });
  * ```
  *
  * @public
  */
-export function createClient(_config?: ClientConfig): ManifoldClient {
+export function createClient(config: ClientConfig): ManifoldClient {
+  const { publicProvider } = config;
   return {
     /**
      * Fetches detailed product information from Manifold.
@@ -99,14 +105,14 @@ export function createClient(_config?: ClientConfig): ManifoldClient {
         if (isBlindMintInstanceData(instanceData)) {
           // TypeScript now knows instanceData is InstanceData<BlindMintPublicData>
           // Create BlindMintProduct with both instance and preview data
-          return new BlindMintProduct(instanceData, previewData);
+          return new BlindMintProduct(instanceData, previewData, publicProvider);
         }
 
         // Create Edition product if it matches the app ID
         if (isEditionInstanceData(instanceData)) {
           // TypeScript now knows instanceData is InstanceData<EditionPublicData>
           // Create EditionProduct with both instance and preview data
-          return new EditionProduct(instanceData, previewData);
+          return new EditionProduct(instanceData, previewData, publicProvider);
         }
 
         // For other product types, throw an error until implemented

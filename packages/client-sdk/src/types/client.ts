@@ -1,4 +1,5 @@
 import type { Product } from './product';
+import type { IPublicProvider } from './account-adapter';
 
 /**
  * Configuration options for initializing the Manifold SDK client.
@@ -6,6 +7,27 @@ import type { Product } from './product';
  * @public
  */
 export interface ClientConfig {
+  /**
+   * Public provider for read-only blockchain interactions.
+   * Required for fetching balances, estimating gas, and reading contracts.
+   *
+   * @example
+   * ```typescript
+   * // Using Ethers v5
+   * import { Ethers5PublicClient } from '@manifoldxyz/client-sdk/adapters';
+   * const provider = new ethers.providers.JsonRpcProvider('...');
+   * const publicProvider = new Ethers5PublicClient({ provider });
+   *
+   * // Using Viem
+   * import { ViemPublicClient } from '@manifoldxyz/client-sdk/adapters';
+   * const publicClient = createPublicClient({ ... });
+   * const publicProvider = new ViemPublicClient({ publicClient });
+   *
+   * const client = createClient({ publicProvider });
+   * ```
+   */
+  publicProvider: IPublicProvider;
+
   /**
    * Enable debug logging for SDK operations.
    * Useful for troubleshooting and development.

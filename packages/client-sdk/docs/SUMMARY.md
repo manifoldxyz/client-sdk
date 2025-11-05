@@ -17,6 +17,7 @@
 * [Manifold Client](sdk/manifold-client/README.md)
   * [getProduct](sdk/manifold-client/getproduct.md)
 * [Account Adapters](sdk/account-adapters/README.md)
+  * [Public Providers](sdk/account-adapters/public-providers.md)
   * [EthersV5](sdk/account-adapters/ethersv5.md)
   * [Viem](sdk/account-adapters/viem.md)
 * [Product](sdk/product/README.md)

@@ -12,6 +12,7 @@ Before getting started, make sure you have the following:
   * Check your version: `node --version`
   * Download from [nodejs.org](https://nodejs.org/)
 * A package manager (npm, pnpm, or yarn)
+* An RPC provider (Alchemy, Infura, or other)
 
 ## Installation <a href="#installation" id="installation"></a>
 
@@ -26,10 +27,16 @@ npm install @manifoldxyz/client-sdk
 {% tabs %}
 {% tab title="index.ts" %}
 ```typescript
-import { createClient, EditionProduct, isBlindMintProduct, isEditionProduct, createAccountViem } from '@manifoldxyz/client-sdk';
-import { walletClient } from './walletClient.ts';
+import { createClient, EditionProduct, isBlindMintProduct, isEditionProduct, createAccountViem, createPublicProviderViem } from '@manifoldxyz/client-sdk';
+import { walletClient, publicClient } from './walletClient.ts';
 
-const client = createClient();
+// Create a public provider for blockchain interactions
+const publicProvider = createPublicProviderViem({ 
+  1: publicClient // mainnet
+});
+
+// Initialize the Manifold client
+const client = createClient({ publicProvider });
 
 // Fetch product
 const product = await client.getProduct('4150231280') as EditionProduct; // Edition product
@@ -51,17 +58,23 @@ console.log(`Edition purchase transaction: ${txHash}`);
 
 {% tab title="walletClient.ts" %}
 ```typescript
-import { createWalletClient, custom } from 'viem'
+import { createWalletClient, createPublicClient, custom, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { mainnet } from 'viem/chains'
 
+// Create public client for read operations
+export const publicClient = createPublicClient({
+  chain: mainnet,
+  transport: http('YOUR_RPC_URL') // or custom(window.ethereum) for browser
+})
+
+// Create wallet client for transactions
 const account = privateKeyToAccount('0x...') 
-const client = createWalletClient({
+export const walletClient = createWalletClient({
   account, 
   chain: mainnet,
   transport: custom(window.ethereum)
 })
-export { walletClient }
 ```
 {% endtab %}
 {% endtabs %}

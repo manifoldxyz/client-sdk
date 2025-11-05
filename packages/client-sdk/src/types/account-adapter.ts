@@ -334,3 +334,144 @@ export interface TypedDataPayload {
   /** Message data to sign */
   message: Record<string, unknown>;
 }
+
+// =============================================================================
+// PUBLIC PROVIDER INTERFACES
+// =============================================================================
+
+/**
+ * Public provider interface for read-only blockchain interactions.
+ * Provides a unified API for balance queries, gas estimation, and contract reads
+ * across different Web3 libraries (ethers, viem, etc).
+ *
+ * This interface abstracts the underlying provider implementation and provides
+ * a consistent way to interact with the blockchain for read operations.
+ *
+ * @example
+ * ```typescript
+ * const provider = new Ethers5PublicClient({ provider: ethersProvider });
+ *
+ * // Get balance
+ * const balance = await provider.getBalance({
+ *   address: '0x742d35cc6488ad532a3b33a8b3c9f9b8eb8c5b3a',
+ *   networkId: 1
+ * });
+ *
+ * // Estimate gas for contract call
+ * const gasEstimate = await provider.estimateContractGas({
+ *   address: '0x...',
+ *   abi: contractAbi,
+ *   functionName: 'transfer',
+ *   args: [recipient, amount],
+ *   from: '0x...'
+ * });
+ * ```
+ *
+ * @public
+ */
+export interface IPublicProvider {
+  /**
+   * Get the balance of an address (native token or ERC20).
+   *
+   * @param params - Balance query parameters
+   * @param params.address - The address to query balance for
+   * @param params.networkId - The network ID to query on
+   * @param params.tokenAddress - Optional ERC20 token address (omit for native token)
+   * @returns Promise resolving to balance as bigint
+   *
+   * @example
+   * ```typescript
+   * // Get native token balance
+   * const ethBalance = await provider.getBalance({
+   *   address: '0x...',
+   *   networkId: 1
+   * });
+   *
+   * // Get ERC20 token balance
+   * const usdcBalance = await provider.getBalance({
+   *   address: '0x...',
+   *   networkId: 1,
+   *   tokenAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+   * });
+   * ```
+   */
+  getBalance(params: {
+    address: string;
+    networkId: number;
+    tokenAddress?: string;
+  }): Promise<bigint>;
+
+  /**
+   * Estimate gas for a contract function call.
+   *
+   * @param params - Gas estimation parameters
+   * @param params.contractAddress - The contract address
+   * @param params.abi - Contract ABI (can be partial, only needs the function being called)
+   * @param params.functionName - Name of the function to call
+   * @param params.args - Function arguments
+   * @param params.from - The address that would send the transaction
+   * @param params.value - Optional ETH value to send with the call (for payable functions)
+   * @param params.networkId - The network ID for the estimation
+   * @returns Promise resolving to estimated gas as bigint
+   *
+   * @example
+   * ```typescript
+   * const gasEstimate = await provider.estimateContractGas({
+   *   contractAddress: '0x...',
+   *   abi: erc20Abi,
+   *   functionName: 'transfer',
+   *   args: ['0xrecipient...', '1000000'],
+   *   from: '0xsender...',
+   *   networkId: 1
+   * });
+   * ```
+   */
+  estimateContractGas(params: {
+    contractAddress: string;
+    abi: readonly unknown[];
+    functionName: string;
+    args?: readonly unknown[];
+    from: string;
+    value?: bigint;
+    networkId: number;
+  }): Promise<bigint>;
+
+  /**
+   * Read data from a contract (call a view/pure function).
+   *
+   * @param params - Contract read parameters
+   * @param params.contractAddress - The contract address
+   * @param params.abi - Contract ABI (can be partial, only needs the function being called)
+   * @param params.functionName - Name of the function to call
+   * @param params.args - Function arguments
+   * @param params.networkId - The network ID for the read
+   * @returns Promise resolving to the function return value
+   *
+   * @example
+   * ```typescript
+   * // Read ERC20 balance
+   * const balance = await provider.readContract({
+   *   contractAddress: '0xUSDC...',
+   *   abi: erc20Abi,
+   *   functionName: 'balanceOf',
+   *   args: ['0xholder...'],
+   *   networkId: 1
+   * });
+   *
+   * // Read contract state
+   * const totalSupply = await provider.readContract({
+   *   contractAddress: '0x...',
+   *   abi: nftAbi,
+   *   functionName: 'totalSupply',
+   *   networkId: 1
+   * });
+   * ```
+   */
+  readContract<T = unknown>(params: {
+    contractAddress: string;
+    abi: readonly unknown[];
+    functionName: string;
+    args?: readonly unknown[];
+    networkId: number;
+  }): Promise<T>;
+}

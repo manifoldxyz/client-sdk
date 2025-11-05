@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useAccount, useWalletClient } from 'wagmi'
 import { EditionProduct, PreparedPurchase, createAccountViem, isEditionProduct } from '@manifoldxyz/client-sdk'
 import StepModal from './StepModal'
-import { client } from '@/utils/SDKClient'
+import { getClient } from '@/utils/SDKClient'
 
 interface MintButtonButtonProps {
   instanceId: string
@@ -35,7 +35,7 @@ export default function MintButton({ instanceId, quantity = 1 }: MintButtonButto
     setPurchaseComplete(false)
 
     try {
-      const fetchedProduct = await client.getProduct(instanceId)
+      const fetchedProduct = await getClient().getProduct(instanceId)
       
       // Verify it's an Edition product
       if (!isEditionProduct(fetchedProduct)) {

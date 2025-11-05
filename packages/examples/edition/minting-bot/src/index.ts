@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { createClient, createAccountViem, isEditionProduct, ClientSDKError } from '@manifoldxyz/client-sdk';
-import { createWalletClient, custom, http } from 'viem'
+import { createClient, createAccountViem, isEditionProduct, createPublicProviderViem } from '@manifoldxyz/client-sdk';
+import { createWalletClient, createPublicClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { sepolia } from 'viem/chains'
  
@@ -31,10 +31,13 @@ async function main() {
   }
 
   console.log(`🔄 Initializing client for network ${networkId}...`);
+  const publicClient = createPublicClient({
+    chain: sepolia,
+    transport: http(rpcUrl),
+  });
+  const publicProvider = createPublicProviderViem({ [networkId]: publicClient });
   const client = createClient({
-    httpRPCs: {
-      [networkId]: rpcUrl,
-    },
+    publicProvider,
   });
 
   console.log(`📦 Fetching product ${instanceId}...`);

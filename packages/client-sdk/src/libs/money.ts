@@ -8,7 +8,7 @@ import type { MoneyData } from '../types/money';
  * Robust Money class for handling both native and ERC20 token amounts
  */
 export class Money implements MoneyData {
-  readonly value: ethers.BigNumber;
+  readonly value: bigint;
   readonly decimals: number;
   readonly erc20: string;
   readonly symbol: string;
@@ -17,7 +17,7 @@ export class Money implements MoneyData {
   readonly networkId: number;
 
   private constructor(params: {
-    value: ethers.BigNumber;
+    value: bigint;
     decimals: number;
     erc20: string;
     symbol: string;
@@ -28,7 +28,7 @@ export class Money implements MoneyData {
     this.decimals = params.decimals;
     this.erc20 = params.erc20;
     this.symbol = params.symbol;
-    this.formatted = ethers.utils.formatUnits(params.value, params.decimals);
+    this.formatted = ethers.utils.formatUnits(params.value.toString(), params.decimals);
     this.formattedUSD = params.formattedUSD;
     this.networkId = params.networkId;
   }
@@ -37,21 +37,14 @@ export class Money implements MoneyData {
    * Create a Money instance - automatically fetches metadata
    */
   static async create(params: {
-    value: ethers.BigNumber | string | number;
+    value: bigint | string | number;
     networkId: number;
     erc20?: string;
-    provider?: ethers.providers.JsonRpcProvider | ethers.providers.Web3Provider;
     fetchUSD?: boolean;
   }): Promise<Money> {
-    const {
-      value,
-      networkId,
-      erc20 = ethers.constants.AddressZero,
-      provider,
-      fetchUSD = true,
-    } = params;
+    const { value, networkId, erc20 = ethers.constants.AddressZero, fetchUSD = true } = params;
 
-    const bigNumberValue = ethers.BigNumber.from(value.toString());
+    const bigintValue = typeof value === 'bigint' ? value : BigInt(value.toString());
     const isNative = erc20 === ethers.constants.AddressZero;
 
     let symbol: string;
@@ -67,7 +60,7 @@ export class Money implements MoneyData {
         try {
           const usdRate = await getEthToUsdRate(symbol);
           if (usdRate) {
-            formattedUSD = calculateUSDValue(BigInt(bigNumberValue.toString()), decimals, usdRate);
+            formattedUSD = calculateUSDValue(bigintValue, decimals, usdRate);
           }
         } catch (error) {
           console.debug('Failed to fetch USD rate for native token:', error);
@@ -75,7 +68,7 @@ export class Money implements MoneyData {
       }
     } else {
       // ERC20 token
-      const metadata = await Currency.getERC20Metadata(networkId, erc20, provider);
+      const metadata = await Currency.getERC20Metadata(networkId, erc20);
       symbol = metadata.symbol;
       decimals = metadata.decimals;
 
@@ -83,7 +76,7 @@ export class Money implements MoneyData {
         try {
           const usdRate = await getERC20ToUSDRate(symbol, erc20);
           if (usdRate) {
-            formattedUSD = calculateUSDValue(BigInt(bigNumberValue.toString()), decimals, usdRate);
+            formattedUSD = calculateUSDValue(bigintValue, decimals, usdRate);
           }
         } catch (error) {
           console.debug('Failed to fetch USD rate for ERC20:', error);
@@ -92,7 +85,7 @@ export class Money implements MoneyData {
     }
 
     return new Money({
-      value: bigNumberValue,
+      value: bigintValue,
       decimals,
       erc20,
       symbol,
@@ -104,16 +97,11 @@ export class Money implements MoneyData {
   /**
    * Create a zero-value Money instance
    */
-  static async zero(params: {
-    networkId: number;
-    erc20?: string;
-    provider: ethers.providers.JsonRpcProvider | ethers.providers.Web3Provider;
-  }): Promise<Money> {
+  static async zero(params: { networkId: number; erc20?: string }): Promise<Money> {
     return Money.create({
       value: 0,
       networkId: params.networkId,
       erc20: params.erc20,
-      provider: params.provider,
       fetchUSD: false, // No need to fetch USD for zero value
     });
   }
@@ -164,7 +152,7 @@ export class Money implements MoneyData {
       );
     }
 
-    const newValue = this.value.add(other.value);
+    const newValue = this.value + other.value;
     const newUSD =
       this.formattedUSD && other.formattedUSD
         ? (parseFloat(this.formattedUSD) + parseFloat(other.formattedUSD)).toFixed(2)
@@ -191,14 +179,14 @@ export class Money implements MoneyData {
       );
     }
 
-    if (other.value.gt(this.value)) {
+    if (other.value > this.value) {
       throw new ClientSDKError(
         ErrorCode.INVALID_INPUT,
         `Cannot subtract ${other.formatted} from ${this.formatted} - would result in negative`,
       );
     }
 
-    const newValue = this.value.sub(other.value);
+    const newValue = this.value - other.value;
     const newUSD =
       this.formattedUSD && other.formattedUSD
         ? (parseFloat(this.formattedUSD) - parseFloat(other.formattedUSD)).toFixed(2)
@@ -218,8 +206,8 @@ export class Money implements MoneyData {
    * Multiply by a scalar value
    */
   multiply(scalar: number | string): Money {
-    const multiplier = ethers.BigNumber.from(Math.floor(Number(scalar) * 1000));
-    const newValue = this.value.mul(multiplier).div(1000);
+    const multiplier = BigInt(Math.floor(Number(scalar) * 1000));
+    const newValue = (this.value * multiplier) / 1000n;
 
     const newUSD = this.formattedUSD
       ? (parseFloat(this.formattedUSD) * Number(scalar)).toFixed(2)
@@ -239,7 +227,7 @@ export class Money implements MoneyData {
    * Multiply by an integer (more precise than multiply for whole numbers)
    */
   multiplyInt(scalar: number): Money {
-    const newValue = this.value.mul(scalar);
+    const newValue = this.value * BigInt(scalar);
 
     const newUSD = this.formattedUSD
       ? (parseFloat(this.formattedUSD) * scalar).toFixed(2)
@@ -266,7 +254,7 @@ export class Money implements MoneyData {
       );
     }
 
-    const dividedValue = this.value.div(divisor);
+    const dividedValue = this.value / BigInt(divisor);
     const formattedUSD =
       this.formattedUSD !== undefined
         ? (parseFloat(this.formattedUSD) / divisor).toFixed(2)
@@ -294,8 +282,8 @@ export class Money implements MoneyData {
       );
     }
 
-    if (this.value.lt(other.value)) return -1;
-    if (this.value.gt(other.value)) return 1;
+    if (this.value < other.value) return -1;
+    if (this.value > other.value) return 1;
     return 0;
   }
 
@@ -303,7 +291,7 @@ export class Money implements MoneyData {
    * Check if equal to another Money amount
    */
   isEqualTo(other: Money): boolean {
-    return this.isSameCurrency(other) && this.value.eq(other.value);
+    return this.isSameCurrency(other) && this.value === other.value;
   }
 
   /**
@@ -316,7 +304,7 @@ export class Money implements MoneyData {
         `Cannot compare different currencies: ${this.symbol} and ${other.symbol}`,
       );
     }
-    return this.value.gt(other.value);
+    return this.value > other.value;
   }
 
   /**
@@ -329,7 +317,7 @@ export class Money implements MoneyData {
         `Cannot compare different currencies: ${this.symbol} and ${other.symbol}`,
       );
     }
-    return this.value.gte(other.value);
+    return this.value >= other.value;
   }
 
   /**
@@ -342,7 +330,7 @@ export class Money implements MoneyData {
         `Cannot compare different currencies: ${this.symbol} and ${other.symbol}`,
       );
     }
-    return this.value.lt(other.value);
+    return this.value < other.value;
   }
 
   /**
@@ -355,21 +343,21 @@ export class Money implements MoneyData {
         `Cannot compare different currencies: ${this.symbol} and ${other.symbol}`,
       );
     }
-    return this.value.lte(other.value);
+    return this.value <= other.value;
   }
 
   /**
    * Check if the value is zero
    */
   isZero(): boolean {
-    return this.value.isZero();
+    return this.value === 0n;
   }
 
   /**
    * Check if the value is positive (greater than zero)
    */
   isPositive(): boolean {
-    return this.value.gt(0);
+    return this.value > 0n;
   }
 
   /**
@@ -413,9 +401,9 @@ export class Money implements MoneyData {
   }
 
   /**
-   * Get the raw BigNumber value
+   * Get the raw bigint value
    */
-  get raw(): ethers.BigNumber {
+  get raw(): bigint {
     return this.value;
   }
 }

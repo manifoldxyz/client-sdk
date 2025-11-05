@@ -30,19 +30,16 @@ import type {
   TokenOrderItem,
   Token,
   EditionPublicDataResponse,
+  IPublicProvider,
 } from '../types';
 import { AppType, AppId } from '../types/common';
 import type {
   ClaimableMerkleInfo,
   EditionClaimData,
-  EditionClaimContract,
   ERC721ClaimData,
   ERC1155ClaimData,
 } from '../types/edition';
 import * as ethers from 'ethers';
-
-import { createProvider } from '../utils/provider-factory';
-import { ContractFactory as ContractFactoryClass } from '../utils/contract-factory';
 import { validateAddress } from '../utils/validation';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import type { InstancePreview } from '@manifoldxyz/studio-apps-client-public';
@@ -52,6 +49,7 @@ import { Money } from '../libs/money';
 import type { Cost } from '../types/money';
 import type { UniversalTransactionResponse } from '../types/account-adapter';
 import { convertManifoldContractToContract } from '../utils/common';
+import { ClaimExtensionERC1155ABI, ClaimExtensionERC721ABI, ERC20ABI } from '../abis';
 
 type MintedTokenAllocation = {
   tokenId: string;
@@ -99,18 +97,24 @@ export class EditionProduct implements IEditionProduct {
   onchainData?: EditionOnchainData;
 
   // Internal state
+  private readonly _publicProvider: IPublicProvider;
 
   /**
    * Creates a new EditionProduct instance.
    *
    * @param instanceData - Product instance data from the API
    * @param previewData - Preview data for the product
+   * @param publicProvider - Public provider for blockchain interactions
    *
    * @throws {ClientSDKError} If the app ID doesn't match EDITION
    *
    * @internal
    */
-  constructor(instanceData: InstanceData<EditionPublicDataResponse>, previewData: InstancePreview) {
+  constructor(
+    instanceData: InstanceData<EditionPublicDataResponse>,
+    previewData: InstancePreview,
+    publicProvider: IPublicProvider,
+  ) {
     // Validate app ID
     if (instanceData.appId !== AppId.EDITION) {
       throw new ClientSDKError(
@@ -131,8 +135,8 @@ export class EditionProduct implements IEditionProduct {
       },
     };
     this.previewData = previewData;
-
     this.id = instanceData.id;
+    this._publicProvider = publicProvider;
   }
 
   // =============================================================================
@@ -176,16 +180,12 @@ export class EditionProduct implements IEditionProduct {
 
       // Fetch platform fees from contract first
       const networkId = this.data.publicData.network;
-      const provider = await createProvider({
-        networkId,
-      });
 
       // Fetch standard mint fee
       const mintFee = await contract.MINT_FEE();
       const platformFee = await Money.create({
         value: mintFee,
         networkId,
-        provider,
         fetchUSD: true,
       });
 
@@ -194,7 +194,6 @@ export class EditionProduct implements IEditionProduct {
       const merklePlatformFee = await Money.create({
         value: merkleMintFee,
         networkId,
-        provider,
         fetchUSD: true,
       });
 
@@ -307,9 +306,6 @@ export class EditionProduct implements IEditionProduct {
     }
 
     const onchainData = await this.fetchOnchainData();
-    const provider = await createProvider({
-      networkId,
-    });
 
     // Calculate costs
     const productCost = onchainData.cost.multiplyInt(quantity);
@@ -338,33 +334,43 @@ export class EditionProduct implements IEditionProduct {
     // Build steps array
     const steps: TransactionStep[] = [];
 
-    const contractFactory = new ContractFactoryClass({
-      provider,
-      networkId,
-    });
-
     // Check balances and create approvals for each token type
     for (const [tokenAddress, totalCost] of Array.from(costsByToken.entries())) {
       if (totalCost.isERC20()) {
-        const erc20Contract = contractFactory.createERC20Contract(tokenAddress);
+        // Read balance and allowance using publicProvider
         const [balance, currentAllowance] = await Promise.all([
-          erc20Contract.balanceOf(user),
-          erc20Contract.allowance(user, this._extensionAddress),
+          this._publicProvider.readContract<bigint>({
+            contractAddress: tokenAddress,
+            abi: ERC20ABI,
+            functionName: 'balanceOf',
+            args: [user],
+            networkId,
+          }),
+          this._publicProvider.readContract<bigint>({
+            contractAddress: tokenAddress,
+            abi: ERC20ABI,
+            functionName: 'allowance',
+            args: [user, this._extensionAddress],
+            networkId,
+          }),
         ]);
 
-        if (balance.lt(totalCost.raw)) {
+        if (balance < totalCost.value) {
           throw new ClientSDKError(
             ErrorCode.INSUFFICIENT_FUNDS,
             `Insufficient ${totalCost.symbol} balance. Need ${totalCost.formatted} but have ${ethers.utils.formatUnits(balance, totalCost.decimals)}`,
           );
         }
 
-        if (currentAllowance.lt(totalCost.raw)) {
+        if (currentAllowance < totalCost.value) {
           const gasEstimate = await estimateGas({
-            contract: erc20Contract,
-            method: 'approve',
-            args: [this._extensionAddress, totalCost.raw],
+            publicProvider: this._publicProvider,
+            contractAddress: tokenAddress,
+            abi: ERC20ABI,
+            functionName: 'approve',
+            args: [this._extensionAddress, totalCost.value],
             from: user,
+            networkId,
           });
 
           const approvalStep: TransactionStep = {
@@ -377,7 +383,7 @@ export class EditionProduct implements IEditionProduct {
               contractAddress: tokenAddress,
               transactionData: this._buildApprovalData(
                 this._extensionAddress,
-                totalCost.raw.toString(),
+                totalCost.value.toString(),
               ),
               gasEstimate: BigInt(gasEstimate.toString()), // Will be updated with actual estimate
               networkId,
@@ -386,10 +392,13 @@ export class EditionProduct implements IEditionProduct {
               await account.switchNetwork(networkId);
               const address = await account.getAddress();
               const gasEstimate = await estimateGas({
-                contract: erc20Contract,
-                method: 'approve',
-                args: [this._extensionAddress, totalCost.raw],
+                publicProvider: this._publicProvider,
+                contractAddress: tokenAddress,
+                abi: ERC20ABI,
+                functionName: 'approve',
+                args: [this._extensionAddress, totalCost.value],
                 from: address,
+                networkId,
               });
               const gasLimit = this._applyGasBuffer(gasEstimate, params.gasBuffer).toString();
 
@@ -426,11 +435,13 @@ export class EditionProduct implements IEditionProduct {
         } else {
           // Try getting from available provider
           try {
-            const rawBalance = await provider.getBalance(user);
-            nativeBalance = await Money.create({
-              value: rawBalance,
+            const rawBalance = await this._publicProvider.getBalance({
+              address: user,
               networkId,
-              provider,
+            });
+            nativeBalance = await Money.create({
+              value: BigInt(rawBalance.toString()),
+              networkId,
               fetchUSD: true,
             });
           } catch (e) {
@@ -447,8 +458,9 @@ export class EditionProduct implements IEditionProduct {
     }
 
     // Calculate native payment value for mint transaction
-    const nativePaymentValue =
-      costsByToken.get(ethers.constants.AddressZero)?.raw || ethers.BigNumber.from(0);
+    const nativePaymentValue = costsByToken.get(ethers.constants.AddressZero)?.raw
+      ? BigInt(costsByToken.get(ethers.constants.AddressZero)!.raw.toString())
+      : 0n;
 
     // Build cost breakdown for mint step and enhanced cost
     const nativeCost = costsByToken.get(ethers.constants.AddressZero);
@@ -457,7 +469,7 @@ export class EditionProduct implements IEditionProduct {
       .map(([, cost]) => cost);
 
     // Build Cost structure (reuse the already computed values)
-    const resolvedNativeCost = nativeCost ?? (await Money.zero({ networkId, provider }));
+    const resolvedNativeCost = nativeCost ?? (await Money.zero({ networkId }));
 
     const totalUsdValue =
       (productCost.formattedUSD ? parseFloat(productCost.formattedUSD) : 0) +
@@ -480,16 +492,18 @@ export class EditionProduct implements IEditionProduct {
     if (nativeCost) mintCost.native = nativeCost;
     if (erc20Costs.length > 0) mintCost.erc20s = erc20Costs;
 
-    const editionContract = await this._getClaimContract();
     // Generate merkle proofs if needed for allowlist
     const { mintIndices, merkleProofs } = await this._generateMintProofs(recipient, quantity);
 
     // estimate gas
     const gasEstimate = await estimateGas({
-      contract: editionContract,
-      method: 'mintProxy',
+      publicProvider: this._publicProvider,
+      contractAddress: this._extensionAddress,
+      abi: ClaimExtensionERC721ABI,
+      functionName: 'mintProxy',
       args: [this._creatorContract, this.id, quantity, mintIndices, merkleProofs, recipient],
       from: user,
+      networkId,
       value: nativePaymentValue,
     });
 
@@ -536,8 +550,10 @@ export class EditionProduct implements IEditionProduct {
         );
 
         const gasEstimate = await estimateGas({
-          contract: editionContract,
-          method: 'mintProxy',
+          publicProvider: this._publicProvider,
+          contractAddress: this._extensionAddress,
+          abi: ClaimExtensionERC721ABI,
+          functionName: 'mintProxy',
           args: [
             this._creatorContract,
             this.id,
@@ -547,6 +563,7 @@ export class EditionProduct implements IEditionProduct {
             mintToAddress,
           ],
           from: walletAddress,
+          networkId,
           value: nativePaymentValue,
         });
 
@@ -649,10 +666,11 @@ export class EditionProduct implements IEditionProduct {
    * Get the extension address (alias for consistency)
    */
   private get _extensionAddress(): string {
-    if (this.contract.spec.toLowerCase() === 'erc721') {
+    const spec = this.contract.spec as string;
+    if (spec.toLowerCase() === 'erc721') {
       return this.data.publicData.extensionAddress721.value;
     }
-    if (this.contract.spec.toLowerCase() === 'erc1155') {
+    if (spec.toLowerCase() === 'erc1155') {
       return this.data.publicData.extensionAddress1155.value;
     }
     throw new ClientSDKError(
@@ -661,22 +679,79 @@ export class EditionProduct implements IEditionProduct {
     );
   }
 
-  private async _getClaimContract(): Promise<EditionClaimContract> {
+  private async _getClaimContract() {
     const networkId = this.data.publicData.network || 1;
 
-    // Use configured providers (READ operations)
-    const provider = await createProvider({
-      networkId,
-    });
+    // Return a wrapper object that uses publicProvider for contract reads
+    return {
+      getClaim: async (creatorContract: string, instanceId: number) => {
+        const spec = this.contract.spec as string;
+        const isERC721 = spec.toLowerCase() === 'erc721';
 
-    const factory = new ContractFactoryClass({
-      provider,
-      networkId,
-    });
-
-    return this.data.publicData.contract.spec.toLowerCase() === 'erc721'
-      ? factory.createEditionContract(this._extensionAddress)
-      : factory.createEdition1155Contract(this._extensionAddress);
+        if (isERC721) {
+          const result = await this._publicProvider.readContract<ERC721ClaimData>({
+            contractAddress: this._extensionAddress,
+            abi: ClaimExtensionERC721ABI,
+            functionName: 'getClaim',
+            args: [creatorContract, instanceId],
+            networkId,
+          });
+          return result;
+        } else {
+          const result = await this._publicProvider.readContract<ERC1155ClaimData>({
+            contractAddress: this._extensionAddress,
+            abi: ClaimExtensionERC1155ABI,
+            functionName: 'getClaim',
+            args: [creatorContract, instanceId],
+            networkId,
+          });
+          return result;
+        }
+      },
+      MINT_FEE: async () => {
+        const result = await this._publicProvider.readContract<bigint>({
+          contractAddress: this._extensionAddress,
+          abi: ClaimExtensionERC721ABI,
+          functionName: 'MINT_FEE',
+          networkId,
+        });
+        return result;
+      },
+      MINT_FEE_MERKLE: async () => {
+        const result = await this._publicProvider.readContract<bigint>({
+          contractAddress: this._extensionAddress,
+          abi: ClaimExtensionERC721ABI,
+          functionName: 'MINT_FEE_MERKLE',
+          networkId,
+        });
+        return result;
+      },
+      getTotalMints: async (wallet: string, creatorContract: string, instanceId: number) => {
+        // This is typically the same as getUserMints for most contracts
+        const result = await this._publicProvider.readContract<number>({
+          contractAddress: this._extensionAddress,
+          abi: ClaimExtensionERC721ABI,
+          functionName: 'getTotalMints',
+          args: [wallet, creatorContract, instanceId],
+          networkId,
+        });
+        return result;
+      },
+      checkMintIndices: async (
+        creatorContract: string,
+        instanceId: number,
+        mintIndices: number[],
+      ) => {
+        const result = await this._publicProvider.readContract<boolean[]>({
+          contractAddress: this._extensionAddress,
+          abi: ClaimExtensionERC721ABI,
+          functionName: 'checkMintIndices',
+          args: [creatorContract, instanceId, mintIndices],
+          networkId,
+        });
+        return result;
+      },
+    };
   }
 
   private async _processClaimData(
@@ -685,21 +760,18 @@ export class EditionProduct implements IEditionProduct {
     merklePlatformFee: Money,
   ): Promise<EditionOnchainData> {
     // Convert dates from unix seconds
-    const convertDate = (unixSeconds: number): Date => {
-      return new Date(unixSeconds * 1000);
+    const convertDate = (unixSeconds: number | bigint): Date => {
+      const seconds = typeof unixSeconds === 'bigint' ? Number(unixSeconds) : unixSeconds;
+      return new Date(seconds * 1000);
     };
 
     const networkId = this.data.publicData.network;
-    const provider = await createProvider({
-      networkId,
-    });
 
     // Create Money object which will fetch all metadata automatically
     const costMoney = await Money.create({
-      value: claimData.cost,
+      value: typeof claimData.cost === 'bigint' ? claimData.cost : BigInt(claimData.cost),
       networkId,
       erc20: claimData.erc20,
-      provider,
       fetchUSD: true,
     });
 
@@ -709,13 +781,18 @@ export class EditionProduct implements IEditionProduct {
       audienceType = 'Allowlist';
     }
 
-    const isERC721 = this.contract.spec.toLowerCase() === 'erc721';
-
+    const spec = this.contract.spec as string;
+    const isERC721 = spec.toLowerCase() === 'erc721';
+    
     // Build the base onchain data
     const baseData = {
-      totalMax: claimData.totalMax === 0 ? null : claimData.totalMax,
+      totalMax:
+        claimData.totalMax === 0 ? null : claimData.totalMax,
       total: claimData.total || 0,
-      walletMax: claimData.walletMax === 0 ? null : claimData.walletMax,
+      walletMax:
+        claimData.walletMax === 0
+          ? null
+          : claimData.walletMax,
       startDate: claimData.startDate ? convertDate(claimData.startDate) : null,
       endDate: claimData.endDate ? convertDate(claimData.endDate) : null,
       audienceType,
@@ -747,7 +824,6 @@ export class EditionProduct implements IEditionProduct {
   private async _fetchClaimableMerkleInfo(
     _merkleTreeId: number,
     _walletAddress: string,
-    _contract: EditionClaimContract,
   ): Promise<ClaimableMerkleInfo> {
     const merkleInfo = await manifoldApiClient.studioClient.public.getMerkleInfo({
       merkleTreeId: _merkleTreeId,
@@ -757,7 +833,10 @@ export class EditionProduct implements IEditionProduct {
     const mintIndices = merkleInfo
       .filter((info) => info.value !== undefined)
       .map((claimMerkleInfo) => claimMerkleInfo.value as number);
-    const mintIndicesStatus = await _contract.checkMintIndices(
+
+    // Call checkMintIndices directly using the wrapper object
+    const contract = await this._getClaimContract();
+    const mintIndicesStatus = await contract.checkMintIndices(
       this.contract.contractAddress,
       this.id,
       mintIndices,
@@ -784,11 +863,9 @@ export class EditionProduct implements IEditionProduct {
     }
     // For allowlist mints, fetch claimable merkle info
     if (this.data.publicData.instanceAllowlist?.merkleTreeId) {
-      const contract = await this._getClaimContract();
       const claimableMerkleInfo = await this._fetchClaimableMerkleInfo(
         this.data.publicData.instanceAllowlist.merkleTreeId,
         walletAddress,
-        contract,
       );
       return {
         mintIndices: claimableMerkleInfo.mintIndices.slice(0, quantity),
@@ -852,7 +929,6 @@ export class EditionProduct implements IEditionProduct {
       const claimableMerkleInfo = await this._fetchClaimableMerkleInfo(
         this.data.publicData.instanceAllowlist.merkleTreeId,
         recipientAddress,
-        contract,
       );
       isOnAllowlist = claimableMerkleInfo.isInAllowlist;
       availableForWallet = claimableMerkleInfo.mintIndices.length;
@@ -864,7 +940,7 @@ export class EditionProduct implements IEditionProduct {
         this.contract.contractAddress,
         this.id,
       );
-      availableForWallet = Math.max(0, onchainData.walletMax - totalMinted);
+      availableForWallet = Math.max(0, onchainData.walletMax - Number(totalMinted));
     }
 
     // Return minimum of supply and wallet availability
@@ -962,9 +1038,7 @@ export class EditionProduct implements IEditionProduct {
 
     const rawGasUsed = response.gasUsed;
 
-    const normalizeGasUsed = (
-      value: string | number | bigint | ethers.BigNumber | undefined,
-    ): bigint | undefined => {
+    const normalizeGasUsed = (value: string | number | bigint | undefined): bigint | undefined => {
       if (value === undefined) {
         return undefined;
       }
@@ -973,9 +1047,7 @@ export class EditionProduct implements IEditionProduct {
         return value;
       }
 
-      if (ethers.BigNumber.isBigNumber(value)) {
-        return BigInt(value.toString());
-      }
+      // BigNumber case removed - no longer needed
 
       if (typeof value === 'number') {
         return BigInt(Math.trunc(value));
@@ -1006,7 +1078,8 @@ export class EditionProduct implements IEditionProduct {
     const targetAddresses = new Set([walletAddress.toLowerCase(), recipientAddress.toLowerCase()]);
 
     const allocations: MintedTokenAllocation[] = [];
-    const contractSpec = this.contract.spec.toLowerCase();
+    const spec = this.contract.spec as string;
+    const contractSpec = spec.toLowerCase();
 
     if (contractSpec === 'erc721') {
       const iface = new ethers.utils.Interface([
@@ -1081,25 +1154,23 @@ export class EditionProduct implements IEditionProduct {
             allocations.push({ tokenId, quantity });
           }
         } else if (parsed.name === 'TransferBatch') {
-          const ids = Array.from(
-            parsed.args.ids as unknown as Iterable<ethers.BigNumber | bigint | number | string>,
-          );
+          const ids = Array.from(parsed.args.ids as unknown as Iterable<bigint | number | string>);
           const values = Array.from(
             // eslint-disable-next-line @typescript-eslint/unbound-method
-            parsed.args.values as unknown as Iterable<ethers.BigNumber | bigint | number | string>,
+            parsed.args.values as unknown as Iterable<bigint | number | string>,
           );
 
           ids.forEach((idValue, index) => {
             const tokenId = idValue.toString();
             const rawQuantity = values[index];
             const quantityString =
-              rawQuantity instanceof ethers.BigNumber
+              typeof rawQuantity === 'bigint'
                 ? rawQuantity.toString()
-                : typeof rawQuantity === 'bigint'
+                : typeof rawQuantity === 'number'
                   ? rawQuantity.toString()
-                  : typeof rawQuantity === 'number'
-                    ? rawQuantity.toString()
-                    : (rawQuantity?.toString?.() ?? '0');
+                  : typeof rawQuantity === 'string'
+                    ? rawQuantity
+                    : '0';
             const quantity = Number(quantityString);
 
             if (!Number.isNaN(quantity) && quantity > 0) {
@@ -1218,13 +1289,13 @@ export class EditionProduct implements IEditionProduct {
     };
   }
 
-  private _applyGasBuffer(gasEstimate: ethers.BigNumber, gasBuffer?: GasBuffer): ethers.BigNumber {
+  private _applyGasBuffer(gasEstimate: bigint, gasBuffer?: GasBuffer): bigint {
     if (!gasBuffer) {
       return gasEstimate;
     }
     return gasBuffer.fixed
-      ? gasEstimate.add(gasBuffer.fixed)
-      : gasEstimate.mul(gasBuffer.multiplier || 120).div(100);
+      ? gasEstimate + BigInt(gasBuffer.fixed.toString())
+      : (gasEstimate * BigInt(Math.floor((gasBuffer.multiplier || 1.2) * 100))) / 100n;
   }
 
   /**

@@ -96,10 +96,24 @@ export default function Home() {
 
 **Core Steps**
 
-a. Create a [Manifold Client](../../sdk/manifold-client/)
+a. Create a [Manifold Client](../../sdk/manifold-client/) with a public provider
 
 ```typescript
-const client = createClient();
+import { createPublicProviderViem } from '@manifoldxyz/client-sdk';
+import { createPublicClient, custom } from 'viem';
+import { mainnet } from 'viem/chains';
+
+// Create a public provider for blockchain interactions
+const publicClient = createPublicClient({
+  chain: mainnet,
+  transport: custom(window.ethereum),
+});
+const publicProvider = createPublicProviderViem({ 
+  1: publicClient // mainnet
+});
+
+// Initialize the client
+const client = createClient({ publicProvider });
 ```
 
 b. Create an [Account](../../reference/account.md) representing the connected user.

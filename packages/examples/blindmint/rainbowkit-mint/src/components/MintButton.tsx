@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { useAccount, useWalletClient } from 'wagmi';
-import { createClient, createAccountViem } from '@manifoldxyz/client-sdk';
+import { createClient, createAccountViem, createPublicProviderViem } from '@manifoldxyz/client-sdk';
+import { createPublicClient, custom, PublicClient } from 'viem';
+import { mainnet, base } from 'viem/chains';
 
 const INSTANCE_ID = process.env.NEXT_PUBLIC_INSTANCE_ID || '4149776624';
 
@@ -25,7 +27,24 @@ export function MintButton() {
 
     try {
       // Create Manifold SDK client
-      const client = createClient();
+      const providers: Record<number, PublicClient> = {};
+      providers[1] = createPublicClient({
+        chain: mainnet,
+        transport: custom(window.ethereum),
+      }) as PublicClient;
+      providers[8453] = createPublicClient({
+        chain: base,
+        transport: custom(window.ethereum),
+      }) as PublicClient;
+      providers[11155111] = createPublicClient({
+        chain: base,
+        transport: custom(window.ethereum),
+      }) as PublicClient;
+      
+      const publicProvider = createPublicProviderViem(providers);
+      const client = createClient({
+        publicProvider,
+      });
       const viemClient = walletClient;
       // Create viem adapter from wallet client
       const account = createAccountViem({

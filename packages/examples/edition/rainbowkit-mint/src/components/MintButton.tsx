@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { useAccount, useWalletClient } from 'wagmi';
-import { createClient, createAccountViem, isEditionProduct } from '@manifoldxyz/client-sdk';
+import { createClient, createAccountViem, isEditionProduct, createPublicProviderViem } from '@manifoldxyz/client-sdk';
+import { createPublicClient, custom, PublicClient } from 'viem';
+import { mainnet, base, sepolia } from 'viem/chains';
 
 // Example Edition product instance ID - replace with your own
 const INSTANCE_ID = process.env.NEXT_PUBLIC_INSTANCE_ID || '4133757168';
@@ -26,11 +28,23 @@ export function MintButton() {
 
     try {
       // Create Manifold SDK client
+      const providers: Record<number, PublicClient> = {};
+      providers[8453] = createPublicClient({
+        chain: base,
+        transport: custom(window.ethereum),
+      }) as PublicClient;
+      providers[1] = createPublicClient({
+        chain: mainnet,
+        transport: custom(window.ethereum),
+      }) as PublicClient;
+      providers[11155111] = createPublicClient({
+        chain: sepolia,
+        transport: custom(window.ethereum),
+      }) as PublicClient;
+      
+      const publicProvider = createPublicProviderViem(providers);
       const client = createClient({
-        httpRPCs: {
-          1: process.env.NEXT_PUBLIC_RPC_URL_MAINNET || 'https://eth-mainnet.g.alchemy.com/v2/demo',
-          8453: process.env.NEXT_PUBLIC_RPC_URL_BASE || 'https://base-mainnet.infura.io/v3/demo',
-        }
+        publicProvider,
       });
       const viemClient = walletClient;
       // Create viem adapter from wallet client
@@ -101,6 +115,7 @@ export function MintButton() {
       
     } catch (err: any) {
       console.error('Mint error:', err);
+      console.error(`Error details`, err.details)
       setError(err.message || 'Failed to mint');
       setStatus('');
     } finally {

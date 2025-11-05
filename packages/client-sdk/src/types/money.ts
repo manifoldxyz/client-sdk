@@ -1,4 +1,4 @@
-import type { BigNumber } from 'ethers';
+// BigNumber import removed - using native bigint
 import type { Money } from '../libs/money';
 
 // Re-export Money class and utilities for type system
@@ -8,7 +8,7 @@ export { Money, isMoney } from '../libs/money';
  * Internal Money data structure used by the Money class implementation
  */
 export interface MoneyData {
-  value: BigNumber;
+  value: bigint;
   decimals: number;
   erc20: string;
   symbol: string;

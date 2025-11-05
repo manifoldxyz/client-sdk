@@ -8,21 +8,6 @@
 
 export { validateInstanceId, parseManifoldUrl, validateAddress } from './validation';
 
-// Provider utilities
-export { createProvider } from './provider-factory';
-
-export type { ProviderFactoryOptions } from './provider-factory';
-
-// Contract utilities
-export { ContractFactory, parseContractEvents } from './contract-factory';
-
-export type {
-  ContractFactoryOptions,
-  BlindMintClaimContract,
-  CreatorContract,
-  ERC20Contract,
-} from './contract-factory';
-
 // Gas estimation utilities
 export { estimateGas, applyGasBuffer } from './gas-estimation';
 
@@ -40,23 +25,23 @@ export type { EnsureConnectedNetworkOptions } from './network';
 // =============================================================================
 
 /**
- * Format BigNumber to human-readable string
+ * Format bigint to human-readable string
  */
 import * as ethers from 'ethers';
 
 export function formatBigNumber(
-  value: ethers.BigNumber,
+  value: bigint,
   decimals: number = 18,
   precision: number = 4,
 ): string {
-  return parseFloat(ethers.utils.formatUnits(value, decimals)).toFixed(precision);
+  return parseFloat(ethers.utils.formatUnits(value.toString(), decimals)).toFixed(precision);
 }
 
 /**
- * Parse human-readable string to BigNumber
+ * Parse human-readable string to bigint
  */
-export function parseBigNumber(value: string, decimals: number = 18): ethers.BigNumber {
-  return ethers.utils.parseUnits(value, decimals);
+export function parseBigNumber(value: string, decimals: number = 18): bigint {
+  return BigInt(ethers.utils.parseUnits(value, decimals).toString());
 }
 
 /**

@@ -1,50 +1,69 @@
-import type { ethers } from 'ethers';
 import { ClientSDKError, ErrorCode } from '../types/errors';
+import type { IPublicProvider } from '../types';
 
 export interface GasEstimationParams {
-  contract: ethers.Contract;
-  method: string;
-  args: unknown[];
+  publicProvider: IPublicProvider;
+  contractAddress: string;
+  abi: readonly unknown[];
+  functionName: string;
+  args?: readonly unknown[];
   from: string;
-  value?: ethers.BigNumber;
-  fallbackGas?: ethers.BigNumber;
+  networkId: number;
+  value?: bigint;
+  fallbackGas?: bigint;
 }
 
 /**
  * Generic gas estimation function with fallback
  * Can be reused across all product types
  */
-export async function estimateGas(params: GasEstimationParams): Promise<ethers.BigNumber> {
-  const { contract, method, args, from, value, fallbackGas } = params;
+export async function estimateGas(params: GasEstimationParams): Promise<bigint> {
+  const {
+    publicProvider,
+    contractAddress,
+    abi,
+    functionName,
+    args = [],
+    from,
+    networkId,
+    value,
+    fallbackGas,
+  } = params;
 
   try {
-    // Check if the method exists on the contract
-    if (!contract.estimateGas[method]) {
-      throw new ClientSDKError(
-        ErrorCode.ESTIMATION_FAILED,
-        `Method ${method} not found on contract`,
-      );
-    }
+    // Convert ethers BigNumber to bigint for the publicProvider interface
+    const valueBigInt = value ? BigInt(value.toString()) : undefined;
 
-    // Prepare overrides
-    const overrides: ethers.Overrides & { from?: string; value?: ethers.BigNumber } = { from };
-    if (value) {
-      overrides.value = value;
-    }
-
-    // Estimate gas
-    const estimateMethod = contract.estimateGas[method] as (
-      ...args: unknown[]
-    ) => Promise<ethers.BigNumber>;
-    const gasEstimate = await estimateMethod(...args, overrides);
+    // Use the publicProvider's estimateContractGas method
+    const gasEstimate = await publicProvider.estimateContractGas({
+      contractAddress,
+      abi,
+      functionName,
+      args,
+      from,
+      value: valueBigInt,
+      networkId,
+    });
 
     return gasEstimate;
   } catch (error) {
     if (fallbackGas) {
-      console.warn(`Gas estimation failed for ${method}, using fallback:`, error);
+      console.warn(`Gas estimation failed for ${functionName}, using fallback:`, error);
       return fallbackGas;
     }
-    throw error;
+
+    // Wrap the error with more context
+    throw new ClientSDKError(
+      ErrorCode.GAS_ESTIMATION_FAILED,
+      `Failed to estimate gas for ${functionName}`,
+      {
+        contractAddress,
+        functionName,
+        from,
+        networkId,
+        originalError: error instanceof Error ? error : undefined,
+      },
+    );
   }
 }
 
@@ -53,10 +72,7 @@ export async function estimateGas(params: GasEstimationParams): Promise<ethers.B
  * @param gasEstimate The base gas estimate
  * @param bufferPercentage Buffer percentage (e.g., 30 for 30%)
  */
-export function applyGasBuffer(
-  gasEstimate: ethers.BigNumber,
-  bufferPercentage: number = 30,
-): ethers.BigNumber {
-  const buffer = 100 + bufferPercentage;
-  return gasEstimate.mul(buffer).div(100);
+export function applyGasBuffer(gasEstimate: bigint, bufferPercentage: number = 30): bigint {
+  const buffer = 100n + BigInt(bufferPercentage);
+  return (gasEstimate * buffer) / 100n;
 }
