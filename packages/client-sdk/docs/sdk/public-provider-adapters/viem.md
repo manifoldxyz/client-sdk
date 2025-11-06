@@ -1,4 +1,4 @@
-# Viem Public Provider
+# Viem
 
 **createPublicProviderViem(publicClients, fallbackProviders?)** → IPublicProvider
 
@@ -6,10 +6,9 @@ Creates a public provider from Viem public clients with optional fallback suppor
 
 ## Parameters
 
-| Parameter | Type | Required | Description |
-| --------- | ---- | -------- | ----------- |
-| publicClients | Record<number, PublicClient> | ✅ | Map of network IDs to Viem public clients |
-| fallbackProviders | Record<number, PublicClient> | ❌ | Optional fallback providers when primary providers fail or are misconfigured |
+| Parameter     | Type                                             | Required | Description                               |
+| ------------- | ------------------------------------------------ | -------- | ----------------------------------------- |
+| publicClients | Record\<number, PublicClient \| PublicClient\[]> | ✅        | Map of network IDs to Viem public clients |
 
 ## Examples
 
@@ -50,32 +49,22 @@ import { createPublicProviderViem } from '@manifoldxyz/client-sdk';
 import { createPublicClient, http } from 'viem';
 import { mainnet, base } from 'viem/chains';
 
-// Primary providers
+// Providers with fallback (used when primary fails or is on wrong network)
 const publicClients = {
-  1: createPublicClient({
+  1: [
+  createPublicClient({
     chain: mainnet,
     transport: http('PRIMARY_MAINNET_RPC_URL')
   }),
-  8453: createPublicClient({
-    chain: base,
-    transport: http('PRIMARY_BASE_RPC_URL')
-  })
-};
-
-// Fallback providers (used when primary fails or is on wrong network)
-const fallbackProviders = {
-  1: createPublicClient({
+  createPublicClient({
     chain: mainnet,
-    transport: http('BACKUP_MAINNET_RPC_URL')
-  }),
-  8453: createPublicClient({
-    chain: base,
-    transport: http('BACKUP_BASE_RPC_URL')
+    transport: http('FALLBACK_MAINNET_RPC_URL')
   })
+  ]
 };
 
 // Create the public provider with fallback support
-const publicProvider = createPublicProviderViem(publicClients, fallbackProviders);
+const publicProvider = createPublicProviderViem(publicClients);
 
 // Use with Manifold client
 const client = createClient({ publicProvider });
@@ -102,4 +91,3 @@ const publicProvider = createPublicProviderViem({
 
 const client = createClient({ publicProvider });
 ```
-

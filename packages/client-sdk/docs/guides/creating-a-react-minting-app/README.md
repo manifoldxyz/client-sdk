@@ -35,10 +35,12 @@ The edition RainbowKit example showcases how to:
     ```env
     NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
     NEXT_PUBLIC_INSTANCE_ID=your_edition_instance_id
+    NEXT_PUBLIC_RPC_URL_SEPOLIA=your_alchemy_rpc_url
     ```
 
     `NEXT_PUBLIC_INSTANCE_ID` must point to an Edition product you published in Manifold Studio.\
-    `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is optional but required if you want to support [WalletConnect](https://dashboard.reown.com/sign-in) wallets.
+    `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is optional but required if you want to support [WalletConnect](https://dashboard.reown.com/sign-in) wallets.\
+    `NEXT_PUBLIC_RPC_URL_SEPOLIA` your[ Alchemy Sepolia RPC URL](https://www.alchemy.com/overviews/private-rpc-endpoint).
 3. **Launch the example**
 
 ```bash

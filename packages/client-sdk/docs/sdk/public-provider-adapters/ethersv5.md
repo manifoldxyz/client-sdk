@@ -1,4 +1,4 @@
-# Ethers v5 Public Provider
+# Ethers v5
 
 **createPublicProviderEthers5(providers, fallbackProviders?)** → IPublicProvider
 
@@ -6,10 +6,9 @@ Creates a public provider from Ethers v5 providers with optional fallback suppor
 
 ## Parameters
 
-| Parameter | Type | Required | Description |
-| --------- | ---- | -------- | ----------- |
-| providers | Record<number, Provider> | ✅ | Map of network IDs to Ethers providers |
-| fallbackProviders | Record<number, Provider> | ❌ | Optional fallback providers when primary providers fail or are misconfigured |
+| Parameter | Type                                                                                                                                                                                                               | Required | Description                            |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | -------------------------------------- |
+| providers | Record\<number, [JsonRPCProvider](https://docs.ethers.org/v5/api/providers/jsonrpc-provider/#JsonRpcProvider) \| [JsonRPCProvider](https://docs.ethers.org/v5/api/providers/jsonrpc-provider/#JsonRpcProvider)\[]> | ✅        | Map of network IDs to Ethers providers |
 
 ## Examples
 
@@ -41,20 +40,14 @@ import { ethers } from 'ethers';
 
 // Primary providers
 const providers = {
-  1: new ethers.providers.JsonRpcProvider('PRIMARY_MAINNET_RPC_URL'),
-  8453: new ethers.providers.JsonRpcProvider('PRIMARY_BASE_RPC_URL')
-};
-
-// Fallback providers (used when primary fails or is on wrong network)
-const fallbackProviders = {
-  1: new ethers.providers.JsonRpcProvider('BACKUP_MAINNET_RPC_URL'),
-  8453: new ethers.providers.JsonRpcProvider('BACKUP_BASE_RPC_URL')
+  1: [new ethers.providers.JsonRpcProvider('PRIMARY_MAINNET_RPC_URL'), 
+  new ethers.providers.JsonRpcProvider('SECONDARY_MAINNET_RPC_URL')
+  ],
 };
 
 // Create the public provider with fallback support
-const publicProvider = createPublicProviderEthers5(providers, fallbackProviders);
+const publicProvider = createPublicProviderEthers5(providers);
 
 // Use with Manifold client
 const client = createClient({ publicProvider });
 ```
-

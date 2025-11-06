@@ -1,4 +1,4 @@
-# Wagmi Public Provider
+# Wagmi
 
 **createPublicProviderWagmi(params)** → IPublicProvider
 
@@ -6,9 +6,9 @@ Creates a public provider from a Wagmi `Config`. This adapter lets the SDK reuse
 
 ## Parameters
 
-| Parameter | Type | Required | Description |
-| --------- | ---- | -------- | ----------- |
-| config | [Config](https://wagmi.sh/core/api/createConfig) | ✅ | Wagmi config with chains and transports |
+| Parameter | Type                                             | Required | Description                             |
+| --------- | ------------------------------------------------ | -------- | --------------------------------------- |
+| config    | [Config](https://wagmi.sh/core/api/createConfig) | ✅        | Wagmi config with chains and transports |
 
 ## Examples
 
@@ -84,7 +84,6 @@ export function App() {
 function SdkInitializer() {
   const config = useConfig();
   const publicProvider = createPublicProviderWagmi({ config });
-  const client = useMemo(() => createClient({ publicProvider }), [publicProvider]);
 
   return /* your UI */;
 }
@@ -92,6 +91,6 @@ function SdkInitializer() {
 
 ## Notes
 
-- The Wagmi config **must** include a transport for every chain you expect to access. If a chain is missing, calls will throw `ClientSDKError` with `UNSUPPORTED_NETWORK`.
-- The adapter uses Wagmi’s `getPublicClient` under the hood, so the config should expose a public client transport (e.g., `http`, `fallback`).
-- Wagmi handles provider caching; reuse the same config instance when possible to avoid creating redundant clients.
+* The Wagmi config **must** include a transport for every chain you expect to access. If a chain is missing, calls will throw `ClientSDKError` with `UNSUPPORTED_NETWORK`.
+* The adapter uses Wagmi’s `getPublicClient` under the hood, so the config should expose a public client transport (e.g., `http`, `fallback`).
+* Wagmi handles provider caching; reuse the same config instance when possible to avoid creating redundant clients.

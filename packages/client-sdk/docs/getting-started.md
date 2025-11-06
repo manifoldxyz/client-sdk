@@ -12,7 +12,7 @@ Before getting started, make sure you have the following:
   * Check your version: `node --version`
   * Download from [nodejs.org](https://nodejs.org/)
 * A package manager (npm, pnpm, or yarn)
-* An RPC provider (Alchemy, Infura, or other)
+* [**RPC providers**](https://www.alchemy.com/overviews/private-rpc-endpoint) for the networks you plan to support
 
 ## Installation <a href="#installation" id="installation"></a>
 
@@ -39,11 +39,8 @@ const config = createConfig({
   },
 });
 
-// Create a public provider for blockchain interactions
-const publicProvider = createPublicProviderWagmi({ config });
-
 // Initialize the Manifold client
-const client = createClient({ publicProvider });
+const client = createClient({ publicProvider:createPublicProviderWagmi({ config }) });
 
 // Fetch product
 const product = await client.getProduct('4150231280') as EditionProduct;
@@ -60,34 +57,14 @@ const prepared = await product.preparePurchase({
 
 // Get wallet client and create account adapter
 const walletClient = await getWalletClient(config);
-const accountAdapter = createAccountViem({ walletClient });
 
 // Execute purchase
 const order = await product.purchase({
-  account: accountAdapter,
+  account: createAccountViem({ walletClient }),
   preparedPurchase: prepared,
 });
 const txHash = order.receipts[0]?.txHash;
 console.log(`Edition purchase transaction: ${txHash}`);
-```
-{% endtab %}
-
-{% tab title="setup.ts" %}
-```typescript
-import { createConfig, http } from '@wagmi/core';
-import { mainnet } from '@wagmi/core/chains';
-import { injected } from '@wagmi/connectors';
-
-// Create Wagmi config with injected connector (MetaMask, etc.)
-export const config = createConfig({
-  chains: [mainnet],
-  connectors: [
-    injected(),
-  ],
-  transports: {
-    [mainnet.id]: http('YOUR_RPC_URL'), // or http() for public RPC
-  },
-});
 ```
 {% endtab %}
 {% endtabs %}
