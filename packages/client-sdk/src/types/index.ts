@@ -19,6 +19,7 @@ export type { CacheConfig, ApiConfig } from './config';
 export type {
   // Core interfaces
   IAccount,
+  IPublicProvider,
   // Transaction types
   UniversalTransactionRequest,
   UniversalTransactionResponse,

@@ -8,6 +8,7 @@ import {
   isEditionProduct,
   type IAccount,
   type Product,
+  createPublicProviderEthers5,
 } from '../src/index';
 
 // Load environment variables
@@ -22,17 +23,6 @@ const getEnvVar = (key: string, defaultValue?: string): string => {
   return value;
 };
 
-const getNetworkRPCs = (): Record<number, string> => {
-  const rpcs: Record<number, string> = {};
-
-  if (process.env.ETH_MAINNET_RPC) rpcs[1] = process.env.ETH_MAINNET_RPC;
-  if (process.env.BASE_RPC) rpcs[8453] = process.env.BASE_RPC;
-  if (process.env.OPTIMISM_RPC) rpcs[10] = process.env.OPTIMISM_RPC;
-  if (process.env.SHAPE_RPC) rpcs[360] = process.env.SHAPE_RPC;
-  if (process.env.SEPOLIA_RPC) rpcs[11155111] = process.env.SEPOLIA_RPC;
-
-  return rpcs;
-};
 
 interface ProductTestOptions {
   address: string;
@@ -77,7 +67,7 @@ async function testEditionProduct(
       const payload = { quantity }
 
       const prepared = await product.preparePurchase({
-        address,
+        userAddress: address,
         recipientAddress: recipient,
         payload,
       });
@@ -108,8 +98,10 @@ async function testEditionProduct(
             account,
             preparedPurchase: prepared,
           });
-          const receiptHash = order.receipts[0]?.txHash ?? 'pending';
+          const receiptHash = order.transactionReceipt.txHash ?? 'pending';
           console.log(`   ✅ Order submitted: ${receiptHash}`);
+          const token = order.order.items[0];
+          console.log(` Token:`, token)
         } else {
           console.log(`\n   🛒 Adapter ready (set EXECUTE_PURCHASE=true to send the transaction)`);
         }
@@ -156,7 +148,7 @@ async function testBlindMintProduct(
       const payload = { quantity }
 
       const prepared = await product.preparePurchase({
-        address,
+        userAddress: address,
         payload,
       });
 
@@ -186,7 +178,7 @@ async function testBlindMintProduct(
             account,
             preparedPurchase: prepared,
           });
-          const receiptHash = order.receipts[0]?.txHash ?? 'pending';
+          const receiptHash = order.transactionReceipt.txHash ?? 'pending';
           console.log(`   ✅ Order submitted: ${receiptHash}`);
         } else {
           console.log(`\n   🛒 Adapter ready (set EXECUTE_PURCHASE=true to send the transaction)`);
@@ -204,9 +196,9 @@ async function main() {
 
   // Load configuration from environment
   const debug = process.env.DEBUG === 'true';
-  const httpRPCs = getNetworkRPCs();
   const testNetworkId = parseInt(getEnvVar('TEST_NETWORK_ID', '11155111'));
   const testInstanceId = getEnvVar('TEST_INSTANCE_ID', '4149776624');
+  const testRPCURL = getEnvVar('RPC_URL')
   const privateKey = process.env.TEST_PRIVATE_KEY;
   const executePurchase = process.env.EXECUTE_PURCHASE === 'true';
 
@@ -214,31 +206,31 @@ async function main() {
   console.log(`   Debug: ${debug}`);
   console.log(`   Test Network: ${testNetworkId}`);
   console.log(`   Test Instance: ${testInstanceId}`);
-  console.log(`   RPC Networks: ${Object.keys(httpRPCs).join(', ')}`);
 
   // Create wallet if private key provided
   let wallet: ethers.Wallet | undefined;
+  const testAddress = wallet?.address || '0x000000000000000000000000000000000000dead';
+  const provider = new ethers.providers.JsonRpcProvider(testRPCURL)
 
   if (
     privateKey &&
     privateKey !== '0x0000000000000000000000000000000000000000000000000000000000000000'
   ) {
-    wallet = new ethers.Wallet(privateKey);
+    wallet = new ethers.Wallet(privateKey, provider);
     console.log(`   Wallet: ${wallet.address.slice(0, 10)}...`);
   } else {
     console.log('   Wallet: Not configured (using read-only mode)');
   }
 
-  const testAddress = wallet?.address || '0x000000000000000000000000000000000000dead';
-
+  const publicProvider = createPublicProviderEthers5({
+    [testNetworkId]: provider
+  })
   // Create client
-  const client = createClient({
-    httpRPCs,
-  });
+  const client = createClient({publicProvider});
 
   let account: IAccount | undefined;
   try {
-    account = createAccountEthers5(client,  {
+    account = createAccountEthers5({
       wallet
     })
   } catch (adapterError) {

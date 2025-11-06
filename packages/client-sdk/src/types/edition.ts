@@ -194,7 +194,7 @@ export interface ERC721ClaimData {
   identical: boolean;
   merkleRoot: string;
   location: string;
-  cost: ethers.BigNumber;
+  cost: bigint;
   paymentReceiver: string;
   erc20: string;
   signingAddress: string;
@@ -212,8 +212,8 @@ export interface ERC1155ClaimData {
   storageProtocol: number;
   merkleRoot: string;
   location: string;
-  tokenId: ethers.BigNumber;
-  cost: ethers.BigNumber;
+  tokenId: bigint;
+  cost: bigint;
   paymentReceiver: string;
   erc20: string;
   signingAddress: string;

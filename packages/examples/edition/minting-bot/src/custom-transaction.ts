@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { createClient, isEditionProduct } from '@manifoldxyz/client-sdk';
+import { createClient, isEditionProduct, createPublicProviderViem } from '@manifoldxyz/client-sdk';
 import { 
   createWalletClient, 
   createPublicClient,
@@ -73,10 +73,9 @@ async function main() {
   // Step 1: Prepare mint using Manifold SDK
   console.log('\n📦 Step 1: Preparing mint transaction with Manifold SDK...');
   
+  const publicProvider = createPublicProviderViem({ [networkId]: publicClient });
   const client = createClient({
-    httpRPCs: {
-      [networkId]: rpcUrl,
-    },
+    publicProvider,
   });
 
   const product = await client.getProduct(instanceId);

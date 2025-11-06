@@ -2,12 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ErrorCode } from '../src/types/errors';
 
 // Move mocks before any imports that use them
-vi.mock('../src/utils', () => {
-  const createProviderMock = vi.fn();
-  return {
-    createProvider: createProviderMock,
-  };
-});
 
 vi.mock('../src/api/manifold-api', () => {
   const getCompleteInstanceDataMock = vi.fn();
@@ -22,14 +16,11 @@ vi.mock('../src/products/blindmint', () => {
   const BlindMintProductMock = vi.fn().mockImplementation(function (
     instanceData: unknown,
     previewData: unknown,
-    options: unknown,
   ) {
     // @ts-ignore
     this.instanceData = instanceData;
     // @ts-ignore
     this.previewData = previewData;
-    // @ts-ignore
-    this.options = options;
     // @ts-ignore
     this.type = 'blind-mint';
   });
@@ -43,43 +34,33 @@ vi.mock('../src/products/blindmint', () => {
 import { createClient } from '../src/client';
 
 // Get references to mocked functions
-const { createProvider: createProviderMock } = await import('../src/utils');
 const manifoldApiClient = (await import('../src/api/manifold-api')).default as any;
 const { BlindMintProduct: BlindMintProductMock } = await import('../src/products/blindmint');
 const getCompleteInstanceDataMock = manifoldApiClient.getCompleteInstanceData;
 
+// Create a mock public provider
+const mockPublicProvider = {
+  estimateContractGas: vi.fn(),
+  readContract: vi.fn(),
+  getBalance: vi.fn(),
+  simulateContract: vi.fn(),
+  getTransactionReceipt: vi.fn(),
+};
+
 describe('createClient', () => {
   beforeEach(() => {
-    createProviderMock.mockReset();
     getCompleteInstanceDataMock.mockReset();
     BlindMintProductMock.mockClear();
   });
 
-  it('returns empty providers when no RPCs supplied', () => {
-    const client = createClient();
-    expect(client.httpRPCs).toEqual({});
-    expect(createProviderMock).not.toHaveBeenCalled();
-  });
-
-  it('creates providers for supplied httpRPCs', () => {
-    const client = createClient({
-      httpRPCs: {
-        1: 'https://mainnet.rpc',
-        10: 'https://optimism.rpc',
-      },
-    });
-
-    // Client just stores httpRPCs, doesn't create providers immediately
-    expect(client.httpRPCs).toEqual({
-      1: 'https://mainnet.rpc',
-      10: 'https://optimism.rpc',
-    });
-    // createProvider is not called during client creation
-    expect(createProviderMock).not.toHaveBeenCalled();
+  it('creates client', () => {
+    const client = createClient({ publicProvider: mockPublicProvider as any });
+    expect(client).toBeDefined();
+    expect(client.getProduct).toBeDefined();
   });
 
   it('rejects malformed instance ids', async () => {
-    const client = createClient();
+    const client = createClient({ publicProvider: mockPublicProvider as any });
 
     await expect(client.getProduct('not-a-valid-id')).rejects.toMatchObject({
       code: ErrorCode.INVALID_INPUT,
@@ -94,7 +75,7 @@ describe('createClient', () => {
       previewData: {},
     });
 
-    const client = createClient();
+    const client = createClient({ publicProvider: mockPublicProvider as any });
     await expect(client.getProduct('https://manifold.xyz/@creator/id/12345')).rejects.toMatchObject(
       {
         code: ErrorCode.UNSUPPORTED_PRODUCT_TYPE,
@@ -118,12 +99,10 @@ describe('createClient', () => {
       previewData,
     });
 
-    const client = createClient({ httpRPCs: { 1: 'https://mainnet.rpc' } });
+    const client = createClient({ publicProvider: mockPublicProvider as any });
     const product = await client.getProduct('https://manifold.xyz/@creator/id/2526777015');
 
-    expect(BlindMintProductMock).toHaveBeenCalledWith(instanceData, previewData, {
-      httpRPCs: { 1: 'https://mainnet.rpc' },
-    });
+    expect(BlindMintProductMock).toHaveBeenCalledWith(instanceData, previewData, mockPublicProvider);
     expect(getCompleteInstanceDataMock).toHaveBeenCalledWith('2526777015', {
       maxMediaWidth: 1024,
     });
@@ -150,7 +129,7 @@ describe('createClient', () => {
       previewData,
     });
 
-    const client = createClient();
+    const client = createClient({ publicProvider: mockPublicProvider as any });
     const product = await client.getProduct('https://manifold.xyz/@creator/id/2522713783');
 
     expect(product).toHaveProperty('type', 'edition');
@@ -161,7 +140,7 @@ describe('createClient', () => {
   });
 
   it('validates workspace limit bounds', async () => {
-    const client = createClient();
+    const client = createClient({ publicProvider: mockPublicProvider as any });
 
     await expect(
       client.getProductsByWorkspace('workspace-id', { limit: 200 }),
@@ -171,7 +150,7 @@ describe('createClient', () => {
   });
 
   it('marks workspace fetch as not implemented', async () => {
-    const client = createClient();
+    const client = createClient({ publicProvider: mockPublicProvider as any });
 
     await expect(client.getProductsByWorkspace('workspace-id')).rejects.toMatchObject({
       code: ErrorCode.UNSUPPORTED_PRODUCT_TYPE,

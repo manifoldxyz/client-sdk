@@ -17,10 +17,17 @@ Create an account representation from [Viem Wallet Client](https://viem.sh/docs/
 {% tabs %}
 {% tab title="index.ts" %}
 ```typescript
-import { createClient,BlindMintProduct, createAccountViem } from '@manifoldxyz/client-sdk';
-import { walletClient } from './client.ts';
+import { createClient, BlindMintProduct, createAccountViem, createPublicProviderViem } from '@manifoldxyz/client-sdk';
+import { walletClient, publicClient } from './client.ts';
 
-const client = createClient();
+// Create public provider for blockchain interactions
+const publicProvider = createPublicProviderViem({
+  1: publicClient // mainnet
+});
+
+// Initialize client with public provider
+const client = createClient({ publicProvider });
+
 // Grab product
 const product = await client.getProduct('4150231280') as BlindMintProduct;
 
@@ -43,17 +50,23 @@ console.log(`Transaction submitted ${txHash}`)
 
 {% tab title="client.ts" %}
 ```typescript
-import { createWalletClient, custom } from 'viem'
+import { createWalletClient, createPublicClient, custom, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { mainnet } from 'viem/chains'
 
+// Create public client for read operations
+export const publicClient = createPublicClient({
+  chain: mainnet,
+  transport: http('YOUR_RPC_URL') // or custom(window.ethereum) for browser
+})
+
+// Create wallet client for transactions
 const account = privateKeyToAccount('0x...') 
-const client = createWalletClient({
+export const walletClient = createWalletClient({
   account, 
   chain: mainnet,
   transport: custom(window.ethereum)
 })
-export { walletClient }
 ```
 {% endtab %}
 {% endtabs %}

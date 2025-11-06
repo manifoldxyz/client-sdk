@@ -1,44 +1,51 @@
 import { describe, it, expect, vi } from 'vitest';
-import { ethers } from 'ethers';
 import { estimateGas, applyGasBuffer } from '../../src/utils/gas-estimation';
 import { ErrorCode } from '../../src/types/errors';
 
 describe('gas estimation utilities', () => {
   it('estimates gas using contract method when available', async () => {
-    const gasValue = ethers.BigNumber.from(21000);
-    const contract = {
-      estimateGas: {
-        mint: vi.fn().mockResolvedValue(gasValue),
-      },
-    } as unknown as ethers.Contract;
+    const gasValue = 21000n;
+    const mockPublicProvider = {
+      estimateContractGas: vi.fn().mockResolvedValue(gasValue),
+    };
 
     const result = await estimateGas({
-      contract,
-      method: 'mint',
+      publicProvider: mockPublicProvider as any,
+      contractAddress: '0x0000000000000000000000000000000000000002',
+      abi: [],
+      functionName: 'mint',
       args: [],
       from: '0x0000000000000000000000000000000000000001',
+      networkId: 1,
     });
 
     expect(result).toEqual(gasValue);
-    expect(contract.estimateGas.mint).toHaveBeenCalledTimes(1);
-    expect(contract.estimateGas.mint.mock.calls[0][0]).toEqual(
-      expect.objectContaining({ from: '0x0000000000000000000000000000000000000001' }),
-    );
+    expect(mockPublicProvider.estimateContractGas).toHaveBeenCalledTimes(1);
+    expect(mockPublicProvider.estimateContractGas).toHaveBeenCalledWith({
+      contractAddress: '0x0000000000000000000000000000000000000002',
+      abi: [],
+      functionName: 'mint',
+      args: [],
+      from: '0x0000000000000000000000000000000000000001',
+      value: undefined,
+      networkId: 1,
+    });
   });
 
   it('falls back to provided fallback gas when estimation fails', async () => {
-    const fallback = ethers.BigNumber.from(500000);
-    const contract = {
-      estimateGas: {
-        mint: vi.fn().mockRejectedValue(new Error('boom')),
-      },
-    } as unknown as ethers.Contract;
+    const fallback = 500000n;
+    const mockPublicProvider = {
+      estimateContractGas: vi.fn().mockRejectedValue(new Error('boom')),
+    };
 
     const result = await estimateGas({
-      contract,
-      method: 'mint',
+      publicProvider: mockPublicProvider as any,
+      contractAddress: '0x0000000000000000000000000000000000000002',
+      abi: [],
+      functionName: 'mint',
       args: [],
       from: '0x0000000000000000000000000000000000000001',
+      networkId: 1,
       fallbackGas: fallback,
     });
 
@@ -46,26 +53,29 @@ describe('gas estimation utilities', () => {
   });
 
   it('throws error when method is missing and no fallback provided', async () => {
-    const contract = {
-      estimateGas: {},
-    } as unknown as ethers.Contract;
+    const mockPublicProvider = {
+      estimateContractGas: vi.fn().mockRejectedValue(new Error('Method approve not found on contract')),
+    };
 
     await expect(
       estimateGas({
-        contract,
-        method: 'approve',
+        publicProvider: mockPublicProvider as any,
+        contractAddress: '0x0000000000000000000000000000000000000002',
+        abi: [],
+        functionName: 'approve',
         args: [],
         from: '0x0000000000000000000000000000000000000001',
+        networkId: 1,
       })
     ).rejects.toMatchObject({
-      code: ErrorCode.ESTIMATION_FAILED,
-      message: 'Method approve not found on contract',
+      code: ErrorCode.GAS_ESTIMATION_FAILED,
+      message: 'Failed to estimate gas for approve',
     });
   });
 
   it('applies buffer percentage to gas estimates', () => {
-    const base = ethers.BigNumber.from(100000);
-    expect(applyGasBuffer(base)).toEqual(ethers.BigNumber.from(130000));
-    expect(applyGasBuffer(base, 50)).toEqual(ethers.BigNumber.from(150000));
+    const base = 100000n;
+    expect(applyGasBuffer(base)).toEqual(130000n);
+    expect(applyGasBuffer(base, 50)).toEqual(150000n);
   });
 });

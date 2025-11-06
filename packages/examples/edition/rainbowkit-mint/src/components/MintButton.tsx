@@ -1,20 +1,27 @@
 'use client';
 
 import { useState } from 'react';
-import { useAccount, useWalletClient } from 'wagmi';
-import { createClient, createAccountViem, isEditionProduct } from '@manifoldxyz/client-sdk';
+import { Transport, useAccount, useWalletClient } from 'wagmi';
+import { createClient, createAccountViem, isEditionProduct, createPublicProviderViem, createPublicProviderWagmi } from '@manifoldxyz/client-sdk';
+import { getPublicProvider } from '@/utils/common';
+import { Account, Chain, WalletClient } from 'viem';
 
-// Example Edition product instance ID - replace with your own
-const INSTANCE_ID = process.env.NEXT_PUBLIC_INSTANCE_ID || '4133757168';
+interface MintButtonProps {
+  instanceId?: string;
+}
 
-export function MintButton() {
+export function MintButton({ instanceId }: MintButtonProps = {}) {
+  // Use provided instanceId or fall back to env variable
+  const INSTANCE_ID = instanceId || process.env.NEXT_PUBLIC_INSTANCE_ID || '4133757168';
   const { address, isConnected } = useAccount();
-  const { data: walletClient } = useWalletClient();
+  const { data: walletClient} = useWalletClient();
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string>('');
   const [error, setError] = useState<string>('');
 
   const handleMint = async () => {
+    console.log('the wallet client', walletClient);
+    console.log('the address', address)
     if (!walletClient || !address) {
       setError('Please connect your wallet first');
       return;
@@ -27,15 +34,11 @@ export function MintButton() {
     try {
       // Create Manifold SDK client
       const client = createClient({
-        httpRPCs: {
-          1: process.env.NEXT_PUBLIC_RPC_URL_MAINNET || 'https://eth-mainnet.g.alchemy.com/v2/demo',
-          8453: process.env.NEXT_PUBLIC_RPC_URL_BASE || 'https://base-mainnet.infura.io/v3/demo',
-        }
+        publicProvider: getPublicProvider(),
       });
-      const viemClient = walletClient;
       // Create viem adapter from wallet client
       const account = createAccountViem({
-        walletClient: viemClient!,
+        walletClient: walletClient as WalletClient<Transport, Chain, Account>,
       })
 
       // Get product details
@@ -101,6 +104,7 @@ export function MintButton() {
       
     } catch (err: any) {
       console.error('Mint error:', err);
+      console.error(`Error details`, err.details)
       setError(err.message || 'Failed to mint');
       setStatus('');
     } finally {

@@ -1,4 +1,4 @@
-import type { BigNumber, ContractTransaction, ContractReceipt } from 'ethers';
+import type { ContractTransaction, ContractReceipt } from 'ethers';
 import type { Address } from './common';
 
 // =============================================================================
@@ -29,28 +29,24 @@ export interface ClaimExtensionContract {
   // Write operations
   mint(
     quantity: number,
-    paymentAmount: BigNumber,
+    paymentAmount: bigint,
     walletAddress: Address,
   ): Promise<TransactionResponse>;
   mintWithProofs(
     quantity: number,
-    paymentAmount: BigNumber,
+    paymentAmount: bigint,
     walletAddress: Address,
     merkleProofs: string[],
   ): Promise<TransactionResponse>;
 
   // Gas estimation
-  estimateGasMint(
-    walletAddress: Address,
-    quantity: number,
-    paymentAmount: BigNumber,
-  ): Promise<BigNumber>;
+  estimateGasMint(walletAddress: Address, quantity: number, paymentAmount: bigint): Promise<bigint>;
   estimateGasMintWithProofs(
     walletAddress: Address,
     quantity: number,
-    paymentAmount: BigNumber,
+    paymentAmount: bigint,
     merkleProofs: string[],
-  ): Promise<BigNumber>;
+  ): Promise<bigint>;
 
   // Utility methods
   isValidNetwork(): boolean;
@@ -67,20 +63,20 @@ export interface ERC20Contract {
   readonly contractAddress: Address;
 
   // Read operations
-  getBalance(walletAddress: Address): Promise<BigNumber>;
-  getAllowance(owner: Address, spender: Address): Promise<BigNumber>;
+  getBalance(walletAddress: Address): Promise<bigint>;
+  getAllowance(owner: Address, spender: Address): Promise<bigint>;
   getERC20Symbol(): Promise<string>;
   getERC20Decimals(): Promise<number>;
   getERC20Name(): Promise<string>;
-  getTotalSupply(): Promise<BigNumber>;
+  getTotalSupply(): Promise<bigint>;
 
   // Write operations
-  approve(spender: Address, amount: BigNumber): Promise<TransactionResponse>;
-  transfer(to: Address, amount: BigNumber): Promise<TransactionResponse>;
+  approve(spender: Address, amount: bigint): Promise<TransactionResponse>;
+  transfer(to: Address, amount: bigint): Promise<TransactionResponse>;
 
   // Gas estimation
-  estimateGasApprove(spender: Address, amount: BigNumber): Promise<BigNumber>;
-  estimateGasTransfer(to: Address, amount: BigNumber): Promise<BigNumber>;
+  estimateGasApprove(spender: Address, amount: bigint): Promise<bigint>;
+  estimateGasTransfer(to: Address, amount: bigint): Promise<bigint>;
 }
 
 // =============================================================================
@@ -93,11 +89,11 @@ export interface ERC20Contract {
  */
 export interface ContractCallOptions {
   /** Gas limit for the transaction */
-  gasLimit?: BigNumber;
+  gasLimit?: bigint;
   /** Gas price in wei */
-  gasPrice?: BigNumber;
+  gasPrice?: bigint;
   /** Value to send with transaction (for payable methods) */
-  value?: BigNumber;
+  value?: bigint;
   /** Use bridge provider instead of wallet provider */
   useBridge?: boolean;
   /** Use unchecked mode (for WalletConnect compatibility) */
@@ -132,7 +128,7 @@ export interface TransactionResponse extends Omit<ContractTransaction, 'type'> {
   /** SDK-generated transaction ID for tracking */
   sdkTxId: string;
   /** Estimated gas used */
-  estimatedGas: BigNumber;
+  estimatedGas: bigint;
   /** Provider used (wallet or bridge) */
   provider: 'wallet' | 'bridge';
   /** Transaction type for categorization */
@@ -186,13 +182,13 @@ export interface OnChainClaimData {
   /** Number of token variations */
   tokenVariations: number;
   /** Starting token ID */
-  startingTokenId: BigNumber;
+  startingTokenId: bigint;
   /** Metadata location string */
   location: string;
   /** Token ID (for specific token queries) */
-  tokenId?: BigNumber;
+  tokenId?: bigint;
   /** Cost per token in wei */
-  cost: BigNumber;
+  cost: bigint;
 }
 
 /**
@@ -251,7 +247,7 @@ export interface ContractError extends Error {
   context?: {
     method?: string;
     params?: unknown;
-    gasEstimate?: BigNumber;
+    gasEstimate?: bigint;
     provider?: 'wallet' | 'bridge';
   };
 }
@@ -276,9 +272,9 @@ export interface CallRequest {
 export interface TransactionRequest {
   to: Address;
   data: string;
-  value?: BigNumber;
-  gasLimit?: BigNumber;
-  gasPrice?: BigNumber;
+  value?: bigint;
+  gasLimit?: bigint;
+  gasPrice?: bigint;
   from?: Address;
 }
 

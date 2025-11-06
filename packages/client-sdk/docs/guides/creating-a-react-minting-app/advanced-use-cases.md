@@ -61,7 +61,15 @@ This is handled within [handlePreparePurchase](https://github.com/manifoldxyz/cl
 a. Create a [Manifold Client](../../sdk/manifold-client/)
 
 ```typescript
-const client = createClient();
+import { createClient, createPublicProviderWagmi } from '@manifoldxyz/client-sdk';
+import { useConfig } from 'wagmi';
+
+// Get Wagmi config from React context
+const config = useConfig();
+
+// Create public provider and client
+const publicProvider = createPublicProviderWagmi({ config });
+const client = createClient({ publicProvider });
 ```
 
 b. Fetch the product and validate the type
@@ -160,11 +168,10 @@ Putting it all together
 'use client'
 
 import { useState } from 'react'
-import { useAccount } from 'wagmi'
-import { createClient, BlindMintProduct, PreparedPurchase, createAccountViem } from '@manifoldxyz/client-sdk'
+import { useAccount, useConfig } from 'wagmi'
+import { createClient, BlindMintProduct, PreparedPurchase, createAccountViem, createPublicProviderWagmi } from '@manifoldxyz/client-sdk'
 import { useWalletClient } from 'wagmi'
 import StepModal from './StepModal'
-import { client } from '@/utils/SDKClient'
 
 interface MintButtonButtonProps {
   instanceId: string
@@ -174,6 +181,7 @@ interface MintButtonButtonProps {
 export default function MintButton({ instanceId, quantity = 1 }: MintButtonButtonProps) {
   const { address, isConnected } = useAccount()
   const { data: walletClient } = useWalletClient()
+  const config = useConfig()
   
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -195,6 +203,9 @@ export default function MintButton({ instanceId, quantity = 1 }: MintButtonButto
     setPurchaseComplete(false)
 
     try {
+      // Create client with Wagmi public provider
+      const publicProvider = createPublicProviderWagmi({ config });
+      const client = createClient({ publicProvider });
 
       const fetchedProduct = await client.getProduct(instanceId) as BlindMintProduct
       setProduct(fetchedProduct)

@@ -1,6 +1,6 @@
 {
   "name": "@manifoldxyz/client-sdk",
-  "version": "0.2.1-beta.4",
+  "version": "0.3.0-beta.0",
   "description": "Manifold Client SDK for headless purchasing and display of Manifold products",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -40,11 +40,11 @@
   "type": "module",
   "dependencies": {
     "@manifoldxyz/js-ts-utils": "^9.0.0",
-    "@manifoldxyz/manifold-provider-client": "^0.2.0",
     "@manifoldxyz/studio-apps-client-public": "^1.0.0-beta.0",
     "ethers": "^5.7.2"
   },
   "peerDependencies": {
+    "@wagmi/core": "^2.0.0",
     "viem": "^2.0.0"
   },
   "peerDependenciesMeta": {
@@ -53,6 +53,9 @@
     },
     "ethers": {
       "optional": true
+    },
+    "@wagmi/core": {
+      "optional": true
     }
   },
   "devDependencies": {
@@ -60,6 +63,7 @@
     "@typescript-eslint/eslint-plugin": "^7.3.1",
     "@typescript-eslint/parser": "^7.3.1",
     "@vitest/coverage-v8": "^1.4.0",
+    "@wagmi/core": "^2.22.1",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.1.3",

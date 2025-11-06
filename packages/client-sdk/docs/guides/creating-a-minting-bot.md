@@ -34,16 +34,23 @@ Each script demonstrates the most direct path to minting—`preparePurchase` fol
 import {
   createClient,
   createAccountEthers5,
+  createPublicProviderEthers5,
   isBlindMintProduct,
   isEditionProduct,
 } from '@manifoldxyz/client-sdk';
 import { ethers } from 'ethers';
 
-const client = createClient({
-  httpRPCs: {
-    [Number(process.env.NETWORK_ID!)]: process.env.RPC_URL!,
-  },
+// Setup provider for the network
+const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL!);
+const networkId = Number(process.env.NETWORK_ID!); // e.g., 1 for mainnet, 8453 for Base
+
+// Create public provider for the client
+const publicProvider = createPublicProviderEthers5({
+  [networkId]: provider
 });
+
+// Initialize the client
+const client = createClient({ publicProvider });
 
 const product = await client.getProduct('INSTANCE_ID');
 
@@ -58,9 +65,9 @@ if (!isEditionProduct(product)) {
    throw new Error('Unsupported product type');
 }
 
-const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL!);
+// Setup wallet for signing transactions
 const wallet = new ethers.Wallet(process.env.WALLET_PRIVATE_KEY!, provider);
-const account = createAccountEthers5(client, { wallet });
+const account = createAccountEthers5({ wallet });
 
 try {
   const prepared = await product.preparePurchase({

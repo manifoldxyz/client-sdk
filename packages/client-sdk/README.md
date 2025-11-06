@@ -8,9 +8,8 @@ Head to [studio.manifold.xyz](https://studio.manifold.xyz/) to launch your produ
 
 ## ✨ Features
 
-- **No API keys required** - Works out of the box
 - **TypeScript first** - Full type safety and IntelliSense
-- **Wallet agnostic** - Works with ethers and viem
+- **Wallet agnostic** - Works with ethers v5 and viem
 - **Support for multiple product types**:
   - Edition
   - Blind Mint
@@ -21,6 +20,7 @@ Head to [studio.manifold.xyz](https://studio.manifold.xyz/) to launch your produ
   - Transaction preparation
   - Cross-chain support (coming soon)
   - Error handling
+- **Built-in provider fallbacks** - Automatic failover between multiple RPC endpoints
 
 ## 📦 Installation
 
@@ -33,14 +33,24 @@ npm install @manifoldxyz/client-sdk
 ### 1. Import and Initialize
 
 ```typescript
-import { createClient } from '@manifoldxyz/client-sdk';
+import { createClient, createPublicProviderWagmi } from '@manifoldxyz/client-sdk';
+import { createConfig, http } from '@wagmi/core';
+import { mainnet, base } from '@wagmi/core/chains';
 
-const client = createClient({
-  httpRPCs: {
-    1: 'https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY',
-    8453: 'https://base-mainnet.infura.io/v3/YOUR_KEY',
+// Create Wagmi config
+const config = createConfig({
+  chains: [mainnet, base],
+  transports: {
+    [mainnet.id]: http(),
+    [base.id]: http(),
   },
 });
+
+// Create public provider
+const publicProvider = createPublicProviderWagmi({ config });
+
+// Initialize the SDK client
+const client = createClient({ publicProvider });
 ```
 
 ### 2. Get Product Data
@@ -76,8 +86,23 @@ console.log(`Total cost: ${preparedPurchase.cost.total.formatted}`);
 ### 4. Execute Purchase
 
 ```typescript
+// Using viem
+import { createAccountViem } from '@manifoldxyz/client-sdk';
+import { createWalletClient, custom } from 'viem';
+import { mainnet } from 'viem/chains';
+
+const walletClient = createWalletClient({
+  chain: mainnet,
+  transport: custom(window.ethereum),
+});
+const account = createAccountViem({ walletClient });
+
+// Or using ethers v5
+import { createAccountEthers5 } from '@manifoldxyz/client-sdk';
+const account = createAccountEthers5({ signer });
+
 const order = await product.purchase({
-  account: walletAccount,
+  account,
   preparedPurchase,
 });
 
@@ -88,22 +113,40 @@ console.log(order.receipts[0].txHash, order.status);
 
 ### Client Creation
 
-#### `createClient(config?)`
+#### `createClient(config)`
 
 Creates a new SDK client instance.
 
 **Parameters:**
 
-- `httpRPCs` (object, optional): Custom RPC URLs by network ID
+- `config` (object, required): Configuration options
+  - `publicProvider` (IPublicProvider, required): Provider for blockchain interactions
+  - `debug` (boolean, optional): Enable debug logging
 
 **Example:**
 
 ```typescript
-const client = createClient({
-  httpRPCs: {
-    1: 'https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY',
+import { createClient, createPublicProviderWagmi } from '@manifoldxyz/client-sdk';
+import { createConfig, http } from '@wagmi/core';
+import { mainnet, base } from '@wagmi/core/chains';
+
+// Setup Wagmi config
+const config = createConfig({
+  chains: [mainnet, base],
+  transports: {
+    [mainnet.id]: http(),
+    [base.id]: http(),
   },
 });
+
+// Create public provider
+const publicProvider = createPublicProviderWagmi({ config });
+
+// Create client
+const client = createClient({ publicProvider });
+
+// With debug logging
+const client = createClient({ publicProvider, debug: true });
 ```
 
 ### Client Methods
@@ -175,7 +218,7 @@ Executes the purchase transaction(s).
 
 **Parameters:**
 
-- `account`: Wallet account object
+- `account`: Wallet account adapter (see Wallet Adapters section)
 - `preparedPurchase`: Result from `preparePurchase()`
 
 **Returns:** `Order` with transaction receipts and status
@@ -205,6 +248,51 @@ interface BlindMintProduct {
   maxSupply?: number;
   // ... base properties
 }
+```
+
+## 🔌 Wallet Adapters
+
+The SDK supports multiple wallet libraries through adapters:
+
+### Viem
+
+```typescript
+import { createWalletClient, custom, http } from 'viem';
+import { mainnet } from 'viem/chains';
+import { createAccountViem } from '@manifoldxyz/client-sdk';
+
+// Using browser wallet (MetaMask, etc.)
+const walletClient = createWalletClient({
+  chain: mainnet,
+  transport: custom(window.ethereum),
+});
+const account = createAccountViem({ walletClient });
+
+// Using private key
+import { privateKeyToAccount } from 'viem/accounts';
+const viemAccount = privateKeyToAccount('0x...');
+const walletClient = createWalletClient({
+  account: viemAccount,
+  chain: mainnet,
+  transport: http(),
+});
+const account = createAccountViem({ walletClient });
+```
+
+### Ethers v5
+
+```typescript
+import { ethers } from 'ethers';
+import { createAccountEthers5 } from '@manifoldxyz/client-sdk';
+
+// Using MetaMask or other browser wallet
+const provider = new ethers.providers.Web3Provider(window.ethereum);
+const signer = provider.getSigner();
+const account = createAccountEthers5({ signer });
+
+// Using a private key
+const wallet = new ethers.Wallet(privateKey, provider);
+const account = createAccountEthers5({ signer: wallet });
 ```
 
 ## 🧪 Testing

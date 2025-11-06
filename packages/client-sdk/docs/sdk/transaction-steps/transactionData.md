@@ -42,11 +42,7 @@ import { sepolia } from 'viem/chains';
 
 async function customMint() {
   // Step 1: Prepare the purchase using Manifold SDK
-  const client = createClient({
-    httpRPCs: {
-      11155111: 'https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY',
-    },
-  });
+  const client = createClient();
 
   const product = await client.getProduct('4133757168');
   if (!isEditionProduct(product)) {

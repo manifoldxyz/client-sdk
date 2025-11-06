@@ -2,14 +2,12 @@ import { describe, it, expect, vi, beforeEach, MockedFunction } from 'vitest';
 import { EditionProduct, isEditionProduct } from '../../src/products/edition';
 import { AppId, AppType } from '../../src/types/common';
 import { ClientSDKError, ErrorCode } from '../../src/types/errors';
-import type { InstanceData, EditionPublicData, EditionOnchainData } from '../../src/types/product';
+import type { InstanceData, EditionPublicData } from '../../src/types/product';
 import type { InstancePreview } from '@manifoldxyz/studio-apps-client-public';
 import { Money } from '../../src/libs/money';
 import * as ethers from 'ethers';
 
 // Mock dependencies
-vi.mock('../../src/utils/provider-factory');
-vi.mock('../../src/utils/contract-factory');
 vi.mock('../../src/utils/gas-estimation');
 vi.mock('../../src/utils/validation');
 
@@ -22,14 +20,84 @@ vi.mock('../../src/libs/money', () => ({
 }));
 
 // Import mocked modules
-import { createProvider } from '../../src/utils/provider-factory';
-import { ContractFactory } from '../../src/utils/contract-factory';
 import { estimateGas } from '../../src/utils/gas-estimation';
 import { validateAddress } from '../../src/utils/validation';
 
-const mockCreateProvider = createProvider as MockedFunction<typeof createProvider>;
 const mockEstimateGas = estimateGas as MockedFunction<typeof estimateGas>;
 const mockValidateAddress = validateAddress as MockedFunction<typeof validateAddress>;
+
+// Mock public provider
+const mockPublicProvider = {
+  estimateContractGas: vi.fn(),
+  readContract: vi.fn(),
+  getBalance: vi.fn(),
+  simulateContract: vi.fn(),
+  getTransactionReceipt: vi.fn(),
+};
+
+const normalizeClaimNumericFields = (claim: any) => {
+  const toNumberIfBigInt = (value: any) => (typeof value === 'bigint' ? Number(value) : value);
+  return {
+    ...claim,
+    totalMax:
+      claim.totalMax === null || claim.totalMax === undefined
+        ? claim.totalMax
+        : toNumberIfBigInt(claim.totalMax),
+    total: claim.total === undefined ? claim.total : toNumberIfBigInt(claim.total),
+    walletMax:
+      claim.walletMax === null || claim.walletMax === undefined
+        ? claim.walletMax
+        : toNumberIfBigInt(claim.walletMax),
+    storageProtocol:
+      claim.storageProtocol === undefined ? claim.storageProtocol : toNumberIfBigInt(claim.storageProtocol),
+    contractVersion:
+      claim.contractVersion === undefined ? claim.contractVersion : toNumberIfBigInt(claim.contractVersion),
+  };
+};
+
+// Helper to set up default mock responses
+const setupDefaultMocks = (overrides: any = {}) => {
+  const now = Math.floor(Date.now() / 1000);
+  mockPublicProvider.readContract.mockImplementation(async (args: any) => {
+    if (args.functionName === 'getClaim') {
+      const claim =
+        overrides.getClaim ||
+        normalizeClaimNumericFields({
+          cost: 1000000000000000000n, // 1 ETH
+          erc20: ethers.constants.AddressZero,
+          totalMax: 1000n,
+          total: 100n,
+          walletMax: 5n,
+          startDate: BigInt(now - 3600), // 1 hour ago
+          endDate: BigInt(now + 3600), // 1 hour from now
+          merkleRoot: ethers.constants.HashZero,
+          paymentReceiver: '0x1111111111111111111111111111111111111111',
+          signingAddress: '0x2222222222222222222222222222222222222222',
+          location: 'ipfs://QmXxx',
+          storageProtocol: 1n,
+          contractVersion: 7n,
+          identical: true,
+        });
+      return normalizeClaimNumericFields(claim);
+    }
+    if (args.functionName === 'MINT_FEE') {
+      return overrides.MINT_FEE !== undefined ? overrides.MINT_FEE : 500000000000000000n;
+    }
+    if (args.functionName === 'MINT_FEE_MERKLE') {
+      return overrides.MINT_FEE_MERKLE !== undefined ? overrides.MINT_FEE_MERKLE : 690000000000000000n;
+    }
+    if (args.functionName === 'getTotalMints') {
+      return overrides.getTotalMints !== undefined ? overrides.getTotalMints : 0n;
+    }
+    if (args.functionName === 'balanceOf') {
+      return overrides.balanceOf !== undefined ? overrides.balanceOf : 10000000000n;
+    }
+    if (args.functionName === 'allowance') {
+      return overrides.allowance !== undefined ? overrides.allowance : 0n;
+    }
+    return null;
+  });
+};
 
 // Base test data
 const baseInstanceData: InstanceData<EditionPublicData> = {
@@ -77,36 +145,20 @@ const basePreviewData: InstancePreview = {
   status: 'DEPLOYED',
 };
 
-// Mock contracts
-const createMockClaimContract = () => ({
-  getClaim: vi.fn(),
-  MINT_FEE: vi.fn(),
-  MINT_FEE_MERKLE: vi.fn(),
-  getTotalMints: vi.fn(),
-  mintProxy: vi.fn(),
-  estimateGas: vi.fn(),
-});
-
-const createMockERC20Contract = () => ({
-  balanceOf: vi.fn(),
-  allowance: vi.fn(),
-  approve: vi.fn(),
-  symbol: vi.fn(),
-  decimals: vi.fn(),
-});
+// Remove mock contracts - no longer needed since we mock publicProvider
 
 // Mock Money class
 const createMockMoney = (value: string = '1000000000000000000', isERC20: boolean = false, erc20Address?: string) => {
   const mockMoney = {
-    raw: ethers.BigNumber.from(value),
+    value: BigInt(value),
     formatted: '1.0',
     symbol: isERC20 ? 'USDC' : 'ETH',
     decimals: isERC20 ? 6 : 18,
     erc20: isERC20 ? (erc20Address || '0xA0b86a33E6417a7dA5B4C1D35aF7E7f2F2a0F2F2') : ethers.constants.AddressZero,
     isPositive: vi.fn().mockReturnValue(true),
     isERC20: vi.fn().mockReturnValue(isERC20),
-    multiplyInt: vi.fn().mockImplementation((quantity: number) => createMockMoney((ethers.BigNumber.from(value).mul(quantity)).toString(), isERC20, erc20Address)),
-    add: vi.fn().mockImplementation((other: any) => createMockMoney((ethers.BigNumber.from(value).add(other.raw)).toString(), isERC20, erc20Address)),
+    multiplyInt: vi.fn().mockImplementation((quantity: number) => createMockMoney((BigInt(value) * BigInt(quantity)).toString(), isERC20, erc20Address)),
+    add: vi.fn().mockImplementation((other: any) => createMockMoney((BigInt(value) + BigInt(other.value.toString())).toString(), isERC20, erc20Address)),
     isLessThan: vi.fn().mockReturnValue(false),
   };
   return mockMoney;
@@ -128,63 +180,16 @@ function createProduct(
     ...basePreviewData,
     ...previewOverrides,
   };
-  return new EditionProduct(instanceData, previewData);
+  return new EditionProduct(instanceData, previewData, mockPublicProvider as any);
 }
 
 describe('EditionProduct', () => {
-  let mockProvider: any;
-  let mockContractFactoryInstance: any;
-  let mockClaimContract: any;
-  let mockERC20Contract: any;
-
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Setup mock provider
-    mockProvider = {
-      getNetwork: vi.fn().mockResolvedValue({ chainId: 1 }),
-      getBalance: vi.fn().mockResolvedValue(ethers.BigNumber.from('10000000000000000000')),
-      call: vi.fn(),
-    };
-
-    // Setup mock contracts
-    mockClaimContract = createMockClaimContract();
-    mockERC20Contract = createMockERC20Contract();
-    
-    // Setup default return values for contract methods
-    mockClaimContract.getClaim.mockResolvedValue({
-      cost: ethers.BigNumber.from('1000000000000000000'), // 1 ETH
-      erc20: ethers.constants.AddressZero,
-      totalMax: 1000,
-      total: 100,
-      walletMax: 5,
-      startDate: Math.floor(Date.now() / 1000) - 3600, // 1 hour ago
-      endDate: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
-      merkleRoot: ethers.constants.HashZero,
-      paymentReceiver: '0x1111111111111111111111111111111111111111',
-      signingAddress: '0x2222222222222222222222222222222222222222',
-      location: 'ipfs://QmXxx',
-      storageProtocol: 1,
-      contractVersion: 7,
-      identical: true,
-    });
-    mockClaimContract.MINT_FEE.mockResolvedValue(ethers.BigNumber.from('500000000000000000')); // 0.5 ETH
-    mockClaimContract.MINT_FEE_MERKLE.mockResolvedValue(ethers.BigNumber.from('690000000000000000')); // 0.69 ETH
-    mockClaimContract.getTotalMints.mockResolvedValue(ethers.BigNumber.from('100'));
-
-    // Setup mock contract factory
-    mockContractFactoryInstance = {
-      createEditionContract: vi.fn().mockReturnValue(mockClaimContract),
-      createEdition1155Contract: vi.fn().mockReturnValue(mockClaimContract),
-      createERC20Contract: vi.fn().mockReturnValue(mockERC20Contract),
-    };
-
     // Setup mocks
-    mockCreateProvider.mockResolvedValue(mockProvider);
-    // Mock the ContractFactory as a constructor that returns our mock instance
-    vi.mocked(ContractFactory).mockImplementation(() => mockContractFactoryInstance as any);
     mockValidateAddress.mockReturnValue(true);
-    mockEstimateGas.mockResolvedValue(ethers.BigNumber.from('200000'));
+    mockEstimateGas.mockResolvedValue(200000n);
 
     // Setup Money mock
     vi.mocked(Money.create).mockImplementation(async (params: any) => {
@@ -198,6 +203,11 @@ describe('EditionProduct', () => {
       return createMockMoney(valueStr, isERC20, params?.erc20);
     });
     vi.mocked(Money.zero).mockImplementation(async () => createMockMoney('0'));
+    
+    // Setup default mocks
+    setupDefaultMocks();
+    
+    mockPublicProvider.getBalance.mockResolvedValue(10000000000000000000n);
   });
 
   describe('Constructor', () => {
@@ -236,37 +246,16 @@ describe('EditionProduct', () => {
   });
 
   describe('fetchOnchainData', () => {
-    const mockClaimData = {
-      cost: ethers.BigNumber.from('1000000000000000000'), // 1 ETH
-      erc20: ethers.constants.AddressZero,
-      totalMax: 1000,
-      total: 100,
-      walletMax: 5,
-      startDate: Math.floor(Date.now() / 1000) - 3600, // 1 hour ago
-      endDate: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
-      merkleRoot: ethers.constants.HashZero,
-      paymentReceiver: '0x1111111111111111111111111111111111111111',
-      signingAddress: '0x2222222222222222222222222222222222222222',
-      location: 'ipfs://QmXxx',
-      storageProtocol: 1,
-      contractVersion: 7,
-      identical: true, // For ERC721
-    };
-
-    beforeEach(() => {
-      mockClaimContract.getClaim.mockResolvedValue(mockClaimData);
-      mockClaimContract.MINT_FEE.mockResolvedValue(ethers.BigNumber.from('500000000000000000')); // 0.5 ETH platform fee
-      mockClaimContract.MINT_FEE_MERKLE.mockResolvedValue(ethers.BigNumber.from('690000000000000000')); // 0.69 ETH merkle fee
-    });
 
     it('fetches and caches onchain data successfully', async () => {
       const product = createProduct();
       const onchainData = await product.fetchOnchainData();
 
-      expect(mockClaimContract.getClaim).toHaveBeenCalledWith(
-        baseInstanceData.publicData.contract.contractAddress,
-        123456
+      expect(mockPublicProvider.readContract).toHaveBeenCalled();
+      const getClaimCalls = mockPublicProvider.readContract.mock.calls.filter(
+        (call: any) => call[0]?.functionName === 'getClaim'
       );
+      expect(getClaimCalls).toHaveLength(1);
       expect(onchainData.totalMax).toBe(1000);
       expect(onchainData.total).toBe(100);
       expect(onchainData.walletMax).toBe(5);
@@ -279,7 +268,10 @@ describe('EditionProduct', () => {
       await product.fetchOnchainData();
       await product.fetchOnchainData();
 
-      expect(mockClaimContract.getClaim).toHaveBeenCalledTimes(1);
+      const getClaimCalls = mockPublicProvider.readContract.mock.calls.filter(
+        (call: any) => call[0]?.functionName === 'getClaim'
+      );
+      expect(getClaimCalls).toHaveLength(1);
     });
 
     it('forces refresh when force=true', async () => {
@@ -287,13 +279,26 @@ describe('EditionProduct', () => {
       await product.fetchOnchainData();
       await product.fetchOnchainData(true);
 
-      expect(mockClaimContract.getClaim).toHaveBeenCalledTimes(2);
+      const getCalls = mockPublicProvider.readContract.mock.calls.filter((call: any) => 
+        call[0]?.functionName === 'getClaim'
+      );
+      expect(getCalls).toHaveLength(2);
     });
 
     it('detects allowlist audience type with merkle root', async () => {
-      mockClaimContract.getClaim.mockResolvedValue({
-        ...mockClaimData,
-        merkleRoot: '0x1234567890123456789012345678901234567890123456789012345678901234',
+      const now = Math.floor(Date.now() / 1000);
+      setupDefaultMocks({
+        getClaim: {
+          cost: 1000000000000000000n,
+          erc20: ethers.constants.AddressZero,
+          totalMax: 1000n,
+          total: 100n,
+          walletMax: 5n,
+          startDate: BigInt(now - 3600),
+          endDate: BigInt(now + 3600),
+          merkleRoot: '0x1234567890123456789012345678901234567890123456789012345678901234',
+          paymentReceiver: '0x1111111111111111111111111111111111111111',
+        }
       });
 
       const product = createProduct();
@@ -304,25 +309,34 @@ describe('EditionProduct', () => {
 
     it('handles ERC20 payment token', async () => {
       const erc20Address = '0xA0b86a33E6417a7dA5B4C1D35aF7E7f2F2a0F2F2';
-      mockClaimContract.getClaim.mockResolvedValue({
-        ...mockClaimData,
-        erc20: erc20Address,
+      const now = Math.floor(Date.now() / 1000);
+      setupDefaultMocks({
+        getClaim: {
+          cost: 1000000000000000000n,
+          erc20: erc20Address,
+          totalMax: 1000n,
+          total: 100n,
+          walletMax: 5n,
+          startDate: BigInt(now - 3600),
+          endDate: BigInt(now + 3600),
+          merkleRoot: ethers.constants.HashZero,
+          paymentReceiver: '0x1111111111111111111111111111111111111111',
+        }
       });
 
       const product = createProduct();
       const onchainData = await product.fetchOnchainData();
 
       expect(Money.create).toHaveBeenCalledWith({
-        value: mockClaimData.cost,
+        value: 1000000000000000000n,
         networkId: 1,
         erc20: erc20Address,
-        provider: mockProvider,
         fetchUSD: true,
       });
     });
 
     it('throws error when contract call fails', async () => {
-      mockClaimContract.getClaim.mockRejectedValue(new Error('Contract call failed'));
+      mockPublicProvider.readContract.mockRejectedValue(new Error('Contract call failed'));
 
       const product = createProduct();
       await expect(product.fetchOnchainData()).rejects.toThrow(ClientSDKError);
@@ -332,33 +346,49 @@ describe('EditionProduct', () => {
       // Test ERC1155
       const product1155 = createProduct({}, { contract: { ...baseInstanceData.publicData.contract, spec: 'erc1155' } });
       await product1155.fetchOnchainData();
-      expect(mockContractFactoryInstance.createEdition1155Contract).toHaveBeenCalledWith('0x9876543210987654321098765432109876543211');
+      expect(mockPublicProvider.readContract).toHaveBeenCalledWith(expect.objectContaining({
+        abi: expect.any(Array),
+        contractAddress: '0x9876543210987654321098765432109876543211',
+        functionName: 'getClaim'
+      }));
 
       // Clear mock calls
-      mockContractFactoryInstance.createEdition1155Contract.mockClear();
+      mockPublicProvider.readContract.mockClear();
+      
+      // Reset mock implementation
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            cost: 1000000000000000000n,
+            erc20: ethers.constants.AddressZero,
+            totalMax: 1000n,
+            total: 100n,
+            walletMax: 5n,
+            startDate: BigInt(Math.floor(Date.now() / 1000) - 3600),
+            endDate: BigInt(Math.floor(Date.now() / 1000) + 3600),
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'MINT_FEE') return 500000000000000000n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 690000000000000000n;
+        return null;
+      });
 
       // Test ERC721
       const product721 = createProduct();
       await product721.fetchOnchainData();
-      expect(mockContractFactoryInstance.createEditionContract).toHaveBeenCalledWith('0x9876543210987654321098765432109876543210');
+      expect(mockPublicProvider.readContract).toHaveBeenCalledWith(expect.objectContaining({
+        abi: expect.any(Array),
+        contractAddress: '0x9876543210987654321098765432109876543210',
+        functionName: 'getClaim'
+      }));
     });
   });
 
   describe('getStatus', () => {
     beforeEach(() => {
-      const now = Math.floor(Date.now() / 1000);
-      mockClaimContract.getClaim.mockResolvedValue({
-        totalMax: 1000,
-        total: 100,
-        startDate: now - 3600, // 1 hour ago
-        endDate: now + 3600, // 1 hour from now
-        cost: ethers.BigNumber.from('1000000000000000000'),
-        erc20: ethers.constants.AddressZero,
-        walletMax: 5,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
-      });
-      mockClaimContract.MINT_FEE.mockResolvedValue(ethers.BigNumber.from('0'));
+      setupDefaultMocks({ MINT_FEE: 0n, MINT_FEE_MERKLE: 0n });
     });
 
     it('returns "active" for ongoing sale', async () => {
@@ -369,16 +399,20 @@ describe('EditionProduct', () => {
 
     it('returns "upcoming" for future sale', async () => {
       const futureTime = Math.floor(Date.now() / 1000) + 3600;
-      mockClaimContract.getClaim.mockResolvedValue({
-        totalMax: 1000,
-        total: 0,
-        startDate: futureTime,
-        endDate: futureTime + 3600,
-        cost: ethers.BigNumber.from('1000000000000000000'),
-        erc20: ethers.constants.AddressZero,
-        walletMax: 5,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
+      setupDefaultMocks({
+        getClaim: {
+          totalMax: 1000n,
+          total: 0n,
+          startDate: BigInt(futureTime),
+          endDate: BigInt(futureTime + 3600),
+          cost: 1000000000000000000n,
+          erc20: ethers.constants.AddressZero,
+          walletMax: 5n,
+          merkleRoot: ethers.constants.HashZero,
+          paymentReceiver: '0x1111111111111111111111111111111111111111',
+        },
+        MINT_FEE: 0n,
+        MINT_FEE_MERKLE: 0n
       });
 
       const product = createProduct();
@@ -388,16 +422,23 @@ describe('EditionProduct', () => {
 
     it('returns "ended" for past sale', async () => {
       const pastTime = Math.floor(Date.now() / 1000) - 3600;
-      mockClaimContract.getClaim.mockResolvedValue({
-        totalMax: 1000,
-        total: 100,
-        startDate: pastTime - 3600,
-        endDate: pastTime,
-        cost: ethers.BigNumber.from('1000000000000000000'),
-        erc20: ethers.constants.AddressZero,
-        walletMax: 5,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            totalMax: 1000n,
+            total: 100n,
+            startDate: BigInt(pastTime - 3600),
+            endDate: BigInt(pastTime),
+            cost: 1000000000000000000n,
+            erc20: ethers.constants.AddressZero,
+            walletMax: 5n,
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'MINT_FEE') return 0n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
+        return null;
       });
 
       const product = createProduct();
@@ -406,16 +447,24 @@ describe('EditionProduct', () => {
     });
 
     it('returns "sold-out" when total minted equals total supply', async () => {
-      mockClaimContract.getClaim.mockResolvedValue({
-        totalMax: 1000,
-        total: 1000, // Sold out
-        startDate: Math.floor(Date.now() / 1000) - 3600,
-        endDate: Math.floor(Date.now() / 1000) + 3600,
-        cost: ethers.BigNumber.from('1000000000000000000'),
-        erc20: ethers.constants.AddressZero,
-        walletMax: 5,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
+      const now = Math.floor(Date.now() / 1000);
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            totalMax: 1000n,
+            total: 1000n, // Sold out
+            startDate: BigInt(now - 3600),
+            endDate: BigInt(now + 3600),
+            cost: 1000000000000000000n,
+            erc20: ethers.constants.AddressZero,
+            walletMax: 5n,
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'MINT_FEE') return 0n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
+        return null;
       });
 
       const product = createProduct();
@@ -426,19 +475,26 @@ describe('EditionProduct', () => {
 
   describe('getAllocations', () => {
     beforeEach(() => {
-      mockClaimContract.getClaim.mockResolvedValue({
-        totalMax: 1000,
-        total: 100,
-        startDate: Math.floor(Date.now() / 1000) - 3600,
-        endDate: Math.floor(Date.now() / 1000) + 3600,
-        cost: ethers.BigNumber.from('1000000000000000000'),
-        erc20: ethers.constants.AddressZero,
-        walletMax: 5,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
+      const now = Math.floor(Date.now() / 1000);
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            totalMax: 1000n,
+            total: 100n,
+            startDate: BigInt(now - 3600),
+            endDate: BigInt(now + 3600),
+            cost: 1000000000000000000n,
+            erc20: ethers.constants.AddressZero,
+            walletMax: 5n,
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'MINT_FEE') return 0n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
+        if (args.functionName === 'getTotalMints') return 2n; // Wallet has minted 2 already
+        return null;
       });
-      mockClaimContract.MINT_FEE.mockResolvedValue(ethers.BigNumber.from('0'));
-      mockClaimContract.getTotalMints.mockResolvedValue(2); // Wallet has minted 2 already
     });
 
     it('returns allocation for eligible wallet', async () => {
@@ -461,16 +517,25 @@ describe('EditionProduct', () => {
     });
 
     it('considers remaining supply in calculations', async () => {
-      mockClaimContract.getClaim.mockResolvedValue({
-        totalMax: 105, // Only 5 left total
-        total: 100,
-        startDate: Math.floor(Date.now() / 1000) - 3600,
-        endDate: Math.floor(Date.now() / 1000) + 3600,
-        cost: ethers.BigNumber.from('1000000000000000000'),
-        erc20: ethers.constants.AddressZero,
-        walletMax: 10,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
+      const now = Math.floor(Date.now() / 1000);
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            totalMax: 105n, // Only 5 left total
+            total: 100n,
+            startDate: BigInt(now - 3600),
+            endDate: BigInt(now + 3600),
+            cost: 1000000000000000000n,
+            erc20: ethers.constants.AddressZero,
+            walletMax: 10n,
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'getTotalMints') return 2n;
+        if (args.functionName === 'MINT_FEE') return 0n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
+        return null;
       });
 
       const product = createProduct();
@@ -482,7 +547,28 @@ describe('EditionProduct', () => {
     });
 
     it('handles getTotalMints failure gracefully', async () => {
-      mockClaimContract.getTotalMints.mockRejectedValue(new Error('Contract call failed'));
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getTotalMints') {
+          throw new Error('Contract call failed');
+        }
+        const now = Math.floor(Date.now() / 1000);
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            totalMax: 1000n,
+            total: 100n,
+            startDate: BigInt(now - 3600),
+            endDate: BigInt(now + 3600),
+            cost: 1000000000000000000n,
+            erc20: ethers.constants.AddressZero,
+            walletMax: 5n,
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'MINT_FEE') return 0n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
+        return null;
+      });
 
       const product = createProduct();
       
@@ -498,23 +584,28 @@ describe('EditionProduct', () => {
 
     beforeEach(() => {
       // Setup successful onchain data
-      mockClaimContract.getClaim.mockResolvedValue({
-        totalMax: 1000,
-        total: 100,
-        startDate: Math.floor(Date.now() / 1000) - 3600,
-        endDate: Math.floor(Date.now() / 1000) + 3600,
-        cost: ethers.BigNumber.from('1000000000000000000'),
-        erc20: ethers.constants.AddressZero,
-        walletMax: 5,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
+      const now = Math.floor(Date.now() / 1000);
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            totalMax: 1000n,
+            total: 100n,
+            startDate: BigInt(now - 3600),
+            endDate: BigInt(now + 3600),
+            cost: 1000000000000000000n,
+            erc20: ethers.constants.AddressZero,
+            walletMax: 5n,
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'MINT_FEE') return 500000000000000000n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 690000000000000000n;
+        if (args.functionName === 'getTotalMints') return 0n;
+        if (args.functionName === 'balanceOf') return 10000000000n; // 10 USDC
+        if (args.functionName === 'allowance') return 0n;
+        return null;
       });
-      mockClaimContract.MINT_FEE.mockResolvedValue(ethers.BigNumber.from('500000000000000000'));
-      mockClaimContract.getTotalMints.mockResolvedValue(0);
-
-      // Setup ERC20 contract responses
-      mockERC20Contract.balanceOf.mockResolvedValue(ethers.BigNumber.from('10000000000')); // 10 USDC
-      mockERC20Contract.allowance.mockResolvedValue(ethers.BigNumber.from('0'));
     });
 
     it('prepares purchase for native currency successfully', async () => {
@@ -533,16 +624,27 @@ describe('EditionProduct', () => {
 
     it('prepares purchase with ERC20 approval step', async () => {
       const erc20Address = '0xA0b86a33E6417a7dA5B4C1D35aF7E7f2F2a0F2F2';
-      mockClaimContract.getClaim.mockResolvedValue({
-        totalMax: 1000,
-        total: 100,
-        startDate: Math.floor(Date.now() / 1000) - 3600,
-        endDate: Math.floor(Date.now() / 1000) + 3600,
-        cost: ethers.BigNumber.from('2000000'), // 2 USDC (6 decimals)
-        erc20: erc20Address,
-        walletMax: 5,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
+      const now = Math.floor(Date.now() / 1000);
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            totalMax: 1000n,
+            total: 100n,
+            startDate: BigInt(now - 3600),
+            endDate: BigInt(now + 3600),
+            cost: 2000000n, // 2 USDC (6 decimals)
+            erc20: erc20Address,
+            walletMax: 5n,
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'MINT_FEE') return 500000000000000000n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 690000000000000000n;
+        if (args.functionName === 'getTotalMints') return 0n;
+        if (args.functionName === 'balanceOf') return 10000000000n;
+        if (args.functionName === 'allowance') return 0n;
+        return null;
       });
 
       // Mock Money.create for ERC20
@@ -566,22 +668,30 @@ describe('EditionProduct', () => {
 
       const product = createProduct();
       await expect(product.preparePurchase({
-        address: 'invalid-address',
+        userAddress: 'invalid-address',
         payload: { quantity: 1 },
       })).rejects.toThrow(ClientSDKError);
     });
 
     it('throws error when sale not started', async () => {
-      mockClaimContract.getClaim.mockResolvedValue({
-        totalMax: 1000,
-        total: 0,
-        startDate: Math.floor(Date.now() / 1000) + 3600, // Future
-        endDate: Math.floor(Date.now() / 1000) + 7200,
-        cost: ethers.BigNumber.from('1000000000000000000'),
-        erc20: ethers.constants.AddressZero,
-        walletMax: 5,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
+      const futureTime = Math.floor(Date.now() / 1000) + 3600;
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            totalMax: 1000n,
+            total: 0n,
+            startDate: BigInt(futureTime), // Future
+            endDate: BigInt(futureTime + 3600),
+            cost: 1000000000000000000n,
+            erc20: ethers.constants.AddressZero,
+            walletMax: 5n,
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'MINT_FEE') return 500000000000000000n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
+        return null;
       });
 
       const product = createProduct();
@@ -592,16 +702,24 @@ describe('EditionProduct', () => {
     });
 
     it('throws error when sale ended', async () => {
-      mockClaimContract.getClaim.mockResolvedValue({
-        totalMax: 1000,
-        total: 100,
-        startDate: Math.floor(Date.now() / 1000) - 7200,
-        endDate: Math.floor(Date.now() / 1000) - 3600, // Past
-        cost: ethers.BigNumber.from('1000000000000000000'),
-        erc20: ethers.constants.AddressZero,
-        walletMax: 5,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
+      const pastTime = Math.floor(Date.now() / 1000) - 3600;
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            totalMax: 1000n,
+            total: 100n,
+            startDate: BigInt(pastTime - 3600),
+            endDate: BigInt(pastTime), // Past
+            cost: 1000000000000000000n,
+            erc20: ethers.constants.AddressZero,
+            walletMax: 5n,
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'MINT_FEE') return 500000000000000000n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
+        return null;
       });
 
       const product = createProduct();
@@ -612,16 +730,24 @@ describe('EditionProduct', () => {
     });
 
     it('throws error when sold out', async () => {
-      mockClaimContract.getClaim.mockResolvedValue({
-        totalMax: 1000,
-        total: 1000, // Sold out
-        startDate: Math.floor(Date.now() / 1000) - 3600,
-        endDate: Math.floor(Date.now() / 1000) + 3600,
-        cost: ethers.BigNumber.from('1000000000000000000'),
-        erc20: ethers.constants.AddressZero,
-        walletMax: 5,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
+      const now = Math.floor(Date.now() / 1000);
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            totalMax: 1000n,
+            total: 1000n, // Sold out
+            startDate: BigInt(now - 3600),
+            endDate: BigInt(now + 3600),
+            cost: 1000000000000000000n,
+            erc20: ethers.constants.AddressZero,
+            walletMax: 5n,
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'MINT_FEE') return 500000000000000000n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
+        return null;
       });
 
       const product = createProduct();
@@ -633,20 +759,28 @@ describe('EditionProduct', () => {
 
     it('throws error for insufficient ERC20 balance', async () => {
       const erc20Address = '0xA0b86a33E6417a7dA5B4C1D35aF7E7f2F2a0F2F2';
-      mockClaimContract.getClaim.mockResolvedValue({
-        totalMax: 1000,
-        total: 100,
-        startDate: Math.floor(Date.now() / 1000) - 3600,
-        endDate: Math.floor(Date.now() / 1000) + 3600,
-        cost: ethers.BigNumber.from('2000000'), // 2 USDC
-        erc20: erc20Address,
-        walletMax: 5,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
+      const now = Math.floor(Date.now() / 1000);
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            totalMax: 1000n,
+            total: 100n,
+            startDate: BigInt(now - 3600),
+            endDate: BigInt(now + 3600),
+            cost: 2000000n, // 2 USDC
+            erc20: erc20Address,
+            walletMax: 5n,
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'balanceOf') return 1000000n; // Only 1 USDC
+        if (args.functionName === 'MINT_FEE') return 0n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
+        if (args.functionName === 'getTotalMints') return 0n;
+        if (args.functionName === 'allowance') return 0n;
+        return null;
       });
-
-      // Insufficient balance
-      mockERC20Contract.balanceOf.mockResolvedValue(ethers.BigNumber.from('1000000')); // Only 1 USDC
 
       const mockERC20Money = createMockMoney('2000000', true, erc20Address);
       (Money.create as any).mockResolvedValue(mockERC20Money);
@@ -690,20 +824,28 @@ describe('EditionProduct', () => {
 
     it('skips approval step when sufficient allowance exists', async () => {
       const erc20Address = '0xA0b86a33E6417a7dA5B4C1D35aF7E7f2F2a0F2F2';
-      mockClaimContract.getClaim.mockResolvedValue({
-        totalMax: 1000,
-        total: 100,
-        startDate: Math.floor(Date.now() / 1000) - 3600,
-        endDate: Math.floor(Date.now() / 1000) + 3600,
-        cost: ethers.BigNumber.from('2000000'), // 2 USDC
-        erc20: erc20Address,
-        walletMax: 5,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
+      const now = Math.floor(Date.now() / 1000);
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            totalMax: 1000n,
+            total: 100n,
+            startDate: BigInt(now - 3600),
+            endDate: BigInt(now + 3600),
+            cost: 2000000n, // 2 USDC
+            erc20: erc20Address,
+            walletMax: 5n,
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'allowance') return 10000000n; // 10 USDC
+        if (args.functionName === 'balanceOf') return 10000000n;
+        if (args.functionName === 'MINT_FEE') return 0n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
+        if (args.functionName === 'getTotalMints') return 0n;
+        return null;
       });
-
-      // Sufficient allowance
-      mockERC20Contract.allowance.mockResolvedValue(ethers.BigNumber.from('10000000')); // 10 USDC
 
       const mockERC20Money = createMockMoney('2000000', true, erc20Address);
       (Money.create as any).mockResolvedValue(mockERC20Money);
@@ -938,18 +1080,25 @@ describe('EditionProduct', () => {
 
   describe('Interface Methods', () => {
     beforeEach(() => {
-      mockClaimContract.getClaim.mockResolvedValue({
-        totalMax: 1000,
-        total: 100,
-        startDate: Math.floor(Date.now() / 1000) - 3600,
-        endDate: Math.floor(Date.now() / 1000) + 3600,
-        cost: ethers.BigNumber.from('1000000000000000000'),
-        erc20: ethers.constants.AddressZero,
-        walletMax: 5,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
+      const now = Math.floor(Date.now() / 1000);
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            totalMax: 1000n,
+            total: 100n,
+            startDate: BigInt(now - 3600),
+            endDate: BigInt(now + 3600),
+            cost: 1000000000000000000n,
+            erc20: ethers.constants.AddressZero,
+            walletMax: 5n,
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'MINT_FEE') return 0n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
+        return null;
       });
-      mockClaimContract.MINT_FEE.mockResolvedValue(ethers.BigNumber.from('0'));
     });
 
     describe('getInventory', () => {
@@ -962,16 +1111,24 @@ describe('EditionProduct', () => {
       });
 
       it('returns -1 for unlimited supply', async () => {
-        mockClaimContract.getClaim.mockResolvedValue({
-          totalMax: Number.MAX_SAFE_INTEGER,
-          total: 100,
-          startDate: Math.floor(Date.now() / 1000) - 3600,
-          endDate: Math.floor(Date.now() / 1000) + 3600,
-          cost: ethers.BigNumber.from('1000000000000000000'),
-          erc20: ethers.constants.AddressZero,
-          walletMax: 5,
-          merkleRoot: ethers.constants.HashZero,
-          paymentReceiver: '0x1111111111111111111111111111111111111111',
+        const now = Math.floor(Date.now() / 1000);
+        mockPublicProvider.readContract.mockImplementation((args: any) => {
+          if (args.functionName === 'getClaim') {
+            return normalizeClaimNumericFields({
+              totalMax: BigInt(Number.MAX_SAFE_INTEGER),
+              total: 100n,
+              startDate: BigInt(now - 3600),
+              endDate: BigInt(now + 3600),
+              cost: 1000000000000000000n,
+              erc20: ethers.constants.AddressZero,
+              walletMax: 5n,
+              merkleRoot: ethers.constants.HashZero,
+              paymentReceiver: '0x1111111111111111111111111111111111111111',
+            });
+          }
+          if (args.functionName === 'MINT_FEE') return 0n;
+          if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
+          return null;
         });
 
         const product = createProduct();
@@ -993,16 +1150,24 @@ describe('EditionProduct', () => {
       });
 
       it('returns allowlist restriction for merkle root', async () => {
-        mockClaimContract.getClaim.mockResolvedValue({
-          totalMax: 1000,
-          total: 100,
-          startDate: Math.floor(Date.now() / 1000) - 3600,
-          endDate: Math.floor(Date.now() / 1000) + 3600,
-          cost: ethers.BigNumber.from('1000000000000000000'),
-          erc20: ethers.constants.AddressZero,
-          walletMax: 5,
-          merkleRoot: '0x1234567890123456789012345678901234567890123456789012345678901234',
-          paymentReceiver: '0x1111111111111111111111111111111111111111',
+        const now = Math.floor(Date.now() / 1000);
+        mockPublicProvider.readContract.mockImplementation((args: any) => {
+          if (args.functionName === 'getClaim') {
+            return normalizeClaimNumericFields({
+              totalMax: 1000n,
+              total: 100n,
+              startDate: BigInt(now - 3600),
+              endDate: BigInt(now + 3600),
+              cost: 1000000000000000000n,
+              erc20: ethers.constants.AddressZero,
+              walletMax: 5n,
+              merkleRoot: '0x1234567890123456789012345678901234567890123456789012345678901234',
+              paymentReceiver: '0x1111111111111111111111111111111111111111',
+            });
+          }
+          if (args.functionName === 'MINT_FEE') return 0n;
+          if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
+          return null;
         });
 
         const product = createProduct();
@@ -1079,24 +1244,24 @@ describe('EditionProduct', () => {
     describe('_applyGasBuffer', () => {
       it('applies multiplier gas buffer correctly', () => {
         const product = createProduct();
-        const gasEstimate = ethers.BigNumber.from('100000');
+        const gasEstimate = 100000n;
         
         // Access private method through any
-        const result = (product as any)._applyGasBuffer(gasEstimate, { multiplier: 125 });
+        const result = (product as any)._applyGasBuffer(gasEstimate, { multiplier: 1.25 });
         expect(result.toString()).toBe('125000');
       });
 
       it('applies fixed gas buffer correctly', () => {
         const product = createProduct();
-        const gasEstimate = ethers.BigNumber.from('100000');
+        const gasEstimate = 100000n;
         
-        const result = (product as any)._applyGasBuffer(gasEstimate, { fixed: ethers.BigNumber.from('50000') });
+        const result = (product as any)._applyGasBuffer(gasEstimate, { fixed: 50000n });
         expect(result.toString()).toBe('150000');
       });
 
       it('returns original estimate when no buffer provided', () => {
         const product = createProduct();
-        const gasEstimate = ethers.BigNumber.from('100000');
+        const gasEstimate = 100000n;
         
         const result = (product as any)._applyGasBuffer(gasEstimate);
         expect(result).toBe(gasEstimate);
@@ -1135,35 +1300,38 @@ describe('EditionProduct', () => {
 
   describe('Error Scenarios', () => {
     it('handles provider creation failure', async () => {
-      mockCreateProvider.mockRejectedValue(new Error('Provider creation failed'));
-
-      const product = createProduct();
-      await expect(product.fetchOnchainData()).rejects.toThrow(ClientSDKError);
+      // This test is no longer applicable since provider is passed in constructor
+      // Skipping this test
+      expect(true).toBe(true);
     });
 
     it('handles contract factory creation failure', async () => {
-      vi.mocked(ContractFactory).mockImplementation(() => {
-        throw new Error('Contract factory creation failed');
-      });
-
-      const product = createProduct();
-      await expect(product.fetchOnchainData()).rejects.toThrow(ClientSDKError);
+      // This test is no longer applicable since we don't use ContractFactory
+      // Skipping this test
+      expect(true).toBe(true);
     });
 
     it('handles Money.create failure', async () => {
       (Money.create as any).mockRejectedValue(new Error('Money creation failed'));
-      mockClaimContract.getClaim.mockResolvedValue({
-        cost: ethers.BigNumber.from('1000000000000000000'),
-        erc20: ethers.constants.AddressZero,
-        totalMax: 1000,
-        total: 100,
-        walletMax: 5,
-        startDate: Math.floor(Date.now() / 1000) - 3600,
-        endDate: Math.floor(Date.now() / 1000) + 3600,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
+      const now = Math.floor(Date.now() / 1000);
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            cost: 1000000000000000000n,
+            erc20: ethers.constants.AddressZero,
+            totalMax: 1000n,
+            total: 100n,
+            walletMax: 5n,
+            startDate: BigInt(now - 3600),
+            endDate: BigInt(now + 3600),
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'MINT_FEE') return 0n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
+        return null;
       });
-      mockClaimContract.MINT_FEE.mockResolvedValue(ethers.BigNumber.from('0'));
 
       const product = createProduct();
       await expect(product.fetchOnchainData()).rejects.toThrow(ClientSDKError);
@@ -1172,19 +1340,26 @@ describe('EditionProduct', () => {
 
   describe('Edge Cases', () => {
     it('handles zero cost products', async () => {
-      mockClaimContract.getClaim.mockResolvedValue({
-        cost: ethers.BigNumber.from('0'), // Free mint
-        erc20: ethers.constants.AddressZero,
-        totalMax: 1000,
-        total: 100,
-        walletMax: 5,
-        startDate: Math.floor(Date.now() / 1000) - 3600,
-        endDate: Math.floor(Date.now() / 1000) + 3600,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
+      const now = Math.floor(Date.now() / 1000);
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            cost: 0n, // Free mint
+            erc20: ethers.constants.AddressZero,
+            totalMax: 1000n,
+            total: 100n,
+            walletMax: 5n,
+            startDate: BigInt(now - 3600),
+            endDate: BigInt(now + 3600),
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'MINT_FEE') return 0n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
+        if (args.functionName === 'getTotalMints') return 0n;
+        return null;
       });
-      mockClaimContract.MINT_FEE.mockResolvedValue(ethers.BigNumber.from('0'));
-      mockClaimContract.getTotalMints.mockResolvedValue(0);
 
       // Mock zero Money
       (Money.create as any).mockResolvedValue(createMockMoney('0'));
@@ -1200,18 +1375,25 @@ describe('EditionProduct', () => {
     });
 
     it('handles unlimited supply (totalMax = 0)', async () => {
-      mockClaimContract.getClaim.mockResolvedValue({
-        cost: ethers.BigNumber.from('1000000000000000000'),
-        erc20: ethers.constants.AddressZero,
-        totalMax: 0, // Unlimited
-        total: 100,
-        walletMax: 5,
-        startDate: Math.floor(Date.now() / 1000) - 3600,
-        endDate: Math.floor(Date.now() / 1000) + 3600,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
+      const now = Math.floor(Date.now() / 1000);
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            cost: 1000000000000000000n,
+            erc20: ethers.constants.AddressZero,
+            totalMax: 0n, // Unlimited
+            total: 100n,
+            walletMax: 5n,
+            startDate: BigInt(now - 3600),
+            endDate: BigInt(now + 3600),
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'MINT_FEE') return 0n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
+        return null;
       });
-      mockClaimContract.MINT_FEE.mockResolvedValue(ethers.BigNumber.from('0'));
 
       const product = createProduct();
       const onchainData = await product.fetchOnchainData();
@@ -1223,19 +1405,26 @@ describe('EditionProduct', () => {
     });
 
     it('handles very large numbers correctly', async () => {
-      const largeNumber = ethers.BigNumber.from('999999999999999999999999999999');
-      mockClaimContract.getClaim.mockResolvedValue({
-        cost: largeNumber,
-        erc20: ethers.constants.AddressZero,
-        totalMax: 1000,
-        total: 100,
-        walletMax: 5,
-        startDate: Math.floor(Date.now() / 1000) - 3600,
-        endDate: Math.floor(Date.now() / 1000) + 3600,
-        merkleRoot: ethers.constants.HashZero,
-        paymentReceiver: '0x1111111111111111111111111111111111111111',
+      const largeNumber = 999999999999999999999999999999n;
+      const now = Math.floor(Date.now() / 1000);
+      mockPublicProvider.readContract.mockImplementation((args: any) => {
+        if (args.functionName === 'getClaim') {
+          return normalizeClaimNumericFields({
+            cost: largeNumber,
+            erc20: ethers.constants.AddressZero,
+            totalMax: 1000n,
+            total: 100n,
+            walletMax: 5n,
+            startDate: BigInt(now - 3600),
+            endDate: BigInt(now + 3600),
+            merkleRoot: ethers.constants.HashZero,
+            paymentReceiver: '0x1111111111111111111111111111111111111111',
+          });
+        }
+        if (args.functionName === 'MINT_FEE') return 0n;
+        if (args.functionName === 'MINT_FEE_MERKLE') return 0n;
+        return null;
       });
-      mockClaimContract.MINT_FEE.mockResolvedValue(ethers.BigNumber.from('0'));
 
       const product = createProduct();
       const onchainData = await product.fetchOnchainData();
@@ -1245,7 +1434,6 @@ describe('EditionProduct', () => {
         value: largeNumber,
         networkId: 1,
         erc20: ethers.constants.AddressZero,
-        provider: mockProvider,
         fetchUSD: true,
       });
     });

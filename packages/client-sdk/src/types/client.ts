@@ -1,5 +1,5 @@
-import type { HttpRPCs } from './common';
 import type { Product } from './product';
+import type { IPublicProvider } from './account-adapter';
 
 /**
  * Configuration options for initializing the Manifold SDK client.
@@ -8,22 +8,25 @@ import type { Product } from './product';
  */
 export interface ClientConfig {
   /**
-   * Custom RPC endpoints for blockchain interactions.
-   * Map of network ID to RPC URL string.
-   *
-   * @remarks
-   * Required for transaction execution. Each network you want to support
-   * must have a corresponding RPC endpoint.
+   * Public provider for read-only blockchain interactions.
+   * Required for fetching balances, estimating gas, and reading contracts.
    *
    * @example
    * ```typescript
-   * {
-   *   1: "https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY",
-   *   8453: "https://base-mainnet.infura.io/v3/YOUR_KEY"
-   * }
+   * // Using Ethers v5
+   * import { Ethers5PublicClient } from '@manifoldxyz/client-sdk/adapters';
+   * const provider = new ethers.providers.JsonRpcProvider('...');
+   * const publicProvider = new Ethers5PublicClient({ provider });
+   *
+   * // Using Viem
+   * import { ViemPublicClient } from '@manifoldxyz/client-sdk/adapters';
+   * const publicClient = createPublicClient({ ... });
+   * const publicProvider = new ViemPublicClient({ publicClient });
+   *
+   * const client = createClient({ publicProvider });
    * ```
    */
-  httpRPCs?: HttpRPCs;
+  publicProvider: IPublicProvider;
 
   /**
    * Enable debug logging for SDK operations.
@@ -50,8 +53,6 @@ export interface ClientConfig {
  * @public
  */
 export interface ManifoldClient {
-  httpRPCs: HttpRPCs;
-
   /**
    * Fetches detailed product information from Manifold.
    *

@@ -96,15 +96,32 @@ export default function Home() {
 
 **Core Steps**
 
-a. Create a [Manifold Client](../../sdk/manifold-client/)
+a. Create a [Manifold Client](../../sdk/manifold-client/) with a public provider
 
 ```typescript
-const client = createClient();
+import { createClient, createPublicProviderWagmi } from '@manifoldxyz/client-sdk';
+import { useConfig } from 'wagmi';
+
+// Get the Wagmi config from your React context
+const config = useConfig();
+
+// Create a public provider using Wagmi config
+const publicProvider = createPublicProviderWagmi({ config });
+
+// Initialize the client
+const client = createClient({ publicProvider });
 ```
 
 b. Create an [Account](../../reference/account.md) representing the connected user.
 
 ```typescript
+import { createAccountViem } from '@manifoldxyz/client-sdk';
+import { useWalletClient } from 'wagmi';
+
+// Get the wallet client from wagmi
+const { data: walletClient } = useWalletClient();
+
+// Create the account adapter
 const account = createAccountViem({
   walletClient,
 });

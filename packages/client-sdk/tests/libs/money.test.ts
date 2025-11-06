@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { ethers } from 'ethers';
 import { Money, isMoney } from '../../src/libs/money';
 import { ClientSDKError } from '../../src/types/errors';
+import { ethers } from 'ethers';
 
 const ethData = {
-  value: ethers.BigNumber.from('1000000000000000000'),
+  value: 1000000000000000000n,
   decimals: 18,
   erc20: ethers.constants.AddressZero,
   symbol: 'ETH',
@@ -15,13 +15,13 @@ const ethData = {
 
 const higherEthData = {
   ...ethData,
-  value: ethers.BigNumber.from('2000000000000000000'),
+  value: 2000000000000000000n,
   formatted: '2.0',
   formattedUSD: '6400.00',
 };
 
 const usdcData = {
-  value: ethers.BigNumber.from('1000000'),
+  value: 1000000n,
   decimals: 6,
   erc20: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
   symbol: 'USDC',
@@ -47,11 +47,11 @@ describe('Money class', () => {
     const anotherEth = Money.fromData(ethData);
 
     const added = oneEth.add(anotherEth);
-    expect(added.raw.toString()).toBe('2000000000000000000');
+    expect(added.value.toString()).toBe('2000000000000000000');
     expect(added.formattedUSD).toBe('6400.00');
 
     const subtracted = added.subtract(oneEth);
-    expect(subtracted.raw.toString()).toBe(oneEth.raw.toString());
+    expect(subtracted.value.toString()).toBe(oneEth.value.toString());
     expect(subtracted.formattedUSD).toBe('3200.00');
   });
 
@@ -74,11 +74,11 @@ describe('Money class', () => {
     const oneEth = Money.fromData(ethData);
 
     const multiplied = oneEth.multiply(2.5);
-    expect(multiplied.raw.toString()).toBe('2500000000000000000');
+    expect(multiplied.value.toString()).toBe('2500000000000000000');
     expect(multiplied.formattedUSD).toBe('8000.00');
 
     const multipliedInt = oneEth.multiplyInt(3);
-    expect(multipliedInt.raw.toString()).toBe('3000000000000000000');
+    expect(multipliedInt.value.toString()).toBe('3000000000000000000');
     expect(multipliedInt.formattedUSD).toBe('9600.00');
   });
 

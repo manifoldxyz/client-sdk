@@ -7,6 +7,7 @@ This comprehensive test suite covers all major components of the Manifold Client
 ## Test Coverage
 
 ### 1. **Client Tests** (`client.test.ts`)
+
 - Client initialization and configuration
 - Product fetching and parsing
 - Instance ID validation
@@ -16,6 +17,7 @@ This comprehensive test suite covers all major components of the Manifold Client
 ### 2. **Adapter Tests**
 
 #### Ethers5 Adapter (`adapters/ethers5-adapter.test.ts`)
+
 - Address retrieval from signer
 - Chain ID detection
 - Transaction sending and confirmation
@@ -23,6 +25,7 @@ This comprehensive test suite covers all major components of the Manifold Client
 - Error handling for network operations
 
 #### Viem Adapter (`adapters/viem-adapter.test.ts`)
+
 - Wallet client integration
 - Public client transaction monitoring
 - Network switching capabilities
@@ -32,6 +35,7 @@ This comprehensive test suite covers all major components of the Manifold Client
 ### 3. **API Client Tests**
 
 #### Manifold API (`api/manifold-api.test.ts`)
+
 - Complete instance data fetching
 - Product workspace queries
 - Allocation checking
@@ -40,6 +44,7 @@ This comprehensive test suite covers all major components of the Manifold Client
 - Error handling (404s, rate limiting, network errors)
 
 #### Coinbase API (`api/coinbase.test.ts`)
+
 - Price fetching for multiple currencies
 - Currency pair handling
 - Error recovery
@@ -49,6 +54,7 @@ This comprehensive test suite covers all major components of the Manifold Client
 ### 4. **Product Type Tests**
 
 #### Edition Product (`products/edition.test.ts`)
+
 - Allocation eligibility checking
 - Purchase preparation and simulation
 - Transaction execution
@@ -59,6 +65,7 @@ This comprehensive test suite covers all major components of the Manifold Client
 - On-chain data fetching
 
 #### Burn/Redeem Product (`products/burn-redeem.test.ts`)
+
 - Burn requirements validation
 - Token eligibility checking
 - Burn-redeem transaction preparation
@@ -68,6 +75,7 @@ This comprehensive test suite covers all major components of the Manifold Client
 - On-chain data synchronization
 
 #### Blind Mint Product (`products/blindmint.test.ts`)
+
 - Random minting preparation
 - Reveal time handling
 - Purchase flow
@@ -76,6 +84,7 @@ This comprehensive test suite covers all major components of the Manifold Client
 ### 5. **Utility Tests**
 
 #### Network Utilities (`utils/network.test.ts`)
+
 - Network configuration retrieval
 - Supported network validation
 - Network name resolution
@@ -84,27 +93,21 @@ This comprehensive test suite covers all major components of the Manifold Client
 - RPC URL management
 - Block explorer URLs
 
-#### Contract Factory (`utils/contract-factory.test.ts`)
-- Contract instance creation
-- ABI parsing and validation
-- Address format validation
-- View function calls
-- Gas estimation
-- ERC20/721/1155 interfaces
-- Error handling
-
 #### Gas Estimation (`utils/gas-estimation.test.ts`)
+
 - Dynamic gas estimation
 - Fallback gas values
 - Method-specific gas limits
 - Error recovery
 
 #### Provider Factory (`utils/provider-factory.test.ts`)
+
 - Provider creation for different networks
 - Bridge provider usage
 - RPC URL configuration
 
 #### Validation (`utils/validation.test.ts`)
+
 - Instance ID validation
 - Input sanitization
 - Parameter validation
@@ -112,6 +115,7 @@ This comprehensive test suite covers all major components of the Manifold Client
 ### 6. **Type Tests**
 
 #### Error Handling (`types/errors.test.ts`)
+
 - Custom error creation
 - Error codes and categorization
 - Error details and metadata
@@ -121,6 +125,7 @@ This comprehensive test suite covers all major components of the Manifold Client
 - Helper functions for error management
 
 #### Money Library (`libs/money.test.ts`)
+
 - Currency arithmetic operations
 - Native vs ERC20 token handling
 - Value comparisons
@@ -150,6 +155,7 @@ npm test -- --reporter=verbose
 ## Test Organization
 
 Tests are organized to mirror the source code structure:
+
 - `/tests/adapters/` - Wallet adapter tests
 - `/tests/api/` - External API client tests
 - `/tests/products/` - Product implementation tests
@@ -160,6 +166,7 @@ Tests are organized to mirror the source code structure:
 ## Mocking Strategy
 
 The test suite uses Vitest's mocking capabilities to:
+
 - Mock external dependencies (network calls, blockchain interactions)
 - Isolate components for unit testing
 - Simulate error conditions
@@ -168,6 +175,7 @@ The test suite uses Vitest's mocking capabilities to:
 ## Coverage Goals
 
 The test suite aims for:
+
 - ✅ 100% coverage of public API methods
 - ✅ All error paths tested
 - ✅ Edge cases and boundary conditions
@@ -177,6 +185,7 @@ The test suite aims for:
 ## Contributing
 
 When adding new features:
+
 1. Write tests first (TDD approach)
 2. Ensure all edge cases are covered
 3. Mock external dependencies
@@ -186,6 +195,7 @@ When adding new features:
 ## Test Utilities
 
 Common test utilities and mocks are available:
+
 - Mock providers for blockchain interaction
 - Mock API responses
 - Test data factories

@@ -14,9 +14,23 @@ Fetches detailed product information.
 
 #### Example
 
-<pre class="language-jsx"><code class="lang-jsx">import { isBlindMintProduct, createClient } from '@manifoldxyz/client-sdk';
+<pre class="language-typescript"><code class="lang-typescript">import { isBlindMintProduct, createClient, createPublicProviderWagmi } from '@manifoldxyz/client-sdk';
+import { createConfig, http } from '@wagmi/core';
+import { mainnet } from '@wagmi/core/chains';
 <strong>
-</strong>const client = createClient();
+</strong>// Setup Wagmi config
+const config = createConfig({
+  chains: [mainnet],
+  transports: {
+    [mainnet.id]: http('YOUR_RPC_URL')
+  }
+});
+
+// Create public provider
+const publicProvider = createPublicProviderWagmi({ config });
+
+// Create client
+const client = createClient({ publicProvider });
 
 <strong>const product = await client.getProduct('4150231280');
 </strong>console.log(`AppType: ${product.type}`);

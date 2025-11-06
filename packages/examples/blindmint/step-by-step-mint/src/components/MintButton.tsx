@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useAccount, useWalletClient } from 'wagmi'
 import { BlindMintProduct, PreparedPurchase, createAccountViem } from '@manifoldxyz/client-sdk'
 import StepModal from './StepModal'
-import { client } from '@/utils/SDKClient'
+import { getClient } from '@/utils/SDKClient'
 
 interface MintButtonButtonProps {
   instanceId: string
@@ -35,7 +35,7 @@ export default function MintButton({ instanceId, quantity = 1 }: MintButtonButto
     setPurchaseComplete(false)
 
     try {
-      const fetchedProduct = await client.getProduct(instanceId) as BlindMintProduct
+      const fetchedProduct = await getClient().getProduct(instanceId) as BlindMintProduct
       setProduct(fetchedProduct)
 
       const status = await fetchedProduct.getStatus()

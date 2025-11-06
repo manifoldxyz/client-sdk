@@ -7,30 +7,46 @@ Creates an account representation from an **Ethers v5** signer or wallet.\
 
 #### Parameters
 
-| Parameter       | Type                                                                                      | Required | Description                                                                                            |
-| --------------- | ----------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------ |
-| client          | [ManifoldClient](../manifold-client/)                                                     | ✅        | Instance of Manifold Client                                                                            |
-| provider.signer | [JsonRpcSigner](https://docs.ethers.org/v5/api/providers/jsonrpc-provider/#JsonRpcSigner) | ❌        | Instance of  [JsonRpcSigner](https://docs.ethers.org/v5/api/providers/jsonrpc-provider/#JsonRpcSigner) |
-| provider.wallet | [Wallet](https://docs.ethers.org/v5/api/signer/#Wallet)                                   | ❌        | Useful for server-side applications using programmatic wallet generation.                              |
+| Parameter | Type                                                                                      | Required | Description                                                                                            |
+| --------- | ----------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------ |
+| signer    | [JsonRpcSigner](https://docs.ethers.org/v5/api/providers/jsonrpc-provider/#JsonRpcSigner) | ❌        | Instance of  [JsonRpcSigner](https://docs.ethers.org/v5/api/providers/jsonrpc-provider/#JsonRpcSigner) |
+| wallet    | [Wallet](https://docs.ethers.org/v5/api/signer/#Wallet)                                   | ❌        | Useful for server-side applications using programmatic wallet generation.                              |
 
 #### Returns: [Account](https://app.gitbook.com/o/FkM3zqPi1O0VypWXgiUZ/s/wX9Yl8DLygpenDBVWGPF/~/changes/1/reference/account)
 
 #### Example
 
-<pre class="language-jsx"><code class="lang-jsx">import { createAccountEthers5, createClient, EditionProduct } from '@manifoldxyz/client-sdk';
+<pre class="language-typescript"><code class="lang-typescript">import { createAccountEthers5, createClient, createPublicProviderEthers5, EditionProduct } from '@manifoldxyz/client-sdk';
+import { ethers } from 'ethers';
 
-const client = createClient();
+// Create provider for the network
+const provider = new ethers.providers.JsonRpcProvider('YOUR_RPC_URL');
+
+// Create public provider for the client
+const publicProvider = createPublicProviderEthers5({
+  1: provider // mainnet
+});
+
+// Initialize the client
+const client = createClient({ publicProvider });
+
 <strong>const product = await client.getProduct('4150231280') as EditionProduct;
-</strong>const prepared = await product.preparePurchase({
+</strong>
+// Create wallet for signing
+const wallet = new ethers.Wallet('wallet-private-key', provider);
+
+const prepared = await product.preparePurchase({
   address: wallet.address,
   payload: {
     quantity: 1
   },
 });
-const wallet = new ethers.Wallet(&#x3C;wallet-private-key>);
-const account = createAccountEthers5(client,  {
+
+// Create account from wallet
+const account = createAccountEthers5({
   wallet
 })
+
 const order = await product.purchase({
   account,
   preparedPurchase: prepared,
