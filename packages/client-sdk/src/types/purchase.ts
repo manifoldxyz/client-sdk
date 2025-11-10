@@ -164,6 +164,7 @@ export interface TransactionOnProgress {
 export interface PurchaseParams {
   account: IAccount;
   preparedPurchase: PreparedPurchase;
+  confirmations?: number;
 }
 
 export type Receipt = {

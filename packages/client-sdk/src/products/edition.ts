@@ -607,14 +607,14 @@ export class EditionProduct implements IEditionProduct {
   }
 
   async purchase(params: PurchaseParams) {
-    const { account, preparedPurchase } = params;
+    const { account, preparedPurchase, confirmations } = params;
 
     // Execute all steps sequentially
     const receipts: Receipt[] = [];
 
     for (const step of preparedPurchase.steps) {
       try {
-        const receipt = await step.execute(account);
+        const receipt = await step.execute(account, { confirmations });
         receipts.push(receipt);
       } catch (error) {
         // If any step fails, throw error with context
