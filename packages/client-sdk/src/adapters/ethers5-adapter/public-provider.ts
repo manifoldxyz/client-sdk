@@ -137,13 +137,6 @@ export class Ethers5PublicProvider implements IPublicProvider {
     });
   }
 
-  async resolveName(name: string, networkId: number): Promise<string | null> {
-    return this.executeWithFallback(networkId, async (provider) => {
-      const address = await provider.resolveName(name);
-      return address;
-    });
-  }
-
   private async _ensureConnectedNetwork(networkId: number, provider: providers.JsonRpcProvider) {
     await ensureConnectedNetwork({
       getConnectedNetwork: () => provider.getNetwork().then((network) => network.chainId),
