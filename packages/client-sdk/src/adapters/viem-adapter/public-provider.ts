@@ -1,8 +1,10 @@
 import type { IPublicProvider } from '../../types/account-adapter';
 import type { PublicClient } from 'viem';
 import { getBalance, readContract } from 'viem/actions';
+import { getContract } from 'viem';
 import { ERC20ABI } from '../../abis';
 import { executeWithProviderFallback } from '../utils/fallback';
+import type { Contract } from 'ethers';
 
 /**
  * Public provider implementation for viem
@@ -149,6 +151,29 @@ export class ViemPublicProvider implements IPublicProvider {
       });
 
       return result as T;
+    });
+  }
+
+  async contractInstance(params: {
+    contractAddress: string;
+    abi: readonly unknown[];
+    networkId: number;
+    withSigner?: boolean;
+    unchecked?: boolean;
+  }): Promise<Contract> {
+    const { contractAddress, abi, networkId, withSigner = false } = params;
+
+    return this.executeWithFallback(networkId, async (client) => {
+      // Note: Viem doesn't have the same signer concept as ethers
+      // The withSigner and unchecked parameters are ignored for viem
+      // For write operations, use wallet client instead
+      const contract = getContract({
+        address: contractAddress as `0x${string}`,
+        abi: abi as never,
+        client: withSigner ? client : { public: client },
+      });
+
+      return contract as unknown as Contract;
     });
   }
 }

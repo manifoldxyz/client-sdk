@@ -3,6 +3,8 @@ import type { Config } from '@wagmi/core';
 import { getBalance, readContract, getPublicClient } from '@wagmi/core';
 import { ClientSDKError, ErrorCode } from '../../types';
 import { ERC20ABI } from '../../abis';
+import { getContract } from 'viem';
+import type { Contract } from 'ethers';
 
 /**
  * Public provider implementation for Wagmi
@@ -160,6 +162,41 @@ export class WagmiPublicProvider implements IPublicProvider {
       return result as T;
     } catch (error) {
       throw this._wrapError(error, 'readContract', params);
+    }
+  }
+
+  async contractInstance(params: {
+    contractAddress: string;
+    abi: readonly unknown[];
+    networkId: number;
+    withSigner?: boolean;
+    unchecked?: boolean;
+  }): Promise<Contract> {
+    const { contractAddress, abi, networkId, withSigner = false } = params;
+
+    try {
+      // Get the public client for the specific chain
+      const client = getPublicClient(this.config, { chainId: networkId });
+
+      if (!client) {
+        throw new ClientSDKError(
+          ErrorCode.UNSUPPORTED_NETWORK,
+          `No client configured for network ${networkId}`,
+        );
+      }
+
+      // Note: Viem doesn't have the same signer concept as ethers
+      // The withSigner and unchecked parameters are ignored for viem
+      // For write operations, use wallet client instead
+      const contract = getContract({
+        address: contractAddress as `0x${string}`,
+        abi: abi as never,
+        client: withSigner ? client : { public: client },
+      });
+
+      return contract as unknown as Contract;
+    } catch (error: unknown) {
+      throw this._wrapError(error, 'contractInstance', params);
     }
   }
 

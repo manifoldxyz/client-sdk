@@ -112,6 +112,38 @@ export class Ethers5PublicProvider implements IPublicProvider {
     });
   }
 
+  async contractInstance(params: {
+    contractAddress: string;
+    abi: readonly unknown[];
+    networkId: number;
+    withSigner?: boolean;
+    unchecked?: boolean;
+  }): Promise<Contract> {
+    const { contractAddress, abi, networkId, withSigner = false, unchecked = false } = params;
+
+    return this.executeWithFallback(networkId, async (provider) => {
+      let contract = new Contract(contractAddress, abi as never, provider);
+
+      // Attach the signer if the provider is the browser provider
+      if (withSigner) {
+        if (unchecked) {
+          contract = contract.connect(provider.getUncheckedSigner());
+        } else {
+          contract = contract.connect(provider.getSigner());
+        }
+      }
+
+      return contract;
+    });
+  }
+
+  async resolveName(name: string, networkId: number): Promise<string | null> {
+    return this.executeWithFallback(networkId, async (provider) => {
+      const address = await provider.resolveName(name);
+      return address;
+    });
+  }
+
   private async _ensureConnectedNetwork(networkId: number, provider: providers.JsonRpcProvider) {
     await ensureConnectedNetwork({
       getConnectedNetwork: () => provider.getNetwork().then((network) => network.chainId),

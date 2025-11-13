@@ -1,4 +1,5 @@
 import type { Money } from '../libs/money';
+import type { Contract } from 'ethers';
 
 // =============================================================================
 // UNIVERSAL TRANSACTION TYPES
@@ -475,4 +476,33 @@ export interface IPublicProvider {
     args?: readonly unknown[];
     networkId: number;
   }): Promise<T>;
+
+  /**
+   * Get a contract instance for read/write operations.
+   *
+   * @param params - Contract instance parameters
+   * @param params.contractAddress - The contract address
+   * @param params.abi - Contract ABI
+   * @param params.networkId - The network ID for the contract
+   * @param params.withSigner - Whether to include a signer for write operations
+   * @param params.unchecked - Whether to create an unchecked contract instance
+   * @returns  resolving to the contract instance
+   *
+   * @example
+   * ```typescript
+   * const contract = await provider.contractInstance({
+   *   contractAddress: '0x...',
+   *   abi: contractAbi,
+   *   networkId: 1,
+   *   withSigner: true
+   * });
+   * ```
+   */
+  contractInstance(params: {
+    contractAddress: string;
+    abi: readonly unknown[];
+    networkId: number;
+    withSigner?: boolean;
+    unchecked?: boolean;
+  }): Promise<Contract>;
 }
