@@ -509,7 +509,6 @@ export interface IPublicProvider {
     abi: readonly unknown[];
     networkId: number;
     topics: string[];
-    callback: any; // eslint-disable-line @typescript-eslint/no-explicit-any
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }): Promise<any>;
+    callback: (log: unknown) => void;
+  }): Promise<() => void>;
 }

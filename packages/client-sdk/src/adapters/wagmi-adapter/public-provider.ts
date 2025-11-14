@@ -169,10 +169,9 @@ export class WagmiPublicProvider implements IPublicProvider {
     abi: readonly unknown[];
     networkId: number;
     topics: string[];
-    callback: any; // eslint-disable-line @typescript-eslint/no-explicit-any
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }): Promise<any> {
-    const { contractAddress, abi, networkId, topics, callback } = params; // eslint-disable-line @typescript-eslint/no-unsafe-assignment
+    callback: (log: unknown) => void;
+  }): Promise<() => void> {
+    const { contractAddress, abi, networkId, topics, callback } = params;
 
     try {
       // Get the public client for the specific chain
@@ -202,7 +201,7 @@ export class WagmiPublicProvider implements IPublicProvider {
             }
 
             if (matches) {
-              callback(log); // eslint-disable-line @typescript-eslint/no-unsafe-call
+              callback(log);
             }
           }
         },

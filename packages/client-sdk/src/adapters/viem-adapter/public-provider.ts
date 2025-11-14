@@ -132,10 +132,9 @@ export class ViemPublicProvider implements IPublicProvider {
     abi: readonly unknown[];
     networkId: number;
     topics: string[];
-    callback: any; // eslint-disable-line @typescript-eslint/no-explicit-any
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }): Promise<any> {
-    const { contractAddress, abi, topics, callback } = params; // eslint-disable-line @typescript-eslint/no-unsafe-assignment
+    callback: (log: unknown) => void;
+  }): Promise<() => void> {
+    const { contractAddress, abi, topics, callback } = params;
 
     return this.executeWithFallback(params.networkId, async (client) => {
       const unwatch = client.watchContractEvent({
@@ -155,7 +154,7 @@ export class ViemPublicProvider implements IPublicProvider {
             }
 
             if (matches) {
-              callback(log); // eslint-disable-line @typescript-eslint/no-unsafe-call
+              callback(log);
             }
           }
         },
