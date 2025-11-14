@@ -1,5 +1,4 @@
 import type { Money } from '../libs/money';
-import type { Contract } from 'ethers';
 
 // =============================================================================
 // UNIVERSAL TRANSACTION TYPES
@@ -478,31 +477,39 @@ export interface IPublicProvider {
   }): Promise<T>;
 
   /**
-   * Get a contract instance for read/write operations.
+   * Subscribe to contract events (logs) matching specified topics.
    *
-   * @param params - Contract instance parameters
+   * @param params - Event watching parameters
    * @param params.contractAddress - The contract address
-   * @param params.abi - Contract ABI
-   * @param params.networkId - The network ID for the contract
-   * @param params.withSigner - Whether to include a signer for write operations
-   * @param params.unchecked - Whether to create an unchecked contract instance
-   * @returns  resolving to the contract instance
+   * @param params.abi - Contract ABI (can be partial, only needs the events being watched)
+   * @param params.networkId - The network ID to watch on
+   * @param params.topics - Array of topics to filter events
+   * @param params.callback - Callback function invoked with each matching log
+   * @returns Promise resolving to an unsubscribe function
    *
    * @example
    * ```typescript
-   * const contract = await provider.contractInstance({
+   * // Subscribe to Transfer events
+   * const unsubscribe = await provider.subscribeToContractEvents({
    *   contractAddress: '0x...',
-   *   abi: contractAbi,
+   *   abi: erc20Abi,
    *   networkId: 1,
-   *   withSigner: true
+   *   topics: ['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'], // Transfer event signature
+   *   callback: (log) => {
+   *     console.log('Transfer event:', log);
+   *   }
    * });
+   *
+   * // Later: unsubscribe from events
+   * unsubscribe();
    * ```
    */
-  contractInstance(params: {
+  subscribeToContractEvents(params: {
     contractAddress: string;
     abi: readonly unknown[];
     networkId: number;
-    withSigner?: boolean;
-    unchecked?: boolean;
-  }): Promise<Contract>;
+    topics: string[];
+    callback: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  }): Promise<any>;
 }

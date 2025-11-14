@@ -1,10 +1,9 @@
 import type { IPublicProvider } from '../../types/account-adapter';
 import type { Config } from '@wagmi/core';
-import { getBalance, readContract, getPublicClient } from '@wagmi/core';
+import { getBalance, readContract, getPublicClient, watchContractEvent } from '@wagmi/core';
 import { ClientSDKError, ErrorCode } from '../../types';
 import { ERC20ABI } from '../../abis';
-import { getContract } from 'viem';
-import type { Contract } from 'ethers';
+import type { Log } from 'viem';
 
 /**
  * Public provider implementation for Wagmi
@@ -165,14 +164,15 @@ export class WagmiPublicProvider implements IPublicProvider {
     }
   }
 
-  async contractInstance(params: {
+  async subscribeToContractEvents(params: {
     contractAddress: string;
     abi: readonly unknown[];
     networkId: number;
-    withSigner?: boolean;
-    unchecked?: boolean;
-  }): Promise<Contract> {
-    const { contractAddress, abi, networkId, withSigner = false } = params;
+    topics: string[];
+    callback: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  }): Promise<any> {
+    const { contractAddress, abi, networkId, topics, callback } = params; // eslint-disable-line @typescript-eslint/no-unsafe-assignment
 
     try {
       // Get the public client for the specific chain
@@ -185,18 +185,32 @@ export class WagmiPublicProvider implements IPublicProvider {
         );
       }
 
-      // Note: Viem doesn't have the same signer concept as ethers
-      // The withSigner and unchecked parameters are ignored for viem
-      // For write operations, use wallet client instead
-      const contract = getContract({
+      const unwatch = watchContractEvent(this.config, {
         address: contractAddress as `0x${string}`,
         abi: abi as never,
-        client: withSigner ? client : { public: client },
+        onLogs: (logs: Log[]) => {
+          for (const log of logs) {
+            // Check if log has enough topics and all match
+            if (log.topics.length < topics.length) continue;
+
+            let matches = true;
+            for (let i = 0; i < topics.length; i++) {
+              if (log.topics[i] !== topics[i]) {
+                matches = false;
+                break;
+              }
+            }
+
+            if (matches) {
+              callback(log); // eslint-disable-line @typescript-eslint/no-unsafe-call
+            }
+          }
+        },
       });
 
-      return contract as unknown as Contract;
+      return unwatch;
     } catch (error: unknown) {
-      throw this._wrapError(error, 'contractInstance', params);
+      throw this._wrapError(error, 'subscribeToContractEvents', params);
     }
   }
 

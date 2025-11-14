@@ -1,10 +1,8 @@
 import type { IPublicProvider } from '../../types/account-adapter';
-import type { PublicClient } from 'viem';
+import type { Log, PublicClient } from 'viem';
 import { getBalance, readContract } from 'viem/actions';
-import { getContract } from 'viem';
 import { ERC20ABI } from '../../abis';
 import { executeWithProviderFallback } from '../utils/fallback';
-import type { Contract } from 'ethers';
 
 /**
  * Public provider implementation for viem
@@ -129,6 +127,43 @@ export class ViemPublicProvider implements IPublicProvider {
     });
   }
 
+  async subscribeToContractEvents(params: {
+    contractAddress: string;
+    abi: readonly unknown[];
+    networkId: number;
+    topics: string[];
+    callback: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  }): Promise<any> {
+    const { contractAddress, abi, topics, callback } = params; // eslint-disable-line @typescript-eslint/no-unsafe-assignment
+
+    return this.executeWithFallback(params.networkId, async (client) => {
+      const unwatch = client.watchContractEvent({
+        address: contractAddress as `0x${string}`,
+        abi: abi as never,
+        onLogs: (logs: Log[]) => {
+          for (const log of logs) {
+            // Check if log has enough topics and all match
+            if (log.topics.length < topics.length) continue;
+
+            let matches = true;
+            for (let i = 0; i < topics.length; i++) {
+              if (log.topics[i] !== topics[i]) {
+                matches = false;
+                break;
+              }
+            }
+
+            if (matches) {
+              callback(log); // eslint-disable-line @typescript-eslint/no-unsafe-call
+            }
+          }
+        },
+      });
+      return unwatch;
+    });
+  }
+
   /**
    * Read data from a contract (call a view/pure function).
    */
@@ -151,29 +186,6 @@ export class ViemPublicProvider implements IPublicProvider {
       });
 
       return result as T;
-    });
-  }
-
-  async contractInstance(params: {
-    contractAddress: string;
-    abi: readonly unknown[];
-    networkId: number;
-    withSigner?: boolean;
-    unchecked?: boolean;
-  }): Promise<Contract> {
-    const { contractAddress, abi, networkId, withSigner = false } = params;
-
-    return this.executeWithFallback(networkId, async (client) => {
-      // Note: Viem doesn't have the same signer concept as ethers
-      // The withSigner and unchecked parameters are ignored for viem
-      // For write operations, use wallet client instead
-      const contract = getContract({
-        address: contractAddress as `0x${string}`,
-        abi: abi as never,
-        client: withSigner ? client : { public: client },
-      });
-
-      return contract as unknown as Contract;
     });
   }
 }

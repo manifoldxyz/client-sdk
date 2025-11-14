@@ -65,6 +65,29 @@ export class Ethers5PublicProvider implements IPublicProvider {
     });
   }
 
+  async subscribeToContractEvents(params: {
+    contractAddress: string;
+    abi: readonly unknown[];
+    networkId: number;
+    topics: string[];
+    callback: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  }): Promise<any> {
+    const { contractAddress, abi, topics, callback } = params; // eslint-disable-line @typescript-eslint/no-unsafe-assignment
+
+    return this.executeWithFallback(params.networkId, async (provider) => {
+      const contract = new Contract(contractAddress, abi as never, provider);
+
+      // Subscribe using topic filter
+      contract.on({ topics }, callback); // eslint-disable-line @typescript-eslint/no-unsafe-argument
+
+      // Return unsubscribe function
+      return () => {
+        contract.off({ topics }, callback); // eslint-disable-line @typescript-eslint/no-unsafe-argument
+      };
+    });
+  }
+
   async estimateContractGas(params: {
     contractAddress: string;
     abi: readonly unknown[];
@@ -109,31 +132,6 @@ export class Ethers5PublicProvider implements IPublicProvider {
       }
       const result = await method(...(args || []));
       return result;
-    });
-  }
-
-  async contractInstance(params: {
-    contractAddress: string;
-    abi: readonly unknown[];
-    networkId: number;
-    withSigner?: boolean;
-    unchecked?: boolean;
-  }): Promise<Contract> {
-    const { contractAddress, abi, networkId, withSigner = false, unchecked = false } = params;
-
-    return this.executeWithFallback(networkId, async (provider) => {
-      let contract = new Contract(contractAddress, abi as never, provider);
-
-      // Attach the signer if the provider is the browser provider
-      if (withSigner) {
-        if (unchecked) {
-          contract = contract.connect(provider.getUncheckedSigner());
-        } else {
-          contract = contract.connect(provider.getSigner());
-        }
-      }
-
-      return contract;
     });
   }
 
