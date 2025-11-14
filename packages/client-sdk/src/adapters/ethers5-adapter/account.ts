@@ -9,7 +9,7 @@ import { Money } from '../../libs/money';
 import { ClientSDKError, ErrorCode } from '../../types/errors';
 import { ensureConnectedNetwork } from '../../utils';
 import type { Network } from '@manifoldxyz/js-ts-utils';
-import { wrapError } from './utilts';
+import { wrapError } from './utils';
 
 // =============================================================================
 // ETHERS V5 ACCOUNT ADAPTER IMPLEMENTATION

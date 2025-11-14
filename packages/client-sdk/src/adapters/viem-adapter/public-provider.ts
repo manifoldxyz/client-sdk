@@ -1,5 +1,5 @@
 import type { IPublicProvider } from '../../types/account-adapter';
-import type { PublicClient } from 'viem';
+import type { Log, PublicClient } from 'viem';
 import { getBalance, readContract } from 'viem/actions';
 import { ERC20ABI } from '../../abis';
 import { executeWithProviderFallback } from '../utils/fallback';
@@ -124,6 +124,42 @@ export class ViemPublicProvider implements IPublicProvider {
       });
 
       return gasEstimate;
+    });
+  }
+
+  async subscribeToContractEvents(params: {
+    contractAddress: string;
+    abi: readonly unknown[];
+    networkId: number;
+    topics: string[];
+    callback: (log: unknown) => void;
+  }): Promise<() => void> {
+    const { contractAddress, abi, topics, callback } = params;
+
+    return this.executeWithFallback(params.networkId, async (client) => {
+      const unwatch = client.watchContractEvent({
+        address: contractAddress as `0x${string}`,
+        abi: abi as never,
+        onLogs: (logs: Log[]) => {
+          for (const log of logs) {
+            // Check if log has enough topics and all match
+            if (log.topics.length < topics.length) continue;
+
+            let matches = true;
+            for (let i = 0; i < topics.length; i++) {
+              if (log.topics[i] !== topics[i]) {
+                matches = false;
+                break;
+              }
+            }
+
+            if (matches) {
+              callback(log);
+            }
+          }
+        },
+      });
+      return unwatch;
     });
   }
 

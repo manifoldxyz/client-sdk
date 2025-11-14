@@ -475,4 +475,40 @@ export interface IPublicProvider {
     args?: readonly unknown[];
     networkId: number;
   }): Promise<T>;
+
+  /**
+   * Subscribe to contract events (logs) matching specified topics.
+   *
+   * @param params - Event watching parameters
+   * @param params.contractAddress - The contract address
+   * @param params.abi - Contract ABI (can be partial, only needs the events being watched)
+   * @param params.networkId - The network ID to watch on
+   * @param params.topics - Array of topics to filter events
+   * @param params.callback - Callback function invoked with each matching log
+   * @returns Promise resolving to an unsubscribe function
+   *
+   * @example
+   * ```typescript
+   * // Subscribe to Transfer events
+   * const unsubscribe = await provider.subscribeToContractEvents({
+   *   contractAddress: '0x...',
+   *   abi: erc20Abi,
+   *   networkId: 1,
+   *   topics: ['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'], // Transfer event signature
+   *   callback: (log) => {
+   *     console.log('Transfer event:', log);
+   *   }
+   * });
+   *
+   * // Later: unsubscribe from events
+   * unsubscribe();
+   * ```
+   */
+  subscribeToContractEvents(params: {
+    contractAddress: string;
+    abi: readonly unknown[];
+    networkId: number;
+    topics: string[];
+    callback: (log: unknown) => void;
+  }): Promise<() => void>;
 }

@@ -1,8 +1,9 @@
 import type { IPublicProvider } from '../../types/account-adapter';
 import type { Config } from '@wagmi/core';
-import { getBalance, readContract, getPublicClient } from '@wagmi/core';
+import { getBalance, readContract, getPublicClient, watchContractEvent } from '@wagmi/core';
 import { ClientSDKError, ErrorCode } from '../../types';
 import { ERC20ABI } from '../../abis';
+import type { Log } from 'viem';
 
 /**
  * Public provider implementation for Wagmi
@@ -160,6 +161,55 @@ export class WagmiPublicProvider implements IPublicProvider {
       return result as T;
     } catch (error) {
       throw this._wrapError(error, 'readContract', params);
+    }
+  }
+
+  async subscribeToContractEvents(params: {
+    contractAddress: string;
+    abi: readonly unknown[];
+    networkId: number;
+    topics: string[];
+    callback: (log: unknown) => void;
+  }): Promise<() => void> {
+    const { contractAddress, abi, networkId, topics, callback } = params;
+
+    try {
+      // Get the public client for the specific chain
+      const client = getPublicClient(this.config, { chainId: networkId });
+
+      if (!client) {
+        throw new ClientSDKError(
+          ErrorCode.UNSUPPORTED_NETWORK,
+          `No client configured for network ${networkId}`,
+        );
+      }
+
+      const unwatch = watchContractEvent(this.config, {
+        address: contractAddress as `0x${string}`,
+        abi: abi as never,
+        onLogs: (logs: Log[]) => {
+          for (const log of logs) {
+            // Check if log has enough topics and all match
+            if (log.topics.length < topics.length) continue;
+
+            let matches = true;
+            for (let i = 0; i < topics.length; i++) {
+              if (log.topics[i] !== topics[i]) {
+                matches = false;
+                break;
+              }
+            }
+
+            if (matches) {
+              callback(log);
+            }
+          }
+        },
+      });
+
+      return unwatch;
+    } catch (error: unknown) {
+      throw this._wrapError(error, 'subscribeToContractEvents', params);
     }
   }
 
