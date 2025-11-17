@@ -1,6 +1,8 @@
 # X402 Manifold NFT Purchase Endpoint
 
-This is an Express server that implements an x402 payment-enabled endpoint for purchasing NFTs through the Manifold Client SDK. The endpoint handles payment verification, cost calculation in USDC, and NFT minting on behalf of users.
+This is an Express server that implements an x402 payment-enabled endpoint for purchasing Manifold products through the Manifold Client SDK. The endpoint handles payment verification, cost calculation in USDC, and NFT minting on behalf of users.
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/JkC-Dc?referralCode=0RS2bU&utm_medium=integration&utm_source=template&utm_campaign=generic)
 
 ## Features
 
@@ -9,8 +11,6 @@ This is an Express server that implements an x402 payment-enabled endpoint for p
 - **USDC Cost Conversion**: Converts ETH and other costs to USDC using Relay SDK
 - **Multi-Network Support**: Supports Base mainnet (8453) and Base Sepolia (84532)
 - **Admin Wallet Minting**: Admin wallet pays for gas while user receives the NFT
-
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/xn8lJp?referralCode=0RS2bU&utm_medium=integration&utm_source=template&utm_campaign=generic)
 
 ## Architecture
 
@@ -33,7 +33,7 @@ Client → X402 Endpoint → Manifold SDK → Blockchain
 1. Install dependencies:
 
 ```bash
-npm install
+pnpm install
 ```
 
 2. Copy and configure environment variables:
@@ -44,18 +44,18 @@ cp .env.example .env
 
 3. Edit `.env` with your configuration:
 
-- `FACILITATOR_URL`: X402 facilitator URL for payment verification
 - `ADMIN_WALLET_PRIVATE_KEY`: Admin wallet private key for minting
 - `ADMIN_WALLET_ADDRESS`: Admin wallet address
 - `RPC_URL_BASE`: Base mainnet RPC URL
 - `RPC_URL_BASE_SEPOLIA`: Base Sepolia RPC URL
+- `RPC_URL_SEPOLIA`: Sepolia RPC URl
 
 ## Usage
 
 ### Starting the Server
 
 ```bash
-npm run dev
+pnpm run start
 ```
 
 The server will start on `http://localhost:4022`
@@ -142,31 +142,6 @@ Headers:
 }
 ```
 
-## Testing
-
-### Using the Test Script
-
-1. Configure test environment variables in `.env`:
-
-```
-TEST_USER_PRIVATE_KEY=0x... # User wallet with USDC
-TEST_MANIFOLD_INSTANCE_ID=4150231280
-RESOURCE_SERVER_URL=http://localhost:4022
-```
-
-2. Run the test:
-
-```bash
-npm run test:purchase
-```
-
-The test script will:
-
-1. Check wallet USDC balance
-2. Make request to the endpoint
-3. Automatically handle 402 payment
-4. Display the minted NFT details
-
 ### Manual Testing with curl
 
 1. Get payment requirements:
@@ -190,41 +165,6 @@ The endpoint handles various error cases:
 - `PAYMENT_VERIFICATION_FAILED`: Invalid payment
 - `RELAY_QUOTE_FAILED`: Cost conversion failed
 
-## Implementation Details
-
-### Cost Calculation Flow
-
-1. Fetch product from Manifold SDK
-2. Validate network support (Base only)
-3. Run `preparePurchase` to get costs
-4. Convert ETH costs to USDC via Relay SDK
-5. Add 5% buffer for price fluctuation
-6. Generate payment requirements
-
-### Minting Flow
-
-1. Verify X-PAYMENT header
-2. Validate payment amount and recipient
-3. Execute mint with admin wallet
-4. User receives NFT directly
-5. Settle payment and return response
-
-### Key Files
-
-- `src/index.ts`: Main server setup
-- `src/handlers/purchaseHandler.ts`: X402 endpoint implementation
-- `src/utils/viemClients.ts`: Blockchain client utilities
-- `src/types/index.ts`: TypeScript definitions
-- `test/testPurchase.ts`: Test script using x402-axios
-
-## Security Considerations
-
-- Admin wallet private key must be securely stored
-- Implement rate limiting in production
-- Add idempotency keys to prevent duplicate mints
-- Monitor gas costs and adjust buffers
-- Track failed mints for refund handling
-
 ## Supported Networks
 
 - **Base Mainnet** (chainId: 8453)
@@ -241,20 +181,20 @@ The endpoint handles various error cases:
 ### Building
 
 ```bash
-npm run build
+pnpm build
 ```
 
 ### Linting
 
 ```bash
-npm run lint
-npm run lint:fix
+pnpm lint
+pnpm lint:fix
 ```
 
 ### Type Checking
 
 ```bash
-npm run typecheck
+pnpm typecheck
 ```
 
 ## License
