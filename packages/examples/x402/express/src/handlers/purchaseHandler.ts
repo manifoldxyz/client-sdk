@@ -332,10 +332,23 @@ async function handleMintExecution(
       return res.status(400).json(errorResponse);
     }
 
+    try {
+      // 5. Settle payment
+      const settleResponse = await settle(facilitator, decodedPayment, paymentRequirements);
+      const responseHeader = settleResponseHeader(settleResponse);
+      res.setHeader('X-PAYMENT-RESPONSE', responseHeader);
+    } catch (error: any) {
+      return res.status(402).json({
+        x402Version,
+        error,
+        accepts: paymentRequirements,
+      });
+    }
+
     /*
      * 6. Execute mint transaction
-     * We perform the mint first to ensure the NFT is minted to the recipient address before the payment is settled.
-     * NOte: for production, we should have a way to handle the case where the mint fails or the payment is not settled.
+     * We perform the mint after settlement to ensure funds is deposited to the admin wallet before the mint is executed.
+     * NOte: for production, we should have a way to handle the case where the settlement success and mint fails, we should either retry the mint or refund the payment.
      */
     const adminWalletClient = createAdminWalletClient(productChainId);
     const account = createAccountViem({ walletClient: adminWalletClient as any });
@@ -370,19 +383,6 @@ async function handleMintExecution(
         formatted: `${formatUnits(BigInt(totalCostInUSDC), 6)} USDC`,
       },
     };
-
-    try {
-      // 5. Settle payment
-      const settleResponse = await settle(facilitator, decodedPayment, paymentRequirements);
-      const responseHeader = settleResponseHeader(settleResponse);
-      res.setHeader('X-PAYMENT-RESPONSE', responseHeader);
-    } catch (error: any) {
-      return res.status(402).json({
-        x402Version,
-        error,
-        accepts: paymentRequirements,
-      });
-    }
 
     return res.json(mintResponse);
   } catch (error: any) {
