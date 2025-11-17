@@ -4,6 +4,9 @@
   "description": "",
   "main": "dist/index.js",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc",
     "start": "tsx watch src/index.ts",

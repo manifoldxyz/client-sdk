@@ -12,9 +12,9 @@ const App = () => {
   const { data: walletClient } = useWalletClient();
   
   const [formData, setFormData] = useState({
-    instanceId: process.env.VITE_INSTANCE_ID || '4113236208',
+    instanceId: import.meta.env.VITE_INSTANCE_ID || '4113236208',
     quantity: 1,
-    serverUrl: 'http://localhost:4022'
+    serverUrl: import.meta.env.VITE_SERVER_URL || 'http://localhost:4022'
   });
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(false);
