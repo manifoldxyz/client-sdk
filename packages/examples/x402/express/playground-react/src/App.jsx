@@ -77,7 +77,7 @@ const App = () => {
 
       // Construct the endpoint URL
       const endpoint = `/manifold/${network}/id/${formData.instanceId}/purchase`;
-      const fullUrl = `${endpoint}?quantity=${formData.quantity}&recipientAddress=${address}`;
+      const fullUrl = `${endpoint}`;
 
       console.log('Making request to:', formData.serverUrl + fullUrl);
 

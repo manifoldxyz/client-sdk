@@ -35,11 +35,11 @@ createRelayClient({
 export async function handleManifoldPurchase(req: Request, res: Response) {
   const { id: instanceId, chainName } = req.params;
   const quantity = parseInt((req.query.quantity as string) || '1');
-  const recipientAddress = req.query.recipientAddress as string;
-  if (!recipientAddress || !isAddress(recipientAddress)) {
+  const recipientAddress = req.query.recipientAddress as string | undefined;
+  if (recipientAddress && !isAddress(recipientAddress)) {
     const errorResponse: ErrorResponse = {
       x402Version,
-      error: 'Recipient address is required',
+      error: 'Invalid recipient address',
       errorCode: ErrorCodes.INVALID_INPUT,
     };
     return res.status(400).json(errorResponse);
@@ -153,7 +153,7 @@ async function handleCostCalculation(
   req: Request,
   res: Response,
   quantity: number,
-  recipientAddress: string,
+  recipientAddress: string | undefined,
   paymentNetworkId: number,
 ) {
   const productChainId = product.data.publicData.network;
@@ -235,7 +235,7 @@ async function handleMintExecution(
   req: Request,
   res: Response,
   quantity: number,
-  recipientAddress: string,
+  recipientAddress: string | undefined,
   paymentNetworkId: number,
 ) {
   const paymentHeader = req.header('X-PAYMENT');
@@ -263,6 +263,19 @@ async function handleMintExecution(
       return res.status(402).json(errorResponse);
     }
 
+    let mintToAddress = recipientAddress;
+    if (!mintToAddress) {
+      // If no recipient address is provided, use the from address from the authorization
+      mintToAddress = (decodedPayment.payload as any).authorization.from;
+    }
+    if (!mintToAddress || !isAddress(mintToAddress)) {
+      const errorResponse: ErrorResponse = {
+        x402Version,
+        error: 'Invalid recipient address',
+        errorCode: ErrorCodes.INVALID_INPUT,
+      };
+      return res.status(400).json(errorResponse);
+    }
     const productChainId = product.data.publicData.network;
 
     // Recreate payment requirements for verification
@@ -272,7 +285,7 @@ async function handleMintExecution(
     // 3. Prepare purchase with admin wallet paying but user receiving
     const preparedPurchase = await product.preparePurchase({
       userAddress: adminAddress,
-      recipientAddress,
+      recipientAddress: mintToAddress,
       payload: { quantity },
       gasBuffer: { multiplier: 1.2 },
     });
@@ -308,6 +321,17 @@ async function handleMintExecution(
       return res.status(402).json(errorResponse);
     }
 
+    // validate recipient address
+    const payer = verification.payer ? verification.payer.toLowerCase() : undefined;
+    if (!recipientAddress && payer && payer !== mintToAddress.toLowerCase()) {
+      const errorResponse: ErrorResponse = {
+        x402Version,
+        error: 'Recipient address mismatch',
+        errorCode: ErrorCodes.INVALID_INPUT,
+      };
+      return res.status(400).json(errorResponse);
+    }
+
     /*
      * 6. Execute mint transaction
      * We perform the mint first to ensure the NFT is minted to the recipient address before the payment is settled.
@@ -327,7 +351,7 @@ async function handleMintExecution(
       success: true,
       transactionHash: order.transactionReceipt.txHash,
       blockNumber: order.transactionReceipt.blockNumber,
-      recipient: recipientAddress,
+      recipient: mintToAddress,
       product: {
         id: product.id.toString(),
         name: product.previewData.title || 'Manifold NFT',
