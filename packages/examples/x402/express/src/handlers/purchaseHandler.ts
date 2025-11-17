@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import type { Product } from '@manifoldxyz/client-sdk';
-import { ClientSDKError, createAccountViem } from '@manifoldxyz/client-sdk';
+import { ClientSDKError, createAccountViem, isEditionProduct } from '@manifoldxyz/client-sdk';
 import { createClient as createRelayClient, MAINNET_RELAY_API } from '@reservoir0x/relay-sdk';
 import { exact } from 'x402/schemes';
 import type { PaymentPayload, Resource } from 'x402/types';
@@ -77,6 +77,16 @@ export async function handleManifoldPurchase(req: Request, res: Response) {
 
   // 1. Fetch product details using Manifold Client SDK
   const product = await fetchManifoldProduct(instanceId);
+  //Only support edition products
+  if (!isEditionProduct(product)) {
+    const errorResponse: ErrorResponse = {
+      x402Version,
+      error: 'Only edition products are supported',
+      errorCode: ErrorCodes.UNSUPPORTED_PRODUCT_TYPE,
+    };
+    return res.status(400).json(errorResponse);
+  }
+  
   // 2. Validate product type and network support
   const productChainId = product.data.publicData.network;
   if (!SUPPORTED_PRODUCT_NETWORKS.includes(productChainId)) {
