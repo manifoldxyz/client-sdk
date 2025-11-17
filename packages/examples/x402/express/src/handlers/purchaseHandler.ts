@@ -309,6 +309,9 @@ async function handleMintExecution(
       product.previewData.title,
     );
 
+    console.log('payment requirements', JSON.stringify(paymentRequirements, null, 2));
+    console.log('decoded payment', JSON.stringify(decodedPayment, null, 2));
+
     // 4. Verify payment
     const verification = await verify(facilitator, decodedPayment, paymentRequirements);
     if (!verification.isValid) {
