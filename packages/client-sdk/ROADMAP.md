@@ -36,7 +36,7 @@ This roadmap outlines what the Manifold SDK team is currently developing, whatâ€
 
 ## Next
 
-- ### React Components (Mint Button, Product Display)
+- ### React Components (Checkout Flow)
   - **Why**: Simplify integration for React developers building on Manifold.
   - **What**: Provide prebuilt React components for minting and product display for Edition and Blind Mint product, designed for easy embedding and customization.
   - **Status/Target**: **End of November 2025**.

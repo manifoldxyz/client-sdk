@@ -86,12 +86,12 @@ export class ViemPublicProvider implements IPublicProvider {
         return balance;
       } else {
         // Get ERC20 token balance using viem
-        const balance = (await readContract(client, {
+        const balance = await readContract(client, {
           address: tokenAddress as `0x${string}`,
           abi: ERC20ABI,
           functionName: 'balanceOf',
           args: [address as `0x${string}`],
-        })) as bigint;
+        });
 
         return balance;
       }

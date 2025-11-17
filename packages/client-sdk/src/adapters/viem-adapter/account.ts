@@ -164,7 +164,7 @@ export class ViemAccount implements IAccount {
         return Money.create({
           value: balance,
           networkId,
-          erc20: tokenAddress,
+          address: tokenAddress,
           fetchUSD: true,
         });
       }

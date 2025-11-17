@@ -176,7 +176,7 @@ export class Ethers5Account implements IAccount {
         return Money.create({
           value: balance.toBigInt(),
           networkId,
-          erc20: tokenAddress,
+          address: tokenAddress,
           fetchUSD: true,
         });
       }

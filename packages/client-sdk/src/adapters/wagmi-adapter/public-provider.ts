@@ -77,7 +77,7 @@ export class WagmiPublicProvider implements IPublicProvider {
           args: [address as `0x${string}`],
           chainId: networkId,
         });
-        return balance as bigint;
+        return balance;
       }
     } catch (error) {
       throw this._wrapError(error, 'getBalance', params);
