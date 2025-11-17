@@ -322,7 +322,7 @@ export class EditionProduct implements IEditionProduct {
     // Helper to add cost to map
     const addCostToMap = (cost: Money) => {
       if (cost.isPositive()) {
-        const key = cost.erc20;
+        const key = cost.address;
         const existing = costsByToken.get(key);
         costsByToken.set(key, existing ? existing.add(cost) : cost);
       }
@@ -771,7 +771,7 @@ export class EditionProduct implements IEditionProduct {
     const costMoney = await Money.create({
       value: typeof claimData.cost === 'bigint' ? claimData.cost : BigInt(claimData.cost),
       networkId,
-      erc20: claimData.erc20,
+      address: claimData.erc20,
       fetchUSD: true,
     });
 

@@ -10,7 +10,7 @@ import type { MoneyData } from '../types/money';
 export class Money implements MoneyData {
   readonly value: bigint;
   readonly decimals: number;
-  readonly erc20: string;
+  readonly address: string;
   readonly symbol: string;
   readonly formatted: string;
   readonly formattedUSD?: string;
@@ -19,14 +19,14 @@ export class Money implements MoneyData {
   private constructor(params: {
     value: bigint;
     decimals: number;
-    erc20: string;
+    address: string;
     symbol: string;
     formattedUSD?: string;
     networkId: number;
   }) {
     this.value = params.value;
     this.decimals = params.decimals;
-    this.erc20 = params.erc20;
+    this.address = params.address;
     this.symbol = params.symbol;
     this.formatted = ethers.utils.formatUnits(params.value.toString(), params.decimals);
     this.formattedUSD = params.formattedUSD;
@@ -39,13 +39,13 @@ export class Money implements MoneyData {
   static async create(params: {
     value: bigint | string | number;
     networkId: number;
-    erc20?: string;
+    address?: string;
     fetchUSD?: boolean;
   }): Promise<Money> {
-    const { value, networkId, erc20 = ethers.constants.AddressZero, fetchUSD = true } = params;
+    const { value, networkId, address = ethers.constants.AddressZero, fetchUSD = true } = params;
 
     const bigintValue = typeof value === 'bigint' ? value : BigInt(value.toString());
-    const isNative = erc20 === ethers.constants.AddressZero;
+    const isNative = address === ethers.constants.AddressZero;
 
     let symbol: string;
     let decimals: number;
@@ -68,13 +68,13 @@ export class Money implements MoneyData {
       }
     } else {
       // ERC20 token
-      const metadata = await Currency.getERC20Metadata(networkId, erc20);
+      const metadata = await Currency.getERC20Metadata(networkId, address);
       symbol = metadata.symbol;
       decimals = metadata.decimals;
 
       if (fetchUSD) {
         try {
-          const usdRate = await getERC20ToUSDRate(symbol, erc20);
+          const usdRate = await getERC20ToUSDRate(symbol, address);
           if (usdRate) {
             formattedUSD = calculateUSDValue(bigintValue, decimals, usdRate);
           }
@@ -87,7 +87,7 @@ export class Money implements MoneyData {
     return new Money({
       value: bigintValue,
       decimals,
-      erc20,
+      address,
       symbol,
       formattedUSD,
       networkId,
@@ -97,11 +97,11 @@ export class Money implements MoneyData {
   /**
    * Create a zero-value Money instance
    */
-  static async zero(params: { networkId: number; erc20?: string }): Promise<Money> {
+  static async zero(params: { networkId: number; address?: string }): Promise<Money> {
     return Money.create({
       value: 0,
       networkId: params.networkId,
-      erc20: params.erc20,
+      address: params.address,
       fetchUSD: false, // No need to fetch USD for zero value
     });
   }
@@ -113,7 +113,7 @@ export class Money implements MoneyData {
     return new Money({
       value: data.value,
       decimals: data.decimals,
-      erc20: data.erc20,
+      address: data.address,
       symbol: data.symbol,
       networkId: data.networkId,
       formattedUSD: 'formattedUSD' in data ? data.formattedUSD : undefined,
@@ -124,21 +124,21 @@ export class Money implements MoneyData {
    * Check if this is an ERC20 token (vs native token)
    */
   isERC20(): boolean {
-    return this.erc20 !== ethers.constants.AddressZero;
+    return this.address !== ethers.constants.AddressZero;
   }
 
   /**
    * Check if this is a native token
    */
   isNative(): boolean {
-    return this.erc20 === ethers.constants.AddressZero;
+    return this.address === ethers.constants.AddressZero;
   }
 
   /**
    * Check if this Money has the same currency as another
    */
   isSameCurrency(other: Money): boolean {
-    return this.erc20 === other.erc20 && this.symbol === other.symbol;
+    return this.address === other.address && this.symbol === other.symbol;
   }
 
   /**
@@ -161,7 +161,7 @@ export class Money implements MoneyData {
     return new Money({
       value: newValue,
       decimals: this.decimals,
-      erc20: this.erc20,
+      address: this.address,
       symbol: this.symbol,
       formattedUSD: newUSD,
       networkId: this.networkId,
@@ -195,7 +195,7 @@ export class Money implements MoneyData {
     return new Money({
       value: newValue,
       decimals: this.decimals,
-      erc20: this.erc20,
+      address: this.address,
       symbol: this.symbol,
       formattedUSD: newUSD,
       networkId: this.networkId,
@@ -216,7 +216,7 @@ export class Money implements MoneyData {
     return new Money({
       value: newValue,
       decimals: this.decimals,
-      erc20: this.erc20,
+      address: this.address,
       symbol: this.symbol,
       formattedUSD: newUSD,
       networkId: this.networkId,
@@ -236,7 +236,7 @@ export class Money implements MoneyData {
     return new Money({
       value: newValue,
       decimals: this.decimals,
-      erc20: this.erc20,
+      address: this.address,
       symbol: this.symbol,
       formattedUSD: newUSD,
       networkId: this.networkId,
@@ -263,7 +263,7 @@ export class Money implements MoneyData {
     return Money.fromData({
       value: dividedValue,
       decimals: this.decimals,
-      erc20: this.erc20,
+      address: this.address,
       symbol: this.symbol,
       formattedUSD,
       networkId: this.networkId,
@@ -367,7 +367,7 @@ export class Money implements MoneyData {
     return new Money({
       value: this.value,
       decimals: this.decimals,
-      erc20: this.erc20,
+      address: this.address,
       symbol: this.symbol,
       formattedUSD,
       networkId: this.networkId,
@@ -381,7 +381,7 @@ export class Money implements MoneyData {
     return {
       value: this.value,
       decimals: this.decimals,
-      erc20: this.erc20,
+      address: this.address,
       symbol: this.symbol,
       formatted: this.formatted,
       formattedUSD: this.formattedUSD,

@@ -304,7 +304,7 @@ export class BlindMintProduct implements IBlindMintProduct {
     // Helper to add cost to map
     const addCostToMap = (cost: Money) => {
       if (cost.isPositive()) {
-        const key = cost.erc20;
+        const key = cost.address;
         const existing = costsByToken.get(key);
         costsByToken.set(key, existing ? existing.add(cost) : cost);
       }
@@ -677,7 +677,7 @@ export class BlindMintProduct implements IBlindMintProduct {
   }): Promise<BlindMintOnchainData> {
     // Handle the actual structure from ABIv2 getClaim
     const cost = claimData.cost;
-    const erc20 = claimData.erc20;
+    const address = claimData.erc20;
 
     // Convert dates from unix seconds
     const convertDate = (unixSeconds: number): Date | undefined => {
@@ -690,7 +690,7 @@ export class BlindMintProduct implements IBlindMintProduct {
     const costMoney = await Money.create({
       value: cost,
       networkId,
-      erc20,
+      address,
       fetchUSD: true,
     });
 
