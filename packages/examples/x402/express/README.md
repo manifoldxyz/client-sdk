@@ -10,6 +10,8 @@ This is an Express server that implements an x402 payment-enabled endpoint for p
 - **Multi-Network Support**: Supports Base mainnet (8453) and Base Sepolia (84532)
 - **Admin Wallet Minting**: Admin wallet pays for gas while user receives the NFT
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/xn8lJp?referralCode=0RS2bU&utm_medium=integration&utm_source=template&utm_campaign=generic)
+
 ## Architecture
 
 ```
@@ -29,16 +31,19 @@ Client → X402 Endpoint → Manifold SDK → Blockchain
 ## Installation
 
 1. Install dependencies:
+
 ```bash
 npm install
 ```
 
 2. Copy and configure environment variables:
+
 ```bash
 cp .env.example .env
 ```
 
 3. Edit `.env` with your configuration:
+
 - `FACILITATOR_URL`: X402 facilitator URL for payment verification
 - `ADMIN_WALLET_PRIVATE_KEY`: Admin wallet private key for minting
 - `ADMIN_WALLET_ADDRESS`: Admin wallet address
@@ -58,6 +63,7 @@ The server will start on `http://localhost:4022`
 ### Endpoint: GET /manifold/:chainName/id/:id/purchase
 
 **Supported chain names:**
+
 - `base` or `base-mainnet` - Base Mainnet (chainId: 8453)
 - `base-sepolia` or `basesepolia` - Base Sepolia (chainId: 84532)
 
@@ -66,37 +72,42 @@ The `chainName` parameter specifies the payment network where the USDC payment w
 #### Phase 1: Cost Calculation (No Payment)
 
 **Request:**
+
 ```
 GET /manifold/base-sepolia/id/4150231280/purchase?quantity=1&userAddress=0x...
 ```
 
 **Response (402):**
+
 ```json
 {
   "x402Version": 1,
-  "accepts": [{
-    "scheme": "exact",
-    "network": "base-sepolia",
-    "maxAmountRequired": "1000000",
-    "resource": "http://localhost:4022/manifold/base-sepolia/id/4150231280/purchase",
-    "description": "NFT Purchase: Cool NFT",
-    "mimeType": "application/json",
-    "payTo": "0xAdminWallet",
-    "maxTimeoutSeconds": 300,
-    "asset": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
-    "extra": {
-      "name": "USDC",
-      "version": "2",
-      "productId": "4150231280",
-      "quantity": 1
+  "accepts": [
+    {
+      "scheme": "exact",
+      "network": "base-sepolia",
+      "maxAmountRequired": "1000000",
+      "resource": "http://localhost:4022/manifold/base-sepolia/id/4150231280/purchase",
+      "description": "NFT Purchase: Cool NFT",
+      "mimeType": "application/json",
+      "payTo": "0xAdminWallet",
+      "maxTimeoutSeconds": 300,
+      "asset": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      "extra": {
+        "name": "USDC",
+        "version": "2",
+        "productId": "4150231280",
+        "quantity": 1
+      }
     }
-  }]
+  ]
 }
 ```
 
 #### Phase 2: Payment and Minting
 
 **Request with X-PAYMENT header:**
+
 ```
 GET /manifold/base-sepolia/id/4150231280/purchase
 Headers:
@@ -104,6 +115,7 @@ Headers:
 ```
 
 **Success Response (200):**
+
 ```json
 {
   "success": true,
@@ -115,12 +127,14 @@ Headers:
     "name": "Cool NFT",
     "type": "BlindMint"
   },
-  "tokens": [{
-    "tokenId": "1",
-    "quantity": 1,
-    "contractAddress": "0x...",
-    "explorerUrl": "https://basescan.org/..."
-  }],
+  "tokens": [
+    {
+      "tokenId": "1",
+      "quantity": 1,
+      "contractAddress": "0x...",
+      "explorerUrl": "https://basescan.org/..."
+    }
+  ],
   "totalCost": {
     "usdc": "1000000",
     "formatted": "1.0 USDC"
@@ -133,6 +147,7 @@ Headers:
 ### Using the Test Script
 
 1. Configure test environment variables in `.env`:
+
 ```
 TEST_USER_PRIVATE_KEY=0x... # User wallet with USDC
 TEST_MANIFOLD_INSTANCE_ID=4150231280
@@ -140,11 +155,13 @@ RESOURCE_SERVER_URL=http://localhost:4022
 ```
 
 2. Run the test:
+
 ```bash
 npm run test:purchase
 ```
 
 The test script will:
+
 1. Check wallet USDC balance
 2. Make request to the endpoint
 3. Automatically handle 402 payment
@@ -153,6 +170,7 @@ The test script will:
 ### Manual Testing with curl
 
 1. Get payment requirements:
+
 ```bash
 curl http://localhost:4022/manifold/base-sepolia/id/4150231280/purchase?quantity=1
 ```
@@ -210,6 +228,7 @@ The endpoint handles various error cases:
 ## Supported Networks
 
 - **Base Mainnet** (chainId: 8453)
+
   - USDC: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
   - WETH: `0x4200000000000000000000000000000000000006`
 
