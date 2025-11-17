@@ -120,7 +120,47 @@ export function createPaymentRequirements(
     payTo: adminWalletAddress,
     maxTimeoutSeconds: 300,
     asset: chainConfig.usdcAddress,
-    outputSchema: undefined,
+    outputSchema: {
+        input: {
+          type: "http",
+          method:"GET",
+          queryParams: {
+            quantity: {
+              type: "number",
+              description: "Number of NFTs to mint",
+              required: false,
+            },
+            recipientAddress: {
+              type: "string",
+              description: "Recipient wallet address to mint the NFT to",
+              required: false,
+            },
+          },
+        },
+        output: {
+          success: "boolean",
+          transactionHash: "string",
+          blockNumber: "number",
+          recipient: "string",
+          product: {
+            id: "string",
+            name: "string",
+            type: "string",
+          },
+          tokens: [
+            {
+              tokenId: "string",
+              quantity: "number",
+              contractAddress: "string",
+              explorerUrl: "string",
+            }
+          ],
+          totalCost: {
+              usdc: "string",
+              formatted: "string",
+          }
+      },
+    },
     extra: { name: isTestnet(chainId) ? 'USDC' : 'USD Coin', version: '2' },
   };
 }
