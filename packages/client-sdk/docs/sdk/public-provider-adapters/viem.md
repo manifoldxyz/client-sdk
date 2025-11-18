@@ -91,3 +91,36 @@ const publicProvider = createPublicProviderViem({
 
 const client = createClient({ publicProvider });
 ```
+
+## Event Subscription
+
+Subscribe to contract events in real-time using the `subscribeToContractEvents` method:
+
+```typescript
+import { createPublicProviderViem } from '@manifoldxyz/client-sdk';
+import { createPublicClient, http } from 'viem';
+import { mainnet } from 'viem/chains';
+
+const publicClient = createPublicClient({
+  chain: mainnet,
+  transport: http('YOUR_MAINNET_RPC_URL')
+});
+
+const publicProvider = createPublicProviderViem({
+  1: publicClient
+});
+
+// Subscribe to Transfer events
+const unsubscribe = await publicProvider.subscribeToContractEvents({
+  contractAddress: '0x...',
+  abi: erc20Abi,
+  networkId: 1,
+  topics: ['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'], // Transfer event signature
+  callback: (log) => {
+    console.log('Transfer event:', log);
+  }
+});
+
+// Later: unsubscribe from events
+unsubscribe();
+```

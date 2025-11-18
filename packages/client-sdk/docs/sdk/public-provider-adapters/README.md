@@ -1,6 +1,6 @@
 # Public Provider Adapters
 
-Public providers enable the SDK to perform read-only blockchain operations such as fetching balances, estimating gas, and reading smart contract data. They are required when initializing the Manifold Client.
+Public providers enable the SDK to perform read-only blockchain operations such as fetching balances, estimating gas, reading smart contract data, and subscribing to contract events. They are required when initializing the Manifold Client.
 
 ## Available Adapters
 
