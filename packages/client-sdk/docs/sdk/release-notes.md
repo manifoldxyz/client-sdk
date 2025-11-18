@@ -1,6 +1,6 @@
 # Release Notes
 
-### November 18, 2025 (TBD)
+### November 18, 2025 (0.5.0-beta.0)
 
 - **New**: Added `subscribeToContractEvents` method to `IPublicProvider` for subscribing to contract events
 - **New**: Implemented `subscribeToContractEvents` in all provider adapters (Viem, Ethers5, Wagmi)
