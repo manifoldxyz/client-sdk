@@ -10,7 +10,7 @@ export { Money, isMoney } from '../libs/money';
 export interface MoneyData {
   value: bigint;
   decimals: number;
-  erc20: string;
+  address: string;
   symbol: string;
   formatted: string;
   formattedUSD?: string;
