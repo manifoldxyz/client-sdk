@@ -65,6 +65,28 @@ export class Ethers5PublicProvider implements IPublicProvider {
     });
   }
 
+  async subscribeToContractEvents(params: {
+    contractAddress: string;
+    abi: readonly unknown[];
+    networkId: number;
+    topics: string[];
+    callback: (log: unknown) => void;
+  }): Promise<() => void> {
+    const { contractAddress, abi, topics, callback } = params;
+
+    return this.executeWithFallback(params.networkId, async (provider) => {
+      const contract = new Contract(contractAddress, abi as never, provider);
+
+      // Subscribe using topic filter
+      contract.on({ topics }, callback);
+
+      // Return unsubscribe function
+      return () => {
+        contract.off({ topics }, callback);
+      };
+    });
+  }
+
   async estimateContractGas(params: {
     contractAddress: string;
     abi: readonly unknown[];

@@ -89,8 +89,41 @@ function SdkInitializer() {
 }
 ```
 
+## Event Subscription
+
+Subscribe to contract events in real-time using the `subscribeToContractEvents` method:
+
+```typescript
+import { createPublicProviderWagmi } from '@manifoldxyz/client-sdk';
+import { createConfig, http } from '@wagmi/core';
+import { mainnet } from '@wagmi/core/chains';
+
+const config = createConfig({
+  chains: [mainnet],
+  transports: {
+    [mainnet.id]: http('YOUR_MAINNET_RPC_URL'),
+  },
+});
+
+const publicProvider = createPublicProviderWagmi({ config });
+
+// Subscribe to Transfer events
+const unsubscribe = await publicProvider.subscribeToContractEvents({
+  contractAddress: '0x...',
+  abi: erc20Abi,
+  networkId: 1,
+  topics: ['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'], // Transfer event signature
+  callback: (log) => {
+    console.log('Transfer event:', log);
+  }
+});
+
+// Later: unsubscribe from events
+unsubscribe();
+```
+
 ## Notes
 
 * The Wagmi config **must** include a transport for every chain you expect to access. If a chain is missing, calls will throw `ClientSDKError` with `UNSUPPORTED_NETWORK`.
-* The adapter uses Wagmi’s `getPublicClient` under the hood, so the config should expose a public client transport (e.g., `http`, `fallback`).
+* The adapter uses Wagmi's `getPublicClient` under the hood, so the config should expose a public client transport (e.g., `http`, `fallback`).
 * Wagmi handles provider caching; reuse the same config instance when possible to avoid creating redundant clients.

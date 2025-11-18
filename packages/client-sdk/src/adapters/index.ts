@@ -52,6 +52,8 @@
 export {
   createAccount as createAccountEthers5,
   createPublicProvider as createPublicProviderEthers5,
+  Ethers5Account,
+  Ethers5PublicProvider,
 } from './ethers5-adapter';
 export {
   createAccount as createAccountViem,
