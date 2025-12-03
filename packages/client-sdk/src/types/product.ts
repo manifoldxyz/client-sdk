@@ -2,6 +2,7 @@ import type { InstancePreview, PublicInstance } from '@manifoldxyz/studio-apps-c
 import type { Address, AppId, AppType } from './common';
 import type { BlindMintProduct } from './blindmint';
 import type { EditionProduct } from './edition';
+import type { ManiDeckProduct } from './manideck';
 import type { ContractSpec } from './contracts';
 
 /**
@@ -264,7 +265,7 @@ export interface AllocationResponse {
 }
 
 // Union type for Product
-export type Product = EditionProduct | BlindMintProduct;
+export type Product = EditionProduct | BlindMintProduct | ManiDeckProduct;
 
 // PreviewData type (from InstancePreview)
 export type PreviewData = InstancePreview;

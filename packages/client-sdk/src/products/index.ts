@@ -5,3 +5,6 @@ export { BlindMintProduct, isBlindMintProduct } from './blindmint';
 
 // Edition product implementation
 export { EditionProduct, isEditionProduct } from './edition';
+
+// ManiDeck product implementation
+export { ManiDeckProduct, isManiDeckProduct } from './manideck';

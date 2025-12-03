@@ -4,6 +4,7 @@ import type {
   InstanceData,
   BlindMintPublicDataResponse,
   EditionPublicDataResponse,
+  ManiDeckPublicDataResponse,
 } from '../types/';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import { AppId } from '../types/common';
@@ -11,6 +12,7 @@ import { BlindMintProduct } from '../products/blindmint';
 import { EditionProduct } from '../products/edition';
 import { validateInstanceId, parseManifoldUrl } from '../utils/validation';
 import manifoldApiClient from '../api/manifold-api';
+import { ManiDeckProduct } from '../products/manideck';
 
 /**
  * Creates a new Manifold SDK client instance for interacting with Manifold products.
@@ -113,6 +115,12 @@ export function createClient(config: ClientConfig): ManifoldClient {
           // TypeScript now knows instanceData is InstanceData<EditionPublicData>
           // Create EditionProduct with both instance and preview data
           return new EditionProduct(instanceData, previewData, publicProvider);
+        }
+
+        if (isManiDeckInstanceData(instanceData)) {
+          // TypeScript now knows instanceData is InstanceData<ManiDeckPublicData>
+          // Create ManiDeckProduct with both instance and preview data
+          return new ManiDeckProduct(instanceData, previewData, publicProvider);
         }
 
         // For other product types, throw an error until implemented
@@ -236,4 +244,25 @@ function isEditionInstanceData(
   instanceData: InstanceData<unknown>,
 ): instanceData is InstanceData<EditionPublicDataResponse> {
   return (instanceData.appId as AppId) === AppId.EDITION;
+}
+
+/**
+ * Type guard to check if instanceData is for Edition product type.
+ *
+ * @internal
+ * @param instanceData - The instance data to check
+ * @returns True if the instance data is for an Edition product
+ *
+ * @example
+ * ```typescript
+ * if (isManiDeckInstanceData(instanceData)) {
+ *   // TypeScript now knows this is InstanceData<ManiDeckPublicData>
+ *   const maniDeckData = instanceData.publicData;
+ * }
+ * ```
+ */
+function isManiDeckInstanceData(
+  instanceData: InstanceData<unknown>,
+): instanceData is InstanceData<ManiDeckPublicDataResponse> {
+  return (instanceData.appId as AppId) === AppId.MANI_DECK;
 }
