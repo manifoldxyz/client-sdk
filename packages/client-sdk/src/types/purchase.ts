@@ -26,10 +26,6 @@ export interface BlindMintPayload {
   quantity: number;
 }
 
-export interface ManiDeckPayload {
-  quantity: number;
-}
-
 /**
  * Prepared purchase data returned from preparePurchase().
  *
