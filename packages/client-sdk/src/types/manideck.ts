@@ -14,6 +14,13 @@ import type {
   ManifoldContract,
 } from './product';
 import type { Money } from '../libs/money';
+import type {
+  BlindMintPayload,
+  PreparedPurchase,
+  PreparePurchaseParams,
+  PurchaseParams,
+  Receipt,
+} from './purchase';
 
 // =============================================================================
 // CORE MANIDECK INTERFACES
@@ -151,6 +158,8 @@ export interface ManiDeckProduct extends BaseProduct<ManiDeckPublicData> {
 
   // Core product methods (matching Product interface)
   getAllocations(params: AllocationParams): Promise<AllocationResponse>;
+  preparePurchase(params: PreparePurchaseParams<BlindMintPayload>): Promise<PreparedPurchase>;
+  purchase(params: PurchaseParams): Promise<Receipt>;
   getStatus(): Promise<ProductStatus>;
   getPreviewMedia(): Promise<Media | undefined>;
   getMetadata(): Promise<ProductMetadata>;
