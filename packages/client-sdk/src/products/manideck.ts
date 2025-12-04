@@ -19,10 +19,6 @@ import type {
   Contract,
   ManiDeckPublicDataResponse,
   IPublicProvider,
-  ManiDeckPreparePurchaseParams,
-  ManiDeckPurchaseParams,
-  ManiDeckPreparePurchase,
-  InstanceJobResponse,
 } from '../types';
 import type { Address } from '../types/common';
 import { AppType, AppId } from '../types/common';
@@ -170,99 +166,6 @@ export class ManiDeckProduct implements IManiDeckProduct {
       throw new ClientSDKError(ErrorCode.API_ERROR, 'Failed to fetch onchain data', {
         error,
       });
-    }
-  }
-
-  /**
-   * Prepares a purchase transaction for the ManiDeck product.
-   *
-   * @param params - Purchase preparation parameters
-   * @param sessionToken - Session token for authentication
-   * @returns PreparedPurchase object with eligible amount and credits
-   *
-   * @public
-   */
-  async preparePurchase(
-    params: ManiDeckPreparePurchaseParams,
-    sessionToken: string,
-  ): Promise<ManiDeckPreparePurchase> {
-    const { instanceId } = params;
-
-    try {
-      const response = await fetch(
-        `https://studio.api.manifoldxyz.dev/backpack/instance/${instanceId}/purchase/eligibility`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            Session: sessionToken,
-          },
-        },
-      );
-
-      if (!response.ok) {
-        throw new ClientSDKError(
-          ErrorCode.API_ERROR,
-          `Failed to prepare purchase: ${response.status} ${response.statusText}`,
-          { status: response.status, statusText: response.statusText },
-        );
-      }
-
-      const data = (await response.json()) as ManiDeckPreparePurchase;
-      return data;
-    } catch (error) {
-      if (error instanceof ClientSDKError) {
-        throw error;
-      }
-      throw new ClientSDKError(ErrorCode.API_ERROR, 'Failed to prepare purchase', { error });
-    }
-  }
-
-  /**
-   * Executes a purchase transaction for the ManiDeck product.
-   *
-   * @param params - Purchase parameters
-   * @param sessionToken - Session token for authentication
-   * @returns Instance job response with purchase status
-   *
-   * @public
-   */
-  async purchase(
-    params: ManiDeckPurchaseParams,
-    sessionToken: string,
-  ): Promise<InstanceJobResponse> {
-    const { instanceId, amount } = params;
-
-    try {
-      const response = await fetch(
-        `https://studio.api.manifoldxyz.dev/backpack/instance/${instanceId}/purchase`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            Session: sessionToken,
-          },
-          body: JSON.stringify({ amount }),
-        },
-      );
-
-      if (!response.ok) {
-        throw new ClientSDKError(
-          ErrorCode.API_ERROR,
-          `Failed to execute purchase: ${response.status} ${response.statusText}`,
-          { status: response.status, statusText: response.statusText },
-        );
-      }
-
-      const data = (await response.json()) as InstanceJobResponse;
-      return data;
-    } catch (error) {
-      if (error instanceof ClientSDKError) {
-        throw error;
-      }
-      throw new ClientSDKError(ErrorCode.API_ERROR, 'Failed to execute purchase', { error });
     }
   }
 

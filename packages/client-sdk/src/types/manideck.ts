@@ -19,60 +19,6 @@ import type { Money } from '../libs/money';
 // CORE MANIDECK INTERFACES
 // =============================================================================
 
-export enum InstanceJobType {
-  CREATE = 'create',
-  PURCHASE = 'purchase',
-}
-
-export enum InstanceJobStatus {
-  PENDING = 'pending',
-  PROCESSING = 'processing',
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-}
-
-export enum InstanceTaskStatus {
-  PENDING = 'pending',
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-}
-
-export type InstanceTask = {
-  ref?: string;
-  name?: string;
-  type: string;
-  description?: string;
-  inputs?: Record<string, unknown>;
-  [key: string]: unknown;
-};
-
-export type InstanceTaskContext = {
-  txHash?: string;
-  error?: string;
-  output?: unknown;
-  [key: string]: unknown;
-};
-
-export type InstanceJobMetadata = {
-  error?: string;
-  identifier?: string;
-  [key: string]: unknown;
-};
-
-export type InstanceJobResponse = {
-  id: number;
-  workspaceId: number;
-  type: InstanceJobType;
-  appId?: number;
-  instanceId?: number;
-  tasks: InstanceTask[];
-  tasksContext: InstanceTaskContext[];
-  tasksStatus: InstanceTaskStatus[];
-  metadata?: InstanceJobMetadata;
-  status: InstanceJobStatus;
-  updatedAt?: Date;
-};
-
 /**
  * Enhanced ManiDeck On-Chain Data with gacha-specific extensions
  * Based on CONTRACT_PATTERNS.md analysis
@@ -187,20 +133,6 @@ export interface ManiDeckPool {
   metadata: Asset;
 }
 
-export interface ManiDeckPreparePurchaseParams {
-  instanceId: number;
-}
-
-export interface ManiDeckPurchaseParams {
-  instanceId: number;
-  amount: number;
-}
-
-export interface ManiDeckPreparePurchase {
-  eligibleAmount: number;
-  credits: number;
-}
-
 // =============================================================================
 // MANIDECK PRODUCT INTERFACE
 // =============================================================================
@@ -219,11 +151,6 @@ export interface ManiDeckProduct extends BaseProduct<ManiDeckPublicData> {
 
   // Core product methods (matching Product interface)
   getAllocations(params: AllocationParams): Promise<AllocationResponse>;
-  preparePurchase(
-    params: ManiDeckPreparePurchaseParams,
-    sessionToken: string,
-  ): Promise<ManiDeckPreparePurchase>;
-  purchase(params: ManiDeckPurchaseParams, sessionToken: string): Promise<InstanceJobResponse>;
   getStatus(): Promise<ProductStatus>;
   getPreviewMedia(): Promise<Media | undefined>;
   getMetadata(): Promise<ProductMetadata>;
