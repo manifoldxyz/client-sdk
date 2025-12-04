@@ -19,6 +19,19 @@ import type {
   Contract,
   ManiDeckPublicDataResponse,
   IPublicProvider,
+  PurchaseParams,
+  Receipt,
+  PreparePurchaseParams,
+  BlindMintPayload,
+  PreparedPurchase,
+  TransactionStep,
+  TransactionStepExecuteOptions,
+  IAccount,
+  GasBuffer,
+  UniversalTransactionRequest,
+  UniversalTransactionResponse,
+  TransactionReceipt,
+  Cost,
 } from '../types';
 import type { Address } from '../types/common';
 import { AppType, AppId } from '../types/common';
@@ -28,7 +41,9 @@ import { ClientSDKError, ErrorCode } from '../types/errors';
 import type { InstancePreview, PublicInstance } from '@manifoldxyz/studio-apps-client-public';
 import { Money } from '../libs/money';
 import { convertManifoldContractToContract } from '../utils/common';
-import { GachaExtensionERC1155ABIv2 } from '../abis';
+import { ERC20ABI, GachaExtensionERC1155ABIv2 } from '../abis';
+import { estimateGas } from '../utils';
+import { ethers } from 'ethers';
 
 /**
  * ManiDeck product implementation for mystery/gacha-style NFT mints.
@@ -73,6 +88,7 @@ export class ManiDeckProduct implements IManiDeckProduct {
   onchainData?: ManiDeckOnchainData;
 
   // Internal state
+  private _platformFee?: Money;
   private readonly _publicProvider: IPublicProvider;
 
   /**
@@ -169,9 +185,443 @@ export class ManiDeckProduct implements IManiDeckProduct {
     }
   }
 
+  /**
+   * Prepares a purchase transaction for the BlindMint product.
+   *
+   * This method:
+   * - Validates eligibility (wallet limits, supply, dates)
+   * - Calculates total cost including gas
+   * - Generates transaction data
+   * - Returns prepared transaction steps
+   *
+   * @param params - Purchase preparation parameters
+   * @param params.address - Wallet address making the purchase
+   * @param params.recipientAddress - Optional different recipient address
+   * @param params.payload - Purchase payload
+   * @param params.payload.quantity - Number of tokens to mint (default: 1)
+   * @param params.networkId - Optional network ID for cross-chain purchases
+   * @param params.gasBuffer - Optional gas buffer configuration
+   * @params params.account - Optional, if provided will check if account has sufficient balance to purchase
+   *
+   * @returns PreparedPurchase object with cost breakdown and transaction steps
+   *
+   * @throws {ClientSDKError} With error codes:
+   * - `INVALID_INPUT` - Invalid address or quantity
+   * - `NOT_ELIGIBLE` - Wallet not eligible to purchase
+   * - `SOLD_OUT` - Product sold out
+   * - `LIMIT_REACHED` - Wallet limit reached
+   * - `NOT_STARTED` - Sale hasn't started
+   * - `ENDED` - Sale has ended
+   * - `INSUFFICIENT_FUNDS` - Insufficient balance
+   *
+   * @example
+   * ```typescript
+   * const prepared = await product.preparePurchase({
+   *   address: '0x123...',
+   *   payload: { quantity: 2 },
+   *   gasBuffer: { multiplier: 0.25 } // 25% gas buffer
+   * });
+   *
+   * console.log(`Total cost: ${prepared.cost.total.formatted}`);
+   * console.log(`Gas estimate: ${prepared.gasEstimate.formatted}`);
+   * ```
+   *
+   * @public
+   */
+  async preparePurchase(
+    params: PreparePurchaseParams<BlindMintPayload>,
+  ): Promise<PreparedPurchase> {
+    const { userAddress, recipientAddress, payload, account } = params;
+    const quantity = payload?.quantity || 1;
+    const networkId = this.data.publicData.network;
+
+    const user = account ? await account.getAddress() : userAddress;
+    const recipient = recipientAddress || user;
+
+    if (!user || !validateAddress(user)) {
+      throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Invalid wallet address', {
+        user,
+      });
+    }
+
+    if (!recipient || !validateAddress(recipient)) {
+      throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Invalid recipient wallet address', {
+        recipientAddress: recipient,
+      });
+    }
+
+    // Check status first
+    const status = await this.getStatus();
+    if (status === 'upcoming') {
+      throw new ClientSDKError(ErrorCode.NOT_STARTED, 'Sale has not started', {
+        instanceId: String(this.id),
+        mintStatus: status,
+      });
+    }
+    if (status === 'ended') {
+      throw new ClientSDKError(ErrorCode.ENDED, 'Sale has ended', {
+        instanceId: String(this.id),
+        mintStatus: status,
+      });
+    }
+    if (status === 'sold-out') {
+      throw new ClientSDKError(ErrorCode.SOLD_OUT, 'Product is sold out', {
+        instanceId: String(this.id),
+        mintStatus: status,
+      });
+    }
+
+    // Check allocations
+    const allocations = await this.getAllocations({ recipientAddress: recipient });
+    if (!allocations.isEligible) {
+      throw new ClientSDKError(ErrorCode.NOT_ELIGIBLE, allocations.reason || 'Not eligible');
+    }
+    if (allocations.quantity !== null && quantity > allocations.quantity) {
+      throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Quantity exceeds available allocation');
+    }
+
+    const onchainData = await this.fetchOnchainData();
+    // Calculate costs
+    const productCost = onchainData.cost.multiplyInt(quantity);
+    const platformFee = this._platformFee
+      ? this._platformFee.multiplyInt(quantity)
+      : await Money.zero({ networkId });
+
+    // Aggregate costs by currency type
+    const costsByToken = new Map<string, Money>();
+
+    // Helper to add cost to map
+    const addCostToMap = (cost: Money) => {
+      if (cost.isPositive()) {
+        const key = cost.address;
+        const existing = costsByToken.get(key);
+        costsByToken.set(key, existing ? existing.add(cost) : cost);
+      }
+    };
+
+    addCostToMap(productCost);
+    addCostToMap(platformFee);
+
+    // Build steps array
+    const steps: TransactionStep[] = [];
+
+    // Check balances and create approvals for each token type
+    for (const [tokenAddress, totalCost] of Array.from(costsByToken.entries())) {
+      if (totalCost.isERC20()) {
+        // Read balance and allowance using publicProvider
+
+        const [balance, currentAllowance] = await Promise.all([
+          this._publicProvider.readContract<bigint>({
+            contractAddress: tokenAddress,
+            abi: ERC20ABI,
+            functionName: 'balanceOf',
+            args: [user],
+            networkId,
+          }),
+          this._publicProvider.readContract<bigint>({
+            contractAddress: tokenAddress,
+            abi: ERC20ABI,
+            functionName: 'allowance',
+            args: [user, this._extensionAddress],
+            networkId,
+          }),
+        ]);
+
+        if (balance < BigInt(totalCost.raw.toString())) {
+          throw new ClientSDKError(
+            ErrorCode.INSUFFICIENT_FUNDS,
+            `Insufficient ${totalCost.symbol} balance. Need ${totalCost.formatted} but have ${ethers.utils.formatUnits(balance, totalCost.decimals)}`,
+          );
+        }
+
+        if (currentAllowance < BigInt(totalCost.raw.toString())) {
+          const gasEstimate = await estimateGas({
+            publicProvider: this._publicProvider,
+            contractAddress: tokenAddress,
+            abi: ERC20ABI,
+            functionName: 'approve',
+            args: [this._extensionAddress, totalCost.raw],
+            from: user,
+            networkId,
+          });
+
+          const approvalStep: TransactionStep = {
+            id: `approve-${totalCost.symbol.toLowerCase()}`,
+            name: `Approve ${totalCost.symbol} Spending`,
+            type: 'approve',
+            description: `Approve ${totalCost.formatted} ${totalCost.symbol}`,
+            transactionData: {
+              value: BigInt('0'),
+              contractAddress: tokenAddress,
+              transactionData: this._buildApprovalData(
+                this._extensionAddress,
+                totalCost.raw.toString(),
+              ),
+              gasEstimate: BigInt(gasEstimate.toString()), // Will be updated with actual estimate
+              networkId,
+            },
+            execute: async (account: IAccount, options?: TransactionStepExecuteOptions) => {
+              await account.switchNetwork(networkId);
+              const address = await account.getAddress();
+              const gasEstimate = await estimateGas({
+                publicProvider: this._publicProvider,
+                contractAddress: tokenAddress,
+                abi: ERC20ABI,
+                functionName: 'approve',
+                args: [this._extensionAddress, totalCost.raw],
+                from: address,
+                networkId,
+              });
+
+              const gasLimit = this._applyGasBuffer(gasEstimate, params.gasBuffer).toString();
+
+              const txRequest: UniversalTransactionRequest = {
+                to: tokenAddress,
+                data: this._buildApprovalData(this._extensionAddress, totalCost.raw.toString()),
+                gasLimit,
+                chainId: networkId,
+              };
+
+              const confirmation = await account.sendTransactionWithConfirmation(txRequest, {
+                confirmations: options?.confirmations || 1,
+              });
+
+              const transactionReceipt = this._buildTransactionReceipt(confirmation, networkId);
+
+              return {
+                transactionReceipt,
+              };
+            },
+          };
+
+          steps.push(approvalStep);
+        }
+      } else {
+        // Check native balance using provider
+        if (account) {
+          const nativeBalance = await account.getBalance(networkId);
+
+          if (nativeBalance && nativeBalance.isLessThan(totalCost)) {
+            throw new ClientSDKError(
+              ErrorCode.INSUFFICIENT_FUNDS,
+              `Insufficient ${totalCost.symbol} balance. Need ${totalCost.formatted} but have ${nativeBalance.formatted}`,
+            );
+          }
+        }
+      }
+    }
+
+    // Calculate native payment value for mint transaction
+    const nativePaymentValue = costsByToken.get(ethers.constants.AddressZero)?.raw
+      ? BigInt(costsByToken.get(ethers.constants.AddressZero)!.raw.toString())
+      : 0n;
+
+    // Build cost breakdown for mint step and enhanced cost
+    const nativeCost = costsByToken.get(ethers.constants.AddressZero);
+    const erc20Costs = Array.from(costsByToken.entries())
+      .filter(([address]) => address !== ethers.constants.AddressZero)
+      .map(([, cost]) => cost);
+
+    // Build Cost structure (reuse the already computed values)
+    const resolvedNativeCost = nativeCost ?? (await Money.zero({ networkId }));
+
+    const totalUsdValue =
+      (productCost.formattedUSD ? parseFloat(productCost.formattedUSD) : 0) +
+      (platformFee.formattedUSD ? parseFloat(platformFee.formattedUSD) : 0);
+
+    const cost: Cost = {
+      totalUSD: totalUsdValue > 0 ? totalUsdValue.toFixed(2) : '0',
+      total: {
+        native: resolvedNativeCost,
+        erc20s: erc20Costs,
+      },
+      breakdown: {
+        product: productCost,
+        platformFee,
+      },
+    };
+
+    // Build mint step
+    const mintCost: { native?: Money; erc20s?: Money[] } = {};
+    if (nativeCost) mintCost.native = nativeCost;
+    if (erc20Costs.length > 0) mintCost.erc20s = erc20Costs;
+
+    const gasEstimate = await estimateGas({
+      publicProvider: this._publicProvider,
+      contractAddress: this._extensionAddress,
+      abi: GachaExtensionERC1155ABIv2,
+      functionName: 'mintReserve',
+      args: [this._creatorContract, this.id, quantity],
+      from: user,
+      networkId,
+      value: nativePaymentValue,
+    });
+
+    const mintStep: TransactionStep = {
+      id: 'mint',
+      name: 'Mint BlindMint NFTs',
+      type: 'mint',
+      description: `Mint ${quantity} random NFT(s)`,
+      cost: mintCost,
+      transactionData: {
+        contractAddress: this._extensionAddress,
+        value: BigInt(nativePaymentValue.toString()),
+        transactionData: this._buildMintData(this._creatorContract, this.id, quantity),
+        gasEstimate: BigInt(gasEstimate.toString()), // Default estimate, will be updated
+        networkId,
+      },
+      execute: async (account: IAccount, options?: TransactionStepExecuteOptions) => {
+        // This will handle network switch and adding custom network to user wallet if needed
+        await account.switchNetwork(networkId);
+        const minterAddress = await account.getAddress();
+
+        const gasEstimate = await estimateGas({
+          publicProvider: this._publicProvider,
+          contractAddress: this._extensionAddress,
+          abi: GachaExtensionERC1155ABIv2,
+          functionName: 'mintReserve',
+          args: [this._creatorContract, this.id, quantity],
+          from: minterAddress,
+          networkId,
+          value: nativePaymentValue,
+        });
+
+        const gasLimit = this._applyGasBuffer(gasEstimate, params.gasBuffer).toString();
+        const txRequest: UniversalTransactionRequest = {
+          to: this._extensionAddress,
+          data: this._buildMintData(this._creatorContract, this.id, quantity),
+          value: nativePaymentValue.toString(),
+          gasLimit,
+          chainId: networkId,
+        };
+        const confirmation = await account.sendTransactionWithConfirmation(txRequest, {
+          confirmations: options?.confirmations || 1,
+        });
+        const transactionReceipt = this._buildTransactionReceipt(confirmation, networkId);
+
+        return {
+          transactionReceipt,
+        };
+      },
+    };
+
+    steps.push(mintStep);
+
+    return {
+      cost,
+      steps,
+      isEligible: true,
+    };
+  }
+
+  async purchase(params: PurchaseParams) {
+    const { account, preparedPurchase } = params;
+
+    // Execute all steps sequentially
+    const receipts: Receipt[] = [];
+
+    for (const step of preparedPurchase.steps) {
+      try {
+        const receipt = await step.execute(account);
+        receipts.push(receipt);
+      } catch (error) {
+        // If any step fails, throw error with context
+        throw new ClientSDKError(
+          ErrorCode.TRANSACTION_FAILED,
+          `Transaction failed at step ${step.id}: ${(error as Error).message}`,
+          {
+            step: step.id,
+            receipts: receipts.map((item) => item.transactionReceipt),
+            error: error as Error,
+          },
+        );
+      }
+    }
+
+    const finalReceipt = receipts[receipts.length - 1];
+    if (!finalReceipt) {
+      throw new ClientSDKError(ErrorCode.TRANSACTION_FAILED, 'No Receipt found');
+    }
+
+    return {
+      transactionReceipt: finalReceipt.transactionReceipt,
+      order: finalReceipt.order,
+    };
+  }
+
   // =============================================================================
   // HELPER METHODS
   // =============================================================================
+  /**
+   * Build mint transaction data
+   */
+  private _buildMintData(creatorContract: string, instanceId: number, quantity: number): string {
+    // Using the actual mint function signature from the contract
+    const mintInterface = new ethers.utils.Interface([
+      'function mintReserve(address creatorContractAddress,uint256 instanceId,uint32 mintCount)',
+    ]);
+    return mintInterface.encodeFunctionData('mintReserve', [creatorContract, instanceId, quantity]);
+  }
+
+  private _buildTransactionReceipt(
+    response: UniversalTransactionResponse,
+    networkId: number,
+  ): TransactionReceipt {
+    const fallbackReceipt = (
+      response as {
+        receipt?: { blockNumber?: number; gasUsed?: string | number | bigint };
+      }
+    ).receipt;
+
+    const resolvedBlockNumber =
+      response.blockNumber ?? fallbackReceipt?.blockNumber ?? response.logs?.[0]?.blockNumber;
+
+    const rawGasUsed = response.gasUsed ?? fallbackReceipt?.gasUsed ?? undefined;
+
+    const normalizeGasUsed = (value: string | number | bigint | undefined): bigint | undefined => {
+      if (value === undefined) {
+        return undefined;
+      }
+
+      if (typeof value === 'bigint') {
+        return value;
+      }
+
+      // BigNumber case removed - no longer needed
+
+      if (typeof value === 'number') {
+        return BigInt(Math.trunc(value));
+      }
+
+      return BigInt(value);
+    };
+
+    return {
+      networkId,
+      txHash: response.hash,
+      blockNumber: resolvedBlockNumber,
+      gasUsed: normalizeGasUsed(rawGasUsed),
+    };
+  }
+
+  private _applyGasBuffer(gasEstimate: bigint, gasBuffer?: GasBuffer): bigint {
+    if (!gasBuffer) {
+      return gasEstimate;
+    }
+    return gasBuffer.fixed
+      ? gasEstimate + BigInt(gasBuffer.fixed.toString())
+      : (gasEstimate * BigInt(Math.floor((gasBuffer.multiplier || 1.2) * 100))) / 100n;
+  }
+
+  /**
+   * Build ERC-20 approval transaction data
+   */
+  private _buildApprovalData(spender: string, amount: string): string {
+    const approvalInterface = new ethers.utils.Interface([
+      'function approve(address spender, uint256 amount)',
+    ]);
+    return approvalInterface.encodeFunctionData('approve', [spender, amount]);
+  }
 
   private _getContractInfo(): Contract {
     const contractData = this.data.publicData.contract;
