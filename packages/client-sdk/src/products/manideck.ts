@@ -175,6 +175,16 @@ export class ManiDeckProduct implements IManiDeckProduct {
       // Process into ManiDeckOnchainData format
       const onchainData = await this._processManiDeckData(claimData);
 
+      // Fetch platform fee from contract and create Money object
+      const mintFee = await contract.MINT_FEE();
+      const networkId = this.data.publicData.network;
+
+      this._platformFee = await Money.create({
+        value: mintFee,
+        networkId,
+        fetchUSD: true,
+      });
+
       // Cache the result
       this.onchainData = onchainData;
       return onchainData;
