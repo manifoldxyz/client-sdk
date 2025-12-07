@@ -379,6 +379,18 @@ export class EditionProduct implements IEditionProduct {
             type: 'approve',
             description: `Approve ${totalCost.formatted} ${totalCost.symbol}`,
             transactionData: {
+              functionName: 'approve',
+              abi: [{
+                inputs: [
+                  { internalType: 'address', name: 'spender', type: 'address' },
+                  { internalType: 'uint256', name: 'amount', type: 'uint256' },
+                ],
+                name: 'approve',
+                outputs: [],
+                stateMutability: 'nonpayable',
+                type: 'function',
+              }],
+              args: [this._extensionAddress, totalCost.value.toString()],
               value: BigInt('0'),
               contractAddress: tokenAddress,
               transactionData: this._buildApprovalData(
@@ -524,6 +536,22 @@ export class EditionProduct implements IEditionProduct {
       cost: mintCost,
       transactionData: {
         contractAddress: this._extensionAddress,
+        functionName: 'mintProxy',
+        abi: [{
+          inputs: [
+            { internalType: 'address', name: 'creatorContractAddress', type: 'address' },
+            { internalType: 'uint256', name: 'instanceId', type: 'uint256' },
+            { internalType: 'uint16', name: 'mintCount', type: 'uint16' },
+            { internalType: 'uint32[]', name: 'mintIndices', type: 'uint32[]' },
+            { internalType: 'bytes32[][]', name: 'merkleProofs', type: 'bytes32[][]' },
+            { internalType: 'address', name: 'mintFor', type: 'address' },
+          ],
+          name: 'mintProxy',
+          outputs: [],
+          stateMutability: 'payable',
+          type: 'function',
+        },],
+        args: [this._creatorContract, this.id, quantity, mintIndices, merkleProofs, recipient],
         value: BigInt(nativePaymentValue.toString()),
         transactionData: mintData, // Will be populated with actual mint data
         gasEstimate: BigInt(gasEstimate.toString()), // Default estimate, will be updated
