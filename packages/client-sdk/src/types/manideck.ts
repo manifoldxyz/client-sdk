@@ -71,6 +71,8 @@ export interface ManiDeckPublicDataResponse {
   network: number;
   /** Contract details */
   contract: ManifoldContract;
+  /**Total supply */
+  totalSupply?: number;
   /** Claim extension contract address */
   extensionAddress1155: {
     value: Address;

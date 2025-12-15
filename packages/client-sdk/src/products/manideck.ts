@@ -362,16 +362,18 @@ export class ManiDeckProduct implements IManiDeckProduct {
             description: `Approve ${totalCost.formatted} ${totalCost.symbol}`,
             transactionData: {
               functionName: 'approve',
-              abi: [{
-                inputs: [
-                  { internalType: 'address', name: 'spender', type: 'address' },
-                  { internalType: 'uint256', name: 'amount', type: 'uint256' },
-                ],
-                name: 'approve',
-                outputs: [],
-                stateMutability: 'nonpayable',
-                type: 'function',
-              }],
+              abi: [
+                {
+                  inputs: [
+                    { internalType: 'address', name: 'spender', type: 'address' },
+                    { internalType: 'uint256', name: 'amount', type: 'uint256' },
+                  ],
+                  name: 'approve',
+                  outputs: [],
+                  stateMutability: 'nonpayable',
+                  type: 'function',
+                },
+              ],
               args: [this._extensionAddress, totalCost.raw.toString()],
               value: BigInt('0'),
               contractAddress: tokenAddress,
@@ -488,17 +490,19 @@ export class ManiDeckProduct implements IManiDeckProduct {
       transactionData: {
         functionName: 'mintReserve',
         args: [this._creatorContract, this.id, quantity],
-        abi: [{
-          inputs: [
-            { internalType: 'address', name: 'creatorContractAddress', type: 'address' },
-            { internalType: 'uint256', name: 'instanceId', type: 'uint256' },
-            { internalType: 'uint32', name: 'mintCount', type: 'uint32' },
-          ],
-          name: 'mintReserve',
-          outputs: [],
-          stateMutability: 'payable',
-          type: 'function',
-        }],
+        abi: [
+          {
+            inputs: [
+              { internalType: 'address', name: 'creatorContractAddress', type: 'address' },
+              { internalType: 'uint256', name: 'instanceId', type: 'uint256' },
+              { internalType: 'uint32', name: 'mintCount', type: 'uint32' },
+            ],
+            name: 'mintReserve',
+            outputs: [],
+            stateMutability: 'payable',
+            type: 'function',
+          },
+        ],
         contractAddress: this._extensionAddress,
         value: BigInt(nativePaymentValue.toString()),
         transactionData: this._buildMintData(this._creatorContract, this.id, quantity),
