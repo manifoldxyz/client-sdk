@@ -44,6 +44,7 @@ import { convertManifoldContractToContract } from '../utils/common';
 import { ERC20ABI, GachaExtensionERC1155ABIv2 } from '../abis';
 import { estimateGas } from '../utils';
 import { ethers } from 'ethers';
+import { DeckExtensionABI } from '../abis/DeckExtensionABI';
 
 /**
  * ManiDeck product implementation for mystery/gacha-style NFT mints.
@@ -700,7 +701,7 @@ export class ManiDeckProduct implements IManiDeckProduct {
           erc20: string;
         }>({
           contractAddress: this._extensionAddress,
-          abi: GachaExtensionERC1155ABIv2,
+          abi: DeckExtensionABI,
           functionName: 'getClaim',
           args: [creatorContract, instanceId],
           networkId,
@@ -710,7 +711,7 @@ export class ManiDeckProduct implements IManiDeckProduct {
       MINT_FEE: async () => {
         const result = await this._publicProvider.readContract<bigint>({
           contractAddress: this._extensionAddress,
-          abi: GachaExtensionERC1155ABIv2,
+          abi: DeckExtensionABI,
           functionName: 'MINT_FEE',
           networkId,
         });
