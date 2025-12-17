@@ -27,7 +27,7 @@ import type {
 } from '../types';
 import type { Address } from '../types/common';
 import { AppType, AppId } from '../types/common';
-
+import { Currency, Network } from '@manifoldxyz/js-ts-utils';
 import { validateAddress } from '../utils/validation';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import type { InstancePreview, PublicInstance } from '@manifoldxyz/studio-apps-client-public';
@@ -164,14 +164,15 @@ export class ManiDeckProduct implements IManiDeckProduct {
     try {
       // Fetch on-chain data for totalMinted and tokenVariations
       const claimData = await contract.getClaim(this._creatorContract, this.id);
-
+      const currency = publicData.price?.currency ? Currency.getSupportedCurrencyInfo(publicData.price.currency) : undefined;
       // Get cost from publicData.price
       let costMoney: Money;
       if (publicData.price) {
+        console.log(publicData.price)
         costMoney = await Money.create({
           value: BigInt(publicData.price.value),
           networkId,
-          address: publicData.price.erc20 || ethers.constants.AddressZero,
+          address: publicData.price.erc20 || currency?.erc20[networkId as unknown as Network.NetworkId].address || ethers.constants.AddressZero,
           fetchUSD: true,
         });
       } else {

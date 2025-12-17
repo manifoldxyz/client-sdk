@@ -46,7 +46,7 @@ export class Money implements MoneyData {
 
     const bigintValue = typeof value === 'bigint' ? value : BigInt(value.toString());
     const isNative = address === ethers.constants.AddressZero;
-
+    console.log('isNative  ', isNative)
     let symbol: string;
     let decimals: number;
     let formattedUSD: string | undefined;
@@ -67,6 +67,7 @@ export class Money implements MoneyData {
         }
       }
     } else {
+      console.log('isERC20  ', address)
       // ERC20 token
       const metadata = await Currency.getERC20Metadata(networkId, address);
       symbol = metadata.symbol;
