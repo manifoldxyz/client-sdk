@@ -43,8 +43,6 @@ export interface ManiDeckOnchainData {
   audienceType: 'None' | 'Allowlist' | 'RedemptionCode';
   /** Cost per token */
   cost: Money;
-  /** Address that receives payments */
-  paymentReceiver: Address;
   /** Number of unique token variations available */
   tokenVariations: number;
   /** Starting token ID for the collection */
@@ -78,6 +76,8 @@ export interface ManiDeckPublicDataResponse {
     value: Address;
     version: number;
   };
+  startDate?: Date;
+  endDate?: Date;
   /** Price configuration */
   price?: {
     value: string;

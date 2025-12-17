@@ -204,7 +204,7 @@ async function testManiDeckProduct(
     // Get product status
     const status = await product.getStatus();
     console.log(`   Status: ${status}`);
-
+    console.log(product)
     // Test allocation check
     const allocation = await product.getAllocations({
       recipientAddress: address as `0x${string}`,
@@ -305,7 +305,7 @@ async function main() {
     [testNetworkId]: provider
   })
   // Create client
-  const client = createClient({publicProvider});
+  const client = createClient({ publicProvider });
 
   let account: IAccount | undefined;
   try {
@@ -325,7 +325,7 @@ async function main() {
 
   try {
     const product = await client.getProduct(testInstanceId);
-    
+
     // Determine product type and call appropriate test function
     if (isEditionProduct(product)) {
       await testEditionProduct(product, {
@@ -367,7 +367,6 @@ async function main() {
       console.log(`\nTesting ${test.type} (Instance: ${test.id})...`);
       try {
         const product = await client.getProduct(test.id);
-        
         // Determine product type and call appropriate test function
         if (test.type === 'Edition' && isEditionProduct(product)) {
           await testEditionProduct(product, {
