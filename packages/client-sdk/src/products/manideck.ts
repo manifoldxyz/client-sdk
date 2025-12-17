@@ -168,7 +168,6 @@ export class ManiDeckProduct implements IManiDeckProduct {
       // Get cost from publicData.price
       let costMoney: Money;
       if (publicData.price) {
-        console.log(publicData.price)
         costMoney = await Money.create({
           value: BigInt(publicData.price.value),
           networkId,
