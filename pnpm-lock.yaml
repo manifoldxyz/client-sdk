@@ -14,6 +14,9 @@ importers:
 
   packages/client-sdk:
     dependencies:
+      '@manifoldxyz/gachapon-client-public':
+        specifier: ^0.1.0
+        version: 0.1.0
       '@manifoldxyz/js-ts-utils':
         specifier: ^9.1.1
         version: 9.1.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)
@@ -1049,6 +1052,10 @@ packages:
 
   '@manifoldxyz/frontend-provider-types@2.1.0':
     resolution: {integrity: sha512-QHtc4ZWOMr0zaDzed6T1N5DORDJFqTE+Mc2yUCqrK8ADOYIQYLXepvXD04vNi5qtydKbCBiJSYjoQMB4vVi4Sw==}
+
+  '@manifoldxyz/gachapon-client-public@0.1.0':
+    resolution: {integrity: sha512-IGs74E/kUYnfDLLoZoYM8iCG+cIeI8RawcILMyw1oMmBzn76gKQO0b2m35jnv2vfD6Rhwl5DbizyyW1W1JJEfQ==}
+    engines: {node: ^20.0.0}
 
   '@manifoldxyz/js-ts-utils@9.1.1':
     resolution: {integrity: sha512-mR+NxleaYz71PgbVyW84UqCOdNQfkpy9JNKz/QZ98JhKasOv+m4qXmrbY/l/iorVryyxtYfyHfXu98hlptxlBg==}
@@ -6805,6 +6812,12 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+
+  '@manifoldxyz/gachapon-client-public@0.1.0':
+    dependencies:
+      '@manifoldxyz/service-client-lib': 0.0.1-beta.21
+    transitivePeerDependencies:
+      - debug
 
   '@manifoldxyz/js-ts-utils@9.1.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)':
     dependencies:

@@ -74,8 +74,8 @@ export interface TransactionData {
   contractAddress: string;
   transactionData: string;
   functionName: string;
-  abi: any[];
-  args: any[];
+  abi: unknown[];
+  args: unknown[];
   gasEstimate: bigint;
   networkId: number;
 }

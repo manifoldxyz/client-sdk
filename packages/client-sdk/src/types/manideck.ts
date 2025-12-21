@@ -45,8 +45,6 @@ export interface ManiDeckOnchainData {
   cost: Money;
   /** Number of unique token variations available */
   tokenVariations: number;
-  /** Starting token ID for the collection */
-  startingTokenId: string;
 }
 
 export type ManiDeckPublicData = Omit<ManiDeckPublicDataResponse, 'contract'> & {

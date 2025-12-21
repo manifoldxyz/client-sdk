@@ -27,15 +27,15 @@ import type {
 } from '../types';
 import type { Address } from '../types/common';
 import { AppType, AppId } from '../types/common';
-import { Currency, Network } from '@manifoldxyz/js-ts-utils';
+import type { Network } from '@manifoldxyz/js-ts-utils';
+import { Currency } from '@manifoldxyz/js-ts-utils';
 import { validateAddress } from '../utils/validation';
 import { ClientSDKError, ErrorCode } from '../types/errors';
 import type { InstancePreview, PublicInstance } from '@manifoldxyz/studio-apps-client-public';
 import { Money } from '../libs/money';
 import { convertManifoldContractToContract } from '../utils/common';
 import { ethers } from 'ethers';
-import { DeckExtensionABI } from '../abis/DeckExtensionABI';
-
+import { GachaponPublicClient } from '@manifoldxyz/gachapon-client-public';
 /**
  * ManiDeck product implementation for mystery/gacha-style NFT mints.
  *
@@ -78,9 +78,6 @@ export class ManiDeckProduct implements IManiDeckProduct {
    */
   onchainData?: ManiDeckOnchainData;
 
-  // Internal state
-  private readonly _publicProvider: IPublicProvider;
-
   /**
    * Creates a new ManiDeckProduct instance.
    *
@@ -95,7 +92,7 @@ export class ManiDeckProduct implements IManiDeckProduct {
   constructor(
     instanceData: PublicInstance<ManiDeckPublicDataResponse>,
     previewData: InstancePreview,
-    publicProvider: IPublicProvider,
+    _: IPublicProvider,
   ) {
     // Validate app ID
     if (instanceData.appId !== (AppId.MANI_DECK as number)) {
@@ -119,7 +116,6 @@ export class ManiDeckProduct implements IManiDeckProduct {
     };
     this.previewData = previewData;
     this.id = instanceData.id;
-    this._publicProvider = publicProvider;
   }
 
   // =============================================================================
@@ -156,39 +152,45 @@ export class ManiDeckProduct implements IManiDeckProduct {
     if (this.onchainData && !force) {
       return this.onchainData;
     }
-
-    const contract = await this._getManiDeckContract();
     const publicData = this.data.publicData;
     const networkId = publicData.network;
 
     try {
       // Fetch on-chain data for totalMinted and tokenVariations
-      const claimData = await contract.getClaim(this._creatorContract, this.id);
-      const currency = publicData.price?.currency ? Currency.getSupportedCurrencyInfo(publicData.price.currency) : undefined;
+      const currency = publicData.price?.currency
+        ? Currency.getSupportedCurrencyInfo(publicData.price.currency)
+        : undefined;
       // Get cost from publicData.price
       let costMoney: Money;
       if (publicData.price) {
         costMoney = await Money.create({
           value: BigInt(publicData.price.value),
           networkId,
-          address: publicData.price.erc20 || currency?.erc20[networkId as unknown as Network.NetworkId].address || ethers.constants.AddressZero,
+          address:
+            publicData.price.erc20 ||
+            currency?.erc20[networkId as unknown as Network.NetworkId].address ||
+            ethers.constants.AddressZero,
           fetchUSD: true,
         });
       } else {
         costMoney = await Money.zero({ networkId });
       }
 
+      // fetch gachapon-server for total minted
+      const gachaClient = new GachaponPublicClient({
+        baseUrl: 'https://gacha.api.manifoldxyz.dev',
+      });
+      const data = await gachaClient.getInstanceStatus(this.id.toString());
       // Build on-chain data using publicData for cost, startDate, endDate
       // Note: totalSupply, startDate, endDate come from publicData; totalMinted from on-chain
       const onchainData: ManiDeckOnchainData = {
         totalSupply: publicData.totalSupply || 0,
-        totalMinted: claimData.total || 0,
+        totalMinted: data.totalMinted,
         startDate: publicData.startDate ? new Date(publicData.startDate) : undefined,
         endDate: publicData.endDate ? new Date(publicData.endDate) : undefined,
         audienceType: 'None',
         cost: costMoney,
-        tokenVariations: claimData.tokenVariations,
-        startingTokenId: claimData.startingTokenId ? claimData.startingTokenId.toString() : '0',
+        tokenVariations: publicData.pool.length,
       };
 
       // Cache the result
@@ -251,30 +253,6 @@ export class ManiDeckProduct implements IManiDeckProduct {
     };
   }
 
-  private async _getManiDeckContract() {
-    const networkId = this.data.publicData.network || 1;
-
-    // Return a wrapper object that uses publicProvider for contract reads
-    return {
-      getClaim: async (creatorContract: string, instanceId: number) => {
-        const result = await this._publicProvider.readContract<{
-          storageProtocol: number;
-          total: number;
-          startingTokenId: bigint;
-          tokenVariations: number;
-          location: string;
-        }>({
-          contractAddress: this._extensionAddress,
-          abi: DeckExtensionABI,
-          functionName: 'getClaim',
-          args: [creatorContract, instanceId],
-          networkId,
-        });
-        return result;
-      },
-    };
-  }
-
   // =============================================================================
   // PRODUCT INTERFACE IMPLEMENTATION
   // =============================================================================
@@ -288,9 +266,9 @@ export class ManiDeckProduct implements IManiDeckProduct {
     if (onchainData.endDate && now > onchainData.endDate.getTime()) {
       return 'ended';
     }
-    if (onchainData.totalSupply && onchainData.totalMinted >= onchainData.totalSupply) {
-      return 'sold-out';
-    }
+    // if (onchainData.totalSupply && onchainData.totalMinted >= onchainData.totalSupply) {
+    //   return 'sold-out';
+    // }
     return 'active';
   }
 
@@ -372,11 +350,10 @@ export class ManiDeckProduct implements IManiDeckProduct {
   // =============================================================================
 
   async getTokenVariations(): Promise<ManiDeckTokenVariation[]> {
-    const onchainData = await this.fetchOnchainData();
     const publicData = this.data.publicData;
 
     return publicData.pool.map((item) => ({
-      tokenId: parseInt(onchainData.startingTokenId) + (item.seriesIndex - 1), // seriesIndex is 1-based
+      tokenId: item.seriesIndex, // seriesIndex is 1-based
       metadata: item.metadata,
       tier: this._getTierForIndex(item.seriesIndex - 1, publicData.tierProbabilities),
       rarityScore: this._calculateRarityScore(item.seriesIndex - 1),
@@ -435,14 +412,6 @@ export class ManiDeckProduct implements IManiDeckProduct {
   private _calculateRarityScore(_index: number): number {
     // Simple rarity calculation
     return Math.floor(Math.random() * 100);
-  }
-
-  private get _creatorContract(): Address {
-    return this.data.publicData.contract.contractAddress;
-  }
-
-  private get _extensionAddress(): Address {
-    return this.data.publicData.extensionAddress1155.value;
   }
 }
 
