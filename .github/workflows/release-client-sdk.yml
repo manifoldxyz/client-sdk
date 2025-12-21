@@ -1,0 +1,65 @@
+name: Release Client SDK
+on:
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write  # Required for OIDC
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubicloud-standard-2
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      # Ensure npm 11.5.1 or later for trusted publishing
+      - run: npm install -g npm@11.5.1
+
+      - name: Install monorepo dependencies
+        run: pnpm install
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: lint
+        run: pnpm run lint
+        working-directory: ./packages/client-sdk
+
+      - name: typecheck
+        run: pnpm run typecheck
+        working-directory: ./packages/client-sdk
+
+      - name: test
+        run: pnpm run test
+        working-directory: ./packages/client-sdk
+
+      - name: build
+        run: pnpm run build
+        working-directory: ./packages/client-sdk
+
+      - name: publish to npm
+        id: publish
+        if: ${{ success() && github.event_name != 'pull_request' }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "Version: $VERSION"
+
+          if [[ "$VERSION" == *"beta"* ]]; then
+            echo "Publishing with tag 'beta'"
+            npm publish --tag beta
+          else
+            echo "Publishing with default tag (latest)"
+            npm publish
+          fi
+        working-directory: ./packages/client-sdk
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
