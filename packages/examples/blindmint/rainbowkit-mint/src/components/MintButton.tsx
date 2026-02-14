@@ -57,7 +57,6 @@ export function MintButton() {
       console.log('[Mint] Product fetched:', {
         type: product.type,
         id: product.id,
-        networkId: product.networkId,
       });
 
       // Check product status
@@ -69,9 +68,9 @@ export function MintButton() {
 
       // Check allocations / eligibility
       try {
-        const allocations = await product.getAllocations(address);
+        const allocations = await product.getAllocations({ recipientAddress: address });
         console.log('[Mint] Allocations:', {
-          eligible: allocations?.eligible,
+          isEligible: allocations?.isEligible,
           quantity: allocations?.quantity,
           raw: allocations,
         });

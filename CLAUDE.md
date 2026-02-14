@@ -129,6 +129,15 @@ The `Money` class (`src/libs/money.ts`) handles:
 - Currency conversions
 - Safe mathematical operations
 
+## Pre-Push Checklist (MANDATORY)
+
+Before pushing any code changes to git, you MUST always perform these steps in order:
+
+1. **Bump the client-sdk version** in `packages/client-sdk/package.json` (patch for fixes, minor for features)
+2. **Run `pnpm install`** from the repo root to update the lockfile
+3. **Run `pnpm build`** from the repo root to ensure everything compiles cleanly
+4. **Then push** — never push without completing steps 1-3
+
 ## Documentation Updates
 
 When making code changes to the repository, always update the external documentation in the `docs/` directory:
