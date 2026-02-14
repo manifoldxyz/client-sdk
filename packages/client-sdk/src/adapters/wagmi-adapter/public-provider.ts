@@ -4,6 +4,7 @@ import { getBalance, readContract, getPublicClient, watchContractEvent } from '@
 import { ClientSDKError, ErrorCode } from '../../types';
 import { ERC20ABI } from '../../abis';
 import type { Log } from 'viem';
+import { normalizeAbi } from '../utils/normalize-abi';
 
 /**
  * Public provider implementation for Wagmi
@@ -122,7 +123,7 @@ export class WagmiPublicProvider implements IPublicProvider {
       // Use viem's estimateContractGas from the client
       const gasEstimate = await client.estimateContractGas({
         address: contractAddress as `0x${string}`,
-        abi: abi as never,
+        abi: normalizeAbi(abi) as never,
         functionName: functionName as never,
         args: args as never,
         account: from as `0x${string}`,
@@ -152,7 +153,7 @@ export class WagmiPublicProvider implements IPublicProvider {
     try {
       const result = await readContract(this.config, {
         address: contractAddress as `0x${string}`,
-        abi: abi as never,
+        abi: normalizeAbi(abi) as never,
         functionName: functionName as never,
         args: args as never,
         chainId: networkId,
@@ -186,7 +187,7 @@ export class WagmiPublicProvider implements IPublicProvider {
 
       const unwatch = watchContractEvent(this.config, {
         address: contractAddress as `0x${string}`,
-        abi: abi as never,
+        abi: normalizeAbi(abi) as never,
         onLogs: (logs: Log[]) => {
           for (const log of logs) {
             // Check if log has enough topics and all match

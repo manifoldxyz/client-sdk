@@ -65,13 +65,11 @@ async function testEditionProduct(
         throw new Error('Is not an edition product instance')
       }
       const payload = { quantity }
-
       const prepared = await product.preparePurchase({
         userAddress: address,
         recipientAddress: recipient,
         payload,
       });
-
       const nativeTotal = prepared.cost.total.native?.formatted ?? 'n/a';
       const erc20Totals = prepared.cost.total.erc20s
         ?.map((money) => `${money.formatted} ${money.symbol}`)
