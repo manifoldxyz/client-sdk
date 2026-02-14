@@ -457,6 +457,12 @@ export class BlindMintProduct implements IBlindMintProduct {
     if (nativeCost) mintCost.native = nativeCost;
     if (erc20Costs.length > 0) mintCost.erc20s = erc20Costs;
 
+    // If there are pending approval steps, gas estimation for the mint may fail because
+    // the contract can't simulate transferFrom without an existing allowance.
+    // Use a fallback in that case — actual gas will be re-estimated at execute time
+    // after approvals have been completed.
+    const hasPendingApprovals = steps.some((s) => s.type === 'approve');
+
     const gasEstimate = await estimateGas({
       publicProvider: this._publicProvider,
       contractAddress: this._extensionAddress,
@@ -466,6 +472,7 @@ export class BlindMintProduct implements IBlindMintProduct {
       from: user,
       networkId,
       value: nativePaymentValue,
+      fallbackGas: hasPendingApprovals ? 300_000n : undefined,
     });
 
     const mintStep: TransactionStep = {

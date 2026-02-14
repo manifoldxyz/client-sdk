@@ -404,7 +404,7 @@ export class EditionProduct implements IEditionProduct {
 
               const txRequest: UniversalTransactionRequest = {
                 to: tokenAddress,
-                data: this._buildApprovalData(this._extensionAddress, totalCost.raw.toString()),
+                data: this._buildApprovalData(this._extensionAddress, totalCost.value.toString()),
                 gasLimit,
                 chainId: networkId,
               };
@@ -495,6 +495,12 @@ export class EditionProduct implements IEditionProduct {
     // Generate merkle proofs if needed for allowlist
     const { mintIndices, merkleProofs } = await this._generateMintProofs(recipient, quantity);
 
+    // If there are pending approval steps, gas estimation for the mint may fail because
+    // the contract can't simulate transferFrom without an existing allowance.
+    // Use a fallback in that case — actual gas will be re-estimated at execute time
+    // after approvals have been completed.
+    const hasPendingApprovals = steps.some((s) => s.type === 'approve');
+
     // estimate gas
     const gasEstimate = await estimateGas({
       publicProvider: this._publicProvider,
@@ -505,6 +511,7 @@ export class EditionProduct implements IEditionProduct {
       from: user,
       networkId,
       value: nativePaymentValue,
+      fallbackGas: hasPendingApprovals ? 300_000n : undefined,
     });
 
     const mintData = this._buildMintData(
