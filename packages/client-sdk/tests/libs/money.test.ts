@@ -6,7 +6,7 @@ import { ethers } from 'ethers';
 const ethData = {
   value: 1000000000000000000n,
   decimals: 18,
-  erc20: ethers.constants.AddressZero,
+  address: ethers.constants.AddressZero,
   symbol: 'ETH',
   formatted: '1.0',
   networkId: 1,
@@ -23,7 +23,7 @@ const higherEthData = {
 const usdcData = {
   value: 1000000n,
   decimals: 6,
-  erc20: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+  address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
   symbol: 'USDC',
   formatted: '1.0',
   networkId: 1,

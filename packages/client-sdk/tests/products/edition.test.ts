@@ -154,7 +154,7 @@ const createMockMoney = (value: string = '1000000000000000000', isERC20: boolean
     formatted: '1.0',
     symbol: isERC20 ? 'USDC' : 'ETH',
     decimals: isERC20 ? 6 : 18,
-    erc20: isERC20 ? (erc20Address || '0xA0b86a33E6417a7dA5B4C1D35aF7E7f2F2a0F2F2') : ethers.constants.AddressZero,
+    address: isERC20 ? (erc20Address || '0xA0b86a33E6417a7dA5B4C1D35aF7E7f2F2a0F2F2') : ethers.constants.AddressZero,
     isPositive: vi.fn().mockReturnValue(true),
     isERC20: vi.fn().mockReturnValue(isERC20),
     multiplyInt: vi.fn().mockImplementation((quantity: number) => createMockMoney((BigInt(value) * BigInt(quantity)).toString(), isERC20, erc20Address)),
@@ -197,10 +197,10 @@ describe('EditionProduct', () => {
       if (!params) {
         return createMockMoney('0', false);
       }
-      const isERC20 = params?.erc20 && params.erc20 !== ethers.constants.AddressZero;
-      const valueStr = params?.value ? 
+      const isERC20 = params?.address && params.address !== ethers.constants.AddressZero;
+      const valueStr = params?.value ?
         (typeof params.value === 'string' ? params.value : params.value.toString()) : '0';
-      return createMockMoney(valueStr, isERC20, params?.erc20);
+      return createMockMoney(valueStr, isERC20, params?.address);
     });
     vi.mocked(Money.zero).mockImplementation(async () => createMockMoney('0'));
     
@@ -330,7 +330,7 @@ describe('EditionProduct', () => {
       expect(Money.create).toHaveBeenCalledWith({
         value: 1000000000000000000n,
         networkId: 1,
-        erc20: erc20Address,
+        address: erc20Address,
         fetchUSD: true,
       });
     });
@@ -947,7 +947,7 @@ describe('EditionProduct', () => {
         preparedPurchase: preparedPurchase as any,
       });
 
-      expect(mockStepExecute).toHaveBeenCalledWith(mockAccount);
+      expect(mockStepExecute).toHaveBeenCalledWith(mockAccount, { confirmations: undefined });
       expect(order.order).toBeDefined();
       expect(order.transactionReceipt).toBeDefined();
       expect(order.order.walletAddress).toBe(walletAddress);
@@ -1031,8 +1031,8 @@ describe('EditionProduct', () => {
         preparedPurchase: preparedPurchase as any,
       });
 
-      expect(mockApprovalExecute).toHaveBeenCalledWith(mockAccount);
-      expect(mockMintExecute).toHaveBeenCalledWith(mockAccount);
+      expect(mockApprovalExecute).toHaveBeenCalledWith(mockAccount, { confirmations: undefined });
+      expect(mockMintExecute).toHaveBeenCalledWith(mockAccount, { confirmations: undefined });
       expect(order.order).toBeDefined();
       expect(order.transactionReceipt).toBeDefined();
     });
@@ -1433,7 +1433,7 @@ describe('EditionProduct', () => {
       expect(Money.create).toHaveBeenCalledWith({
         value: largeNumber,
         networkId: 1,
-        erc20: ethers.constants.AddressZero,
+        address: ethers.constants.AddressZero,
         fetchUSD: true,
       });
     });
