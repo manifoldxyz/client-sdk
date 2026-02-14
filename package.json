@@ -1,6 +1,7 @@
 {
   "name": "@manifoldxyz/monorepo",
   "private": true,
+  "packageManager": "pnpm@10.15.0",
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
