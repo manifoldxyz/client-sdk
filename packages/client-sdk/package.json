@@ -37,6 +37,10 @@
   ],
   "author": "Manifold",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/manifoldxyz/client-sdk"
+  },
   "type": "module",
   "dependencies": {
     "@manifoldxyz/js-ts-utils": "^9.0.0",
