@@ -3,6 +3,7 @@ import type { Log, PublicClient } from 'viem';
 import { getBalance, readContract } from 'viem/actions';
 import { ERC20ABI } from '../../abis';
 import { executeWithProviderFallback } from '../utils/fallback';
+import { normalizeAbi } from '../utils/normalize-abi';
 
 /**
  * Public provider implementation for viem
@@ -116,7 +117,7 @@ export class ViemPublicProvider implements IPublicProvider {
       // Use viem's estimateContractGas
       const gasEstimate = await client.estimateContractGas({
         address: contractAddress as `0x${string}`,
-        abi: abi as never,
+        abi: normalizeAbi(abi) as never,
         functionName: functionName as never,
         args: args as never,
         account: from as `0x${string}`,
@@ -139,7 +140,7 @@ export class ViemPublicProvider implements IPublicProvider {
     return this.executeWithFallback(params.networkId, async (client) => {
       const unwatch = client.watchContractEvent({
         address: contractAddress as `0x${string}`,
-        abi: abi as never,
+        abi: normalizeAbi(abi) as never,
         onLogs: (logs: Log[]) => {
           for (const log of logs) {
             // Check if log has enough topics and all match
@@ -179,7 +180,7 @@ export class ViemPublicProvider implements IPublicProvider {
       // Use viem's readContract
       const result = await readContract(client, {
         address: contractAddress as `0x${string}`,
-        abi: abi as never,
+        abi: normalizeAbi(abi) as never,
         functionName: functionName as never,
         args: args as never,
       });

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useAccount, useWalletClient } from 'wagmi';
 import { createClient, createAccountViem, createPublicProviderViem } from '@manifoldxyz/client-sdk';
 import { createPublicClient, custom, PublicClient } from 'viem';
-import { mainnet, base } from 'viem/chains';
+import { mainnet, base, sepolia } from 'viem/chains';
 
 const INSTANCE_ID = process.env.NEXT_PUBLIC_INSTANCE_ID || '4149776624';
 
@@ -37,7 +37,7 @@ export function MintButton() {
         transport: custom(window.ethereum),
       }) as PublicClient;
       providers[11155111] = createPublicClient({
-        chain: base,
+        chain: sepolia,
         transport: custom(window.ethereum),
       }) as PublicClient;
       
@@ -54,11 +54,29 @@ export function MintButton() {
       // Get product details
       setStatus('Fetching product details...');
       const product = await client.getProduct(INSTANCE_ID);
-      
+      console.log('[Mint] Product fetched:', {
+        type: product.type,
+        id: product.id,
+        networkId: product.networkId,
+      });
+
       // Check product status
       const productStatus = await product.getStatus();
+      console.log('[Mint] Product status:', productStatus);
       if (productStatus !== 'active') {
         throw new Error(`Product is ${productStatus}`);
+      }
+
+      // Check allocations / eligibility
+      try {
+        const allocations = await product.getAllocations(address);
+        console.log('[Mint] Allocations:', {
+          eligible: allocations?.eligible,
+          quantity: allocations?.quantity,
+          raw: allocations,
+        });
+      } catch (allocErr) {
+        console.log('[Mint] getAllocations not available or failed:', allocErr);
       }
 
       // Prepare purchase (simulate transaction)
@@ -70,6 +88,20 @@ export function MintButton() {
         },
         account,
       });
+      console.log('[Mint] Prepared purchase:', {
+        nativeCost: preparedPurchase.cost.total.native.formatted,
+        nativeSymbol: preparedPurchase.cost.total.native.symbol,
+        erc20Costs: preparedPurchase.cost.total.erc20s.map((c: any) => ({
+          formatted: c.formatted,
+          symbol: c.symbol,
+        })),
+        numberOfSteps: preparedPurchase.steps.length,
+        steps: preparedPurchase.steps.map((s: any, i: number) => ({
+          index: i,
+          type: s.type,
+          description: s.description,
+        })),
+      });
 
       // Display cost
       const nativeCost = preparedPurchase.cost.total.native;
@@ -78,33 +110,44 @@ export function MintButton() {
       if (nativeCost.isPositive()) {
         costParts.push(`${nativeCost.formatted} ${nativeCost.symbol}`);
       }
-      erc20Costs.forEach((cost) => {
+      erc20Costs.forEach((cost: any) => {
         costParts.push(`${cost.formatted} ${cost.symbol}`);
       });
       const costMessage = costParts.length > 0 ? costParts.join(' + ') : '0';
       setStatus(`Total cost: ${costMessage}. Confirm in wallet...`);
 
       // Execute purchase
+      console.log('[Mint] Executing purchase...');
       const receipt = await product.purchase({
         account,
         preparedPurchase,
+      });
+      console.log('[Mint] Purchase complete:', {
+        txHash: receipt.transactionReceipt.txHash,
+        order: receipt.order,
       });
 
       // Success!
       const { txHash } = receipt.transactionReceipt;
       const mintedSummary =
         receipt.order?.items
-          .map((item) => `${item.quantity}x token ${item.token.tokenId}`)
+          .map((item: any) => `${item.quantity}x token ${item.token.tokenId}`)
           .join(', ') || '';
 
       setStatus(
-        `✅ Mint successful! TX: ${txHash.slice(0, 10)}...${
+        `Mint successful! TX: ${txHash.slice(0, 10)}...${
           mintedSummary ? ` (${mintedSummary})` : ''
         }`,
       );
-      
+
     } catch (err: any) {
-      console.error('Mint error:', err.details);
+      console.error('[Mint] Error:', {
+        message: err.message,
+        code: err.code,
+        details: err.details,
+        context: err.context,
+        stack: err.stack,
+      });
       setError(err.message || 'Failed to mint');
       setStatus('');
     } finally {
