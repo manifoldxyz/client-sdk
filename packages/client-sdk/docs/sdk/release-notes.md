@@ -1,5 +1,11 @@
 # Release Notes
 
+### March 1, 2026 (0.5.0-beta.11)
+
+- **New**: Added documentation for the [Manifold AI agent skill](https://github.com/manifoldxyz/manifold-ai), which provides structured guidance for AI coding agents (Claude Code, Cursor, OpenClaw) to help developers build custom minting experiences
+- **Improvement**: Updated [Getting Started](../getting-started.md) with AI agent skill installation instructions
+- **Improvement**: Expanded [AI agents and LLMs guide](../guides/for-ai-agents-and-llms-checklist-and-guidelines.md) with skill details, installation steps, and supported use cases
+
 ### November 18, 2025 (0.5.0-beta.0)
 
 - **New**: Added `subscribeToContractEvents` method to `IPublicProvider` for subscribing to contract events

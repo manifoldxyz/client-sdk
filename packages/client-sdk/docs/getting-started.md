@@ -111,7 +111,14 @@ If you encounter installation or build errors, the most common cause is using an
 
 ### Building with AI
 
-\
-This entire site is converted into a single markdown doc that can fit inside the context window of most LLMs. See [The /llms.txt file](https://manifold-1.gitbook.io/manifold-client-sdk/llms-full.txt).
+For the best AI-assisted development experience, install the **Manifold AI agent skill** from [manifoldxyz/manifold-ai](https://github.com/manifoldxyz/manifold-ai):
+
+```bash
+npx skills add manifoldxyz/manifold-ai
+```
+
+This skill works with Claude Code, Cursor, and OpenClaw to guide you through building custom minting websites, minting bots, and SDK integrations. See the [AI agents guide](guides/for-ai-agents-and-llms-checklist-and-guidelines.md) for more details.
+
+This entire site is also converted into a single markdown doc that can fit inside the context window of most LLMs. See [The /llms.txt file](https://manifold-1.gitbook.io/manifold-client-sdk/llms-full.txt).
 
 \\

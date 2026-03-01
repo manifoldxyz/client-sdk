@@ -4,6 +4,31 @@
 
 You are an AI agent helping developers troubleshoot Manifold Client SDK. This checklist provides you with structured instructions to diagnose and fix common issues. Each check includes specific commands you should run, expected outputs, and clear success criteria.
 
+### Manifold AI Agent Skill
+
+The recommended way for AI agents to work with the Manifold Client SDK is to install the **Manifold AI agent skill** from [manifoldxyz/manifold-ai](https://github.com/manifoldxyz/manifold-ai). This skill provides structured knowledge and step-by-step instructions that help AI coding agents guide developers through building custom minting experiences.
+
+**Installation:**
+
+```bash
+# Install all skills from the repo
+npx skills add manifoldxyz/manifold-ai
+
+# Install just the minting skill
+npx skills add manifoldxyz/manifold-ai --skill manifold-nft-minting
+```
+
+**Compatible agents:** Claude Code, Cursor, OpenClaw
+
+**The skill helps with:**
+
+- **Campaign setup guidance** — Selecting the right product type (Edition or Blind Mint) and deploying through Manifold Studio
+- **Custom minting websites** — Building React/Next.js apps with wallet connectivity and complete mint flows
+- **Minting bots** — Creating headless, server-side Node.js scripts for programmatic minting
+- **SDK integration** — Adding minting capabilities to existing projects using viem, ethers v5, or wagmi
+
+The skill includes lazy-loaded reference documents covering getting started, product types, purchase flows, transaction steps, adapters, error handling, networks, and complete example implementations.
+
 ### General Guidelines
 
 As an AI agent, follow these guidelines here:
