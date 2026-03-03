@@ -9,4 +9,4 @@ Calling [getProduct](../manifold-client/getproduct.md) returns a product object 
 | data        | [InstanceData](../../reference/instancedata.md) | ✅        | Product offchain data              |
 | previewData | [PreviewData](../../reference/previewdata.md)   | ✅        | Return preview data of the product |
 
-Product instances are created based on their specific type (**Edition**, **Burn/Redeem**, or **Blind Mint**). Each specialization adds additional methods and type guards while preserving the shared core API.
+Product instances are created based on their specific type (**Edition** or **Blind Mint**). Each specialization adds additional methods and type guards while preserving the shared core API.

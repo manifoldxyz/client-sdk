@@ -9,9 +9,8 @@ import { ClientSDKError, ErrorCode } from '../types/errors';
 export class ManifoldApiClient {
   studioClient: StudioAppsClientForPublic;
 
-  constructor() {
+  constructor(baseUrl = 'https://apps.api.manifoldxyz.dev') {
     // Initialize Studio Apps Client for public access
-    const baseUrl = 'https://apps.api.manifoldxyz.dev';
     this.studioClient = new StudioAppsClientForPublic({
       baseUrl,
     });
@@ -58,7 +57,5 @@ export class ManifoldApiClient {
   }
 }
 
-/**
- * Factory function to create Manifold API client
- */
-export default new ManifoldApiClient();
+const manifoldApiClient = new ManifoldApiClient();
+export default manifoldApiClient;

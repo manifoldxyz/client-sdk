@@ -1,11 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ErrorCode } from '../src/types/errors';
 
 // Move mocks before any imports that use them
 
 vi.mock('../src/api/manifold-api', () => {
   const getCompleteInstanceDataMock = vi.fn();
+  const MockManifoldApiClient = vi.fn().mockImplementation(() => ({
+    getCompleteInstanceData: getCompleteInstanceDataMock,
+  }));
   return {
+    ManifoldApiClient: MockManifoldApiClient,
     default: {
       getCompleteInstanceData: getCompleteInstanceDataMock,
     },
@@ -139,21 +143,12 @@ describe('createClient', () => {
     });
   });
 
-  it('validates workspace limit bounds', async () => {
-    const client = createClient({ publicProvider: mockPublicProvider as any });
-
-    await expect(
-      client.getProductsByWorkspace('workspace-id', { limit: 200 }),
-    ).rejects.toMatchObject({
-      code: ErrorCode.INVALID_INPUT,
+  it('passes apiBaseUrl to API client config', async () => {
+    const { ManifoldApiClient: MockManifoldApiClient } = await import('../src/api/manifold-api');
+    createClient({
+      publicProvider: mockPublicProvider as any,
+      apiBaseUrl: 'https://apps.api.manifoldxyz.com',
     });
-  });
-
-  it('marks workspace fetch as not implemented', async () => {
-    const client = createClient({ publicProvider: mockPublicProvider as any });
-
-    await expect(client.getProductsByWorkspace('workspace-id')).rejects.toMatchObject({
-      code: ErrorCode.UNSUPPORTED_PRODUCT_TYPE,
-    });
+    expect(MockManifoldApiClient).toHaveBeenCalledWith('https://apps.api.manifoldxyz.com');
   });
 });

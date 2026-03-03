@@ -10,16 +10,24 @@
  * - 📦 Support for Edition and BlindMint products
  * - 💳 Complete purchase flow with eligibility checking
  * - 🔗 Multi-chain support (Ethereum, Base, Optimism, Shape)
- * - 🔌 Wallet agnostic (ethers v5/v6, viem)
+ * - 🔌 Wallet agnostic (ethers v5, viem, wagmi)
  * - 🛡️ Type-safe with full TypeScript support
  *
  * ## Quick Start
  *
  * ```typescript
- * import { createClient } from '@manifoldxyz/client-sdk';
+ * import { createClient, createPublicProviderViem } from '@manifoldxyz/client-sdk';
+ * import { createPublicClient, http } from 'viem';
+ * import { mainnet } from 'viem/chains';
+ *
+ * const publicClient = createPublicClient({
+ *   chain: mainnet,
+ *   transport: http(),
+ * });
+ * const publicProvider = createPublicProviderViem({ 1: publicClient });
  *
  * // Initialize client
- * const client = createClient();
+ * const client = createClient({ publicProvider });
  *
  * // Fetch product
  * const product = await client.getProduct('4150231280');
@@ -49,9 +57,9 @@
  *
  * ### Wallet Adapters
  * Unified interface for different wallet libraries:
- * - Ethers v5: `ethers5Adapter`
- * - Ethers v6: `ethers6Adapter`
- * - Viem: `viemAdapter`
+ * - Ethers v5
+ * - Viem
+ * - Wagmi (public provider)
  *
  * @see {@link https://docs.manifold.xyz/client-sdk} for more information
  * @see {@link https://studio.manifold.xyz} to create products

@@ -6,7 +6,7 @@ Simulates a purchase to check eligibility and calculate the total cost.
 
 #### Parameters
 
-<table><thead><tr><th width="182.84375">Parameter</th><th width="181.56640625">Type</th><th width="97.63671875">Required</th><th>Description</th></tr></thead><tbody><tr><td>userAddress</td><td>string</td><td>✅</td><td>The address making the purchase</td></tr><tr><td>recipientAddress</td><td>string</td><td>❌</td><td>If different than <code>address</code></td></tr><tr><td>networkId</td><td>number</td><td>❌</td><td>If specify, forced transaction on the network (handle funds bridging automatically), assume product network otherwise</td></tr><tr><td>payload</td><td>{quantity: number}</td><td>✅</td><td>Specific to Edition Products. Specify quantity of purchase</td></tr><tr><td><strong>gasBuffer</strong></td><td>object</td><td>❌</td><td>How much additional gas to spend on the purchase</td></tr><tr><td>gasBuffer.fixed</td><td>BigInt</td><td>❌</td><td>Fixed gas buffer amount</td></tr><tr><td>gasBuffer.multipller</td><td>number</td><td>❌</td><td><p>Gas buffer by multiplier. </p><p>The multiplier represents a percentage (as a number out of 100). For example:</p><ul><li>multiplier: 120 means 120% of the original estimate (20% increase)</li><li>multiplier: 150 means 150% of the original estimate (50% increase)</li></ul></td></tr><tr><td>account</td><td><a href="https://app.gitbook.com/o/FkM3zqPi1O0VypWXgiUZ/s/wX9Yl8DLygpenDBVWGPF/~/changes/1/references/account">Account</a></td><td>❌</td><td>If provided, it will perform balance checks on the specified account; otherwise, it will skip balance checks.</td></tr></tbody></table>
+<table><thead><tr><th width="182.84375">Parameter</th><th width="181.56640625">Type</th><th width="97.63671875">Required</th><th>Description</th></tr></thead><tbody><tr><td>userAddress</td><td>string</td><td>✅</td><td>The address making the purchase</td></tr><tr><td>recipientAddress</td><td>string</td><td>❌</td><td>If different than <code>address</code></td></tr><tr><td>networkId</td><td>number</td><td>❌</td><td>If specify, forced transaction on the network (handle funds bridging automatically), assume product network otherwise</td></tr><tr><td>payload</td><td>{quantity: number}</td><td>✅</td><td>Specific to Edition Products. Specify quantity of purchase</td></tr><tr><td><strong>gasBuffer</strong></td><td>object</td><td>❌</td><td>How much additional gas to spend on the purchase</td></tr><tr><td>gasBuffer.fixed</td><td>BigInt</td><td>❌</td><td>Fixed gas buffer amount</td></tr><tr><td>gasBuffer.multiplier</td><td>number</td><td>❌</td><td><p>Gas buffer by multiplier. </p><p>The multiplier represents a percentage (as a number out of 100). For example:</p><ul><li>multiplier: 120 means 120% of the original estimate (20% increase)</li><li>multiplier: 150 means 150% of the original estimate (50% increase)</li></ul></td></tr><tr><td>account</td><td><a href="../../../reference/account.md">Account</a></td><td>❌</td><td>If provided, it will perform balance checks on the specified account; otherwise, it will skip balance checks.</td></tr></tbody></table>
 
 #### Returns: [PreparedPurchase](../../../reference/preparedpurchase.md)
 
@@ -20,9 +20,16 @@ Simulates a purchase to check eligibility and calculate the total cost.
 
 #### Example
 
-<pre class="language-jsx"><code class="lang-jsx">import { createClient, type AppType } from '@manifoldxyz/client-sdk'
+<pre class="language-jsx"><code class="lang-jsx">import { createClient, createPublicProviderViem, type AppType } from '@manifoldxyz/client-sdk'
+import { createPublicClient, http } from 'viem'
+import { mainnet } from 'viem/chains'
 
-const client = createClient();
+const publicClient = createPublicClient({
+  chain: mainnet,
+  transport: http(),
+})
+const publicProvider = createPublicProviderViem({ 1: publicClient })
+const client = createClient({ publicProvider });
 
 const product = await client.getProduct('12311232')
 if (product.type !== AppType.Edition) {
@@ -43,7 +50,7 @@ try {
   return
 }
 
-console.log('Total cost:', simulation.totalCost.formatted);
+console.log('Total cost:', preparedPurchase.cost.total.formatted);
 </code></pre>
 
 [**Errors**](https://www.notion.so/Manifold-Client-SDK-Complete-Developer-Guide-2676b055ee58800abc38ccd30cdfca70?pvs=21)

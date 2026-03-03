@@ -1,4 +1,4 @@
-import type { ClientConfig, ManifoldClient, WorkspaceProductsOptions } from '../types/client';
+import type { ClientConfig, ManifoldClient } from '../types/client';
 import type {
   Product,
   InstanceData,
@@ -10,7 +10,7 @@ import { AppId } from '../types/common';
 import { BlindMintProduct } from '../products/blindmint';
 import { EditionProduct } from '../products/edition';
 import { validateInstanceId, parseManifoldUrl } from '../utils/validation';
-import manifoldApiClient from '../api/manifold-api';
+import { ManifoldApiClient } from '../api/manifold-api';
 
 /**
  * Creates a new Manifold SDK client instance for interacting with Manifold products.
@@ -27,15 +27,15 @@ import manifoldApiClient from '../api/manifold-api';
  * @example
  * ```typescript
  * // Using Ethers v5
- * import { Ethers5PublicClient } from '@manifoldxyz/client-sdk/adapters';
+ * import { createPublicProviderEthers5 } from '@manifoldxyz/client-sdk';
  * const provider = new ethers.providers.JsonRpcProvider('...');
- * const publicProvider = new Ethers5PublicClient({ provider });
+ * const publicProvider = createPublicProviderEthers5({ 1: provider });
  * const client = createClient({ publicProvider });
  *
  * // Using Viem
- * import { ViemPublicClient } from '@manifoldxyz/client-sdk/adapters';
+ * import { createPublicProviderViem } from '@manifoldxyz/client-sdk';
  * const publicClient = createPublicClient({ ... });
- * const publicProvider = new ViemPublicClient({ publicClient });
+ * const publicProvider = createPublicProviderViem({ 1: publicClient });
  * const client = createClient({ publicProvider });
  * ```
  *
@@ -43,15 +43,16 @@ import manifoldApiClient from '../api/manifold-api';
  */
 export function createClient(config: ClientConfig): ManifoldClient {
   const { publicProvider } = config;
+  const manifoldApiClient = new ManifoldApiClient(config.apiBaseUrl);
   return {
     /**
      * Fetches detailed product information from Manifold.
      *
      * This method retrieves complete product data including metadata, pricing,
-     * inventory, and configuration for Edition, Burn/Redeem, or BlindMint products.
+     * inventory, and configuration for Edition or BlindMint products.
      *
      * @param instanceIdOrUrl - Either a Manifold instance ID or a full Manifold product URL
-     * @returns A Promise that resolves to a Product object (EditionProduct, BurnRedeemProduct, or BlindMintProduct)
+     * @returns A Promise that resolves to a Product object (EditionProduct or BlindMintProduct)
      *
      * @throws {ClientSDKError} With error codes:
      * - `INVALID_INPUT` - Invalid URL format or instance ID
@@ -132,66 +133,6 @@ export function createClient(config: ClientConfig): ManifoldClient {
           { instanceId, originalError: (error as Error).message },
         );
       }
-    },
-
-    /**
-     * Fetches products from a specific Manifold workspace.
-     *
-     * Retrieves a list of products created by a workspace, with optional filtering
-     * and pagination capabilities.
-     *
-     * @param workspaceId - The workspace identifier (found in Manifold Studio)
-     * @param options - Optional query parameters for filtering and pagination
-     * @param options.limit - Number of results to return (1-100, default: 50)
-     * @param options.offset - Number of results to skip for pagination
-     * @param options.sort - Sort order: 'latest' or 'oldest' (default: 'latest')
-     * @param options.networkId - Filter by specific network ID (e.g., 1 for Ethereum, 8453 for Base)
-     * @param options.type - Filter by product type: 'edition', 'burn-redeem', or 'blind-mint'
-     *
-     * @returns A Promise that resolves to an array of Product objects
-     *
-     * @throws {ClientSDKError} With error codes:
-     * - `INVALID_INPUT` - Invalid options (e.g., limit out of range)
-     * - `NOT_FOUND` - Workspace not found
-     * - `API_ERROR` - Failed to fetch workspace products
-     *
-     * @example
-     * ```typescript
-     * // Get latest 10 products from a workspace
-     * const products = await client.getProductsByWorkspace('workspace123', {
-     *   limit: 10,
-     *   sort: 'latest'
-     * });
-     *
-     * // Get Edition products on Base network
-     * const baseEditions = await client.getProductsByWorkspace('workspace123', {
-     *   type: 'edition',
-     *   networkId: 8453
-     * });
-     *
-     * // Paginate through products
-     * const page2 = await client.getProductsByWorkspace('workspace123', {
-     *   limit: 20,
-     *   offset: 20
-     * });
-     * ```
-     *
-     * @public
-     */
-    async getProductsByWorkspace(
-      _workspaceId: string,
-      options?: WorkspaceProductsOptions,
-    ): Promise<Product[]> {
-      // Validate options
-      if (options?.limit !== undefined && (options.limit < 1 || options.limit > 100)) {
-        throw new ClientSDKError(ErrorCode.INVALID_INPUT, 'Limit must be between 1 and 100');
-      }
-
-      // TODO: Implement with Studio Apps Client
-      throw new ClientSDKError(
-        ErrorCode.UNSUPPORTED_PRODUCT_TYPE,
-        'getProductsByWorkspace is not yet implemented',
-      );
     },
   };
 }
