@@ -14,19 +14,26 @@ export interface ClientConfig {
    * @example
    * ```typescript
    * // Using Ethers v5
-   * import { Ethers5PublicClient } from '@manifoldxyz/client-sdk/adapters';
+   * import { createPublicProviderEthers5 } from '@manifoldxyz/client-sdk';
    * const provider = new ethers.providers.JsonRpcProvider('...');
-   * const publicProvider = new Ethers5PublicClient({ provider });
+   * const publicProvider = createPublicProviderEthers5({ 1: provider });
    *
    * // Using Viem
-   * import { ViemPublicClient } from '@manifoldxyz/client-sdk/adapters';
+   * import { createPublicProviderViem } from '@manifoldxyz/client-sdk';
    * const publicClient = createPublicClient({ ... });
-   * const publicProvider = new ViemPublicClient({ publicClient });
+   * const publicProvider = createPublicProviderViem({ 1: publicClient });
    *
    * const client = createClient({ publicProvider });
    * ```
    */
   publicProvider: IPublicProvider;
+
+  /**
+   * Base URL for Manifold public API calls.
+   *
+   * @defaultValue 'https://apps.api.manifoldxyz.dev'
+   */
+  apiBaseUrl?: string;
 
   /**
    * Enable debug logging for SDK operations.
@@ -62,71 +69,4 @@ export interface ManifoldClient {
    * @see {@link Product} for the returned product structure
    */
   getProduct(instanceIdOrUrl: string): Promise<Product>;
-
-  /**
-   * Fetches products from a specific Manifold workspace.
-   *
-   * @param workspaceId - The workspace identifier
-   * @param options - Optional filtering and pagination parameters
-   * @returns A Promise resolving to an array of Product objects
-   *
-   * @see {@link WorkspaceProductsOptions} for available options
-   */
-  getProductsByWorkspace(
-    workspaceId: string,
-    options?: WorkspaceProductsOptions,
-  ): Promise<Product[]>;
-}
-
-/**
- * Options for filtering and paginating workspace products.
- *
- * @public
- */
-export interface WorkspaceProductsOptions {
-  /**
-   * Maximum number of products to return.
-   *
-   * @remarks
-   * Must be between 1 and 100.
-   *
-   * @defaultValue 50
-   */
-  limit?: number;
-
-  /**
-   * Number of products to skip for pagination.
-   *
-   * @defaultValue 0
-   */
-  offset?: number;
-
-  /**
-   * Sort order for products.
-   * - 'latest': Most recently created first
-   * - 'oldest': Oldest created first
-   *
-   * @defaultValue 'latest'
-   */
-  sort?: 'latest' | 'oldest';
-
-  /**
-   * Filter products by blockchain network ID.
-   *
-   * Common network IDs:
-   * - 1: Ethereum Mainnet
-   * - 8453: Base
-   * - 10: Optimism
-   * - 360: Shape
-   * - 11155111: Sepolia (testnet)
-   */
-  networkId?: number;
-
-  /**
-   * Filter products by type.
-   * - 'edition': Standard NFT editions
-   * - 'burn-redeem': Burn tokens to receive new ones
-   * - 'blind-mint': Mystery/gacha-style mints
-   */
-  type?: 'edition' | 'burn-redeem' | 'blind-mint';
 }

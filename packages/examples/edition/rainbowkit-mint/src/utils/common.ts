@@ -21,7 +21,7 @@ export function getWagmiConfig(){
           [sepolia.id]: process.env.NEXT_PUBLIC_RPC_URL_SEPOLIA ? http(process.env.NEXT_PUBLIC_RPC_URL_SEPOLIA) : http(),
           [base.id]:  process.env.NEXT_PUBLIC_RPC_URL_BASE ? http(process.env.NEXT_PUBLIC_RPC_URL_BASE) : http(),
         },
-        ssr: true,
+        ssr: false,
     })
 }
 

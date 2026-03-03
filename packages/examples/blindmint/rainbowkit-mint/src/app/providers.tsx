@@ -22,7 +22,7 @@ const config = getDefaultConfig({
   appName: 'Manifold Mint Example',
   projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_PROJECT_ID',
   chains: [mainnet, base, optimism, arbitrum, sepolia],
-  ssr: true,
+  ssr: false,
 });
 
 const queryClient = new QueryClient();

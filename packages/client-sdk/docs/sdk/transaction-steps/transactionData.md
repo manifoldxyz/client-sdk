@@ -35,14 +35,19 @@ Custom transaction execution is useful for:
 This example from the SDK demonstrates how to extract and use `transactionData` for custom execution:
 
 ```typescript
-import { createClient, isEditionProduct } from '@manifoldxyz/client-sdk';
+import { createClient, createPublicProviderViem, isEditionProduct } from '@manifoldxyz/client-sdk';
 import { createWalletClient, createPublicClient, http, type Hex, type Address } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
 
 async function customMint() {
   // Step 1: Prepare the purchase using Manifold SDK
-  const client = createClient();
+  const manifoldPublicClient = createPublicClient({
+    chain: sepolia,
+    transport: http(),
+  });
+  const publicProvider = createPublicProviderViem({ [sepolia.id]: manifoldPublicClient });
+  const client = createClient({ publicProvider });
 
   const product = await client.getProduct('4133757168');
   if (!isEditionProduct(product)) {

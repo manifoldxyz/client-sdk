@@ -18,7 +18,7 @@
  * ### Ethers v5
  * ```typescript
  * import { ethers } from 'ethers';
- * import { createAccountEthers5 } from '@manifoldxyz/client-sdk/adapters';
+ * import { createAccountEthers5 } from '@manifoldxyz/client-sdk';
  *
  * const provider = new ethers.providers.Web3Provider(window.ethereum);
  * const signer = provider.getSigner();
@@ -28,7 +28,7 @@
  * ### Viem
  * ```typescript
  * import { createWalletClient } from 'viem';
- * import { createAccountViem } from '@manifoldxyz/client-sdk/adapters';
+ * import { createAccountViem } from '@manifoldxyz/client-sdk';
  *
  * const walletClient = createWalletClient({ ... });
  * const adapter = createAccountViem(walletClient);
@@ -37,10 +37,10 @@
  * ### Wagmi
  * ```typescript
  * import { createConfig, http } from '@wagmi/core';
- * import { createAccountWagmi } from '@manifoldxyz/client-sdk/adapters';
+ * import { createPublicProviderWagmi } from '@manifoldxyz/client-sdk';
  *
  * const config = createConfig({ ... });
- * const adapter = createAccountWagmi({ config });
+ * const publicProvider = createPublicProviderWagmi({ config });
  * ```
  */
 

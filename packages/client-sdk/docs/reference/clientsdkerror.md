@@ -2,11 +2,11 @@
 
 Base error class with typed error codes.
 
-| Field    | Type   | Required |
-| -------- | ------ | -------- |
-| code     | number | ✅        |
-| message  | string | ❌        |
-| metadata | object | ❌        |
+| Field   | Type   | Required |
+| ------- | ------ | -------- |
+| code    | string | ✅        |
+| message | string | ✅        |
+| details | object | ❌        |
 
 **Error Codes**
 
@@ -18,7 +18,7 @@ Base error class with typed error codes.
 | NOT\_FOUND            | Resource not found                                                                                                  |
 | INVALID\_INPUT        | Invalid parameters                                                                                                  |
 | MISSING\_TOKENS       | Missing required tokens to purchase                                                                                 |
-| UNSUPPORTED\_TYPE     | Unsupported product type (Only support the following types: AppType.Edition, AppType.BurnRedeem, AppType.BlindMInt) |
+| UNSUPPORTED\_TYPE     | Unsupported product type (Only support the following types: AppType.Edition, AppType.BlindMint) |
 | **Blockchain Errors** |                                                                                                                     |
 | ESTIMATION\_FAILED    | Can’t estimate gas                                                                                                  |
 | TRANSACTION\_FAILED   | Transaction reverted                                                                                                |

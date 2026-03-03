@@ -206,7 +206,6 @@ Simulates purchase to check eligibility and get total cost.
 - `networkId` (number, optional): Force transaction on specific network
 - `payload` (object, optional): Product-specific parameters
   - For Edition: `{ quantity: number, code?: string }`
-  - For BurnRedeem: `{ burnTokenIds: string[] }`
   - For BlindMint: `{ quantity: number }`
 - `gasBuffer` (object, optional): Additional gas configuration
 
