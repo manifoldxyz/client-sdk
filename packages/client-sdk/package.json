@@ -48,8 +48,8 @@
     "ethers": "^5.7.2"
   },
   "peerDependencies": {
-    "@wagmi/core": "^2.0.0",
-    "viem": "^2.0.0"
+    "@wagmi/core": ">=2.0.0",
+    "viem": ">=2.0.0"
   },
   "peerDependenciesMeta": {
     "viem": {

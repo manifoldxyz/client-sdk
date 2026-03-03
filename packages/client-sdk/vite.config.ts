@@ -17,6 +17,10 @@ export default defineConfig({
       // Mark dependencies as external so they're not bundled
       external: [
         'ethers',
+        '@wagmi/core',
+        'viem',
+        /^viem\//,
+        /^@wagmi\/core\//,
         '@manifoldxyz/manifold-provider-client',
         '@manifoldxyz/studio-apps-client-public'
       ],
