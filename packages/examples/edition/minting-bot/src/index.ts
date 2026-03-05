@@ -87,7 +87,7 @@ async function main() {
   console.log(`🎉 Mint transaction hash: ${purchaseReceipt.transactionReceipt.txHash}`);
   if (purchaseReceipt.order) {
     purchaseReceipt.order.items.forEach((item, index) => {
-      console.log(`   Item ${index + 1}: token ${item.token.tokenId} x${item.quantity} imageMedia URL: ${item.token.media.imagePreview}`);
+      console.log(`   Item ${index + 1}: token ${item.token.tokenId} x${item.quantity} imageMedia URL: ${item.token.media.image}`);
     });
   }
 }

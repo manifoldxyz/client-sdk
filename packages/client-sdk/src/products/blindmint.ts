@@ -798,11 +798,9 @@ export class BlindMintProduct implements IBlindMintProduct {
 
   async getPreviewMedia(): Promise<Media | undefined> {
     const image = this.previewData.thumbnail;
-    const imagePreview = this.previewData.thumbnail;
 
     return {
       image,
-      imagePreview,
     };
   }
 

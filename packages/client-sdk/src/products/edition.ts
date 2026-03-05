@@ -1019,16 +1019,18 @@ export class EditionProduct implements IEditionProduct {
   }
 
   async getPreviewMedia(): Promise<Media | undefined> {
-    const image = this.data.publicData.asset.image || this.previewData.thumbnail;
-    const imagePreview = this.data.publicData.asset.image_preview || this.previewData.thumbnail;
-    const animation = this.data.publicData.asset.animation;
-    const animationPreview = this.data.publicData.asset.animation_preview;
+    const asset = this.data.publicData.asset;
+
+    const image = asset.image_preview || this.previewData.thumbnail || asset.image;
+    const animation = asset.animation_preview || asset.animation;
+    const originalImage = asset.image;
+    const originalAnimation = asset.animation;
 
     return {
       image,
-      imagePreview,
       animation,
-      animationPreview,
+      originalImage,
+      originalAnimation,
     };
   }
 
@@ -1230,15 +1232,15 @@ export class EditionProduct implements IEditionProduct {
 
   private _getTokenMedia(): Media {
     const asset = this.data.publicData.asset;
-    const fallbackImage =
+    const originalImage =
       asset.image || asset.image_url || this.previewData.thumbnail || asset.animation || '';
-    const fallbackPreview = asset.image_preview || this.previewData.thumbnail || fallbackImage;
+    const image = asset.image_preview || this.previewData.thumbnail || originalImage;
 
     return {
-      image: fallbackImage,
-      imagePreview: fallbackPreview,
-      animation: asset.animation,
-      animationPreview: asset.animation_preview,
+      image,
+      animation: asset.animation_preview || asset.animation,
+      originalImage,
+      originalAnimation: asset.animation,
     };
   }
 

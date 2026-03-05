@@ -386,7 +386,7 @@ async function handleMintExecution(
       tokens:
         order.order?.items?.map((item) => ({
           tokenId: item.token.tokenId,
-          imageUrl: item.token.media.imagePreview,
+          imageUrl: item.token.media.image,
           quantity: item.quantity,
           contractAddress: item.token.contract.contractAddress,
           explorerUrl: item.token.explorerUrl?.etherscanUrl,
