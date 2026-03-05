@@ -1,5 +1,12 @@
 # Release Notes
 
+### March 5, 2026 (1.0.0)
+
+- **Breaking Change**: Simplified `Media` interface — removed `imagePreview` and `animationPreview` fields
+- **Change**: `image` now returns the optimized preview (`image_preview || thumbnail`), falling back to the original image
+- **Change**: `animation` now returns the optimized preview (`animation_preview`), falling back to the original animation
+- **New**: Added `originalImage` and `originalAnimation` fields to `Media` for access to full-resolution originals
+
 ### November 18, 2025 (0.5.0-beta.0)
 
 - **New**: Added `subscribeToContractEvents` method to `IPublicProvider` for subscribing to contract events

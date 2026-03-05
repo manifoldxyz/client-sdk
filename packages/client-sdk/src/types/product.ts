@@ -105,24 +105,24 @@ export interface Asset {
  */
 export interface Media {
   /**
-   * Full resolution image URL.
+   * Optimized preview image URL (image_preview or thumbnail, falling back to original image).
    */
   image?: string;
 
   /**
-   * Thumbnail/preview image URL.
-   */
-  imagePreview?: string;
-
-  /**
-   * Animation/video URL (if applicable).
+   * Optimized preview animation URL (animation_preview, falling back to original animation).
    */
   animation?: string;
 
   /**
-   * Animation preview URL.
+   * Original full-resolution image URL.
    */
-  animationPreview?: string;
+  originalImage?: string;
+
+  /**
+   * Original full-resolution animation URL.
+   */
+  originalAnimation?: string;
 }
 
 export interface ManifoldContract {

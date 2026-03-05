@@ -179,8 +179,9 @@ const product = await client.getProduct(instanceId);
 
 // Off-chain media and metadata (safe to render immediately)
 const { asset, title, contract } = product.data.publicData;
-const imageUrl = asset.image ?? asset.imagePreview;
-const animationUrl = asset.animation ?? asset.animationPreview;
+const media = await product.getPreviewMedia();
+const imageUrl = media?.image;
+const animationUrl = media?.animation;
 
 // Fetch on-chain data once (cost, supply, timing)
 const onchainData = await product.fetchOnchainData();

@@ -1220,9 +1220,9 @@ describe('EditionProduct', () => {
 
         expect(media).toEqual({
           image: 'https://example.com/thumbnail.jpg',
-          imagePreview: 'https://example.com/thumbnail.jpg',
-          animation: undefined,
-          animationPreview: 'https://example.com/animation.mp4',
+          animation: 'https://example.com/animation.mp4',
+          originalImage: undefined,
+          originalAnimation: undefined,
         });
       });
 
@@ -1232,9 +1232,9 @@ describe('EditionProduct', () => {
 
         expect(media).toEqual({
           image: undefined,
-          imagePreview: undefined, 
           animation: undefined,
-          animationPreview: undefined,
+          originalImage: undefined,
+          originalAnimation: undefined,
         });
       });
     });

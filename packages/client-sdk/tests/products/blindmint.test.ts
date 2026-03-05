@@ -135,7 +135,6 @@ describe('BlindMintProduct', () => {
     const product = createProduct();
     await expect(product.getPreviewMedia()).resolves.toEqual({
       image: basePreviewData.thumbnail,
-      imagePreview: basePreviewData.thumbnail,
     });
   });
 
