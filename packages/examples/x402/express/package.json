@@ -24,7 +24,7 @@
     "@coinbase/x402": "^0.7.1",
     "@manifoldxyz/client-sdk": "workspace:*",
     "@reservoir0x/relay-sdk": "^2.4.0",
-    "axios": "^1.13.2",
+    "axios": "1.14.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
