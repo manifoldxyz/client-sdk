@@ -166,3 +166,6 @@ When code changes are made:
 - [ ] Updated method signatures and parameters
 - [ ] Added documentation for new features/methods
 - [ ] Removed documentation for deprecated features
+
+### HARD RULE
+- NEVER edit pnpm-workspace.yaml, the file is reserved for human to edit

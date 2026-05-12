@@ -213,3 +213,6 @@ We take all security reports seriously and will respond promptly to address the 
 - **Documentation**: [Manifold Client SDK Docs](https://manifold-1.gitbook.io/manifold-client-sdk)
 - **Help Center**: [Manifold Help](https://help.manifold.xyz/)
 - **Issues**: [GitHub Issues](https://github.com/manifoldxyz/client-sdk/issues)
+
+### HARD RULE
+- NEVER edit pnpm-workspace.yaml, the file is reserved for human to edit
